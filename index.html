@@ -10,7 +10,7 @@
 	<!-- Primary Meta Tags -->
 	<title>Caption.Ninja</title>
 	<meta name="title" content="Caption.Ninja" />
-	<meta name="description" content="Bring live video from your smartphone, computer, or friends directly into OBS Studio. 100% free." />
+	<meta name="description" content="This is a free-to-use captioning tool for OBS. Speech-to-text done using Machine Learning" />
 	<meta name="author" content="Steve Seguin" />
 	
 	<style>
@@ -65,6 +65,7 @@
 	<br /><br />
 	If you wish to save the translations, just select-all when done (CTRL+A), copy the selected text(CTRL+C), pasting it into text editor (CTRL+V).
 	<br /><br />
+	Experimental: <a href="https://cloud.google.com/speech-to-text/docs/languages" target="_blank">Language Codes</a><br /><br />
 	</span></font>
 	<br /><br />
 	</div>
@@ -127,6 +128,16 @@
 		updateURL("room="+roomID);
 	}
 	
+	var myLang = "en-US";
+	if (urlParams.has("lang")){
+		myLang = urlParams.get("lang");
+	} else {
+		updateURL("lang="+myLang);
+	}
+	
+	console.log("Language: "+myLang);
+		
+				
 	var counter=0;
 	var url = document.URL.substr(0,document.URL.lastIndexOf('/'));
 	
@@ -151,16 +162,21 @@
 	
 	var final_transcript = '';
 	var interim_transcript = "";
-	var recognition;
 	var idle = null;
 	setup();
 	function setup(){
 		if ('webkitSpeechRecognition' in window){
 			var recognition = new webkitSpeechRecognition();
-				recognition.continuous = true;
-				recognition.interimResults = true;
-				recognition.onstart = function(){
+			if (myLang){
+				recognition.lang = myLang;
+			}
+			recognition.continuous = true;
+			recognition.interimResults = true;
+			
+			
+			recognition.onstart = function(){
 				console.log("started transcription");
+				
 			};
 			recognition.onerror = function(event){
 				console.log(event);
@@ -228,7 +244,7 @@
 				
 			};
 			
-			recognition.lang = 'en-US';
+			//recognition.lang = 'en-US';
 			recognition.start();
 		}
 	}
