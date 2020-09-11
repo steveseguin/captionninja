@@ -1,15 +1,15 @@
 # CAPTION.Ninja
 
-THIS IS A FREE-TO-USE CAPTIONING TOOL.
+This is a free-to-use captioning tool.
 
-THE OUTPUT OF THIS APP IS MIRRORED HERE: HTTPS://CAPTION.NINJA/OVERLAY?ROOM={SOMEROMONAME}. ADD IT TO OBS AS A BROWSER SOURCE OVERLAY IF WISHING TO USE IT FOR A LIVE STREAM.
+The output of this app is mirrored here: https://caption.ninja/overlay?room={someromoname}. Add it to obs as a browser source overlay if wishing to use it for a live stream.
 
-TO USE THIS APP, ACCEPT THE MICROPHONE PERMISSIONS ON PAGE LOAD AND THEN JUST SAY SOMETHING OUTLOUD.
+To use this app, accept the microphone permissions on page load and then just say something outloud.
 
-PLEASE NOTE THAT THIS APP USES YOUR DEFAULT MICROPHONE AS THE AUDIO INPUT SOURCE. YOU CAN'T CHANGE THE DEFAULT AUDIO SOURCE FROM WITHIN THE APP, BUT YOU CAN CHANGE IT AT YOUR SYSTEM LEVEL BY CHANGING THE DEFAULT RECORDING DEVICE. YOU CAN ALSO CHANGE AUDIO SOURCES BY USING A VIRTUAL AUDIO CABLE, SUCH AS THIS ONE. USING IT, IT BECOMES POSSIBLE TO SELECT OTHER SOURCES, INCLUDING MICROPHONES, SPEAKERS, AND OTHER APPLICATIONS.
+Please note that this app uses your default microphone as the audio input source. You can't change the default audio source from within the app, but you can change it at your system level by changing the default recording device. You can also change audio sources by using a virtual audio cable, such as this one. Using it, it becomes possible to select other sources, including microphones, speakers, and other applications.
 
-USING GOOGLE CHROME IS STRONGLY RECOMMENDED FOR BEST RESULTS.
+Using Google Chrome is strongly recommended for best results.
 
-IF YOU WISH TO SAVE THE TRANSLATIONS, JUST SELECT-ALL WHEN DONE (CTRL+A), COPY THE SELECTED TEXT(CTRL+C), PASTING IT INTO TEXT EDITOR (CTRL+V).
+If you wish to save the translations, just select-all when done (ctrl+a), copy the selected text(ctrl+c), pasting it into text editor (ctrl+v).
 
-EXPERIMENTAL: LANGUAGE CODES OPTIONS AVAILALBE; default is &lang=en-US
+Experimental: language codes options available; default is &lang=en-US
