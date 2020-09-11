@@ -13,3 +13,5 @@ Using Google Chrome is strongly recommended for best results.
 If you wish to save the translations, just select-all when done (ctrl+a), copy the selected text(ctrl+c), pasting it into text editor (ctrl+v).
 
 Experimental: language codes options available; default is &lang=en-US
+
+I am not responsible if this app fails to work or whatever else. it is provided as-is without warranty or support.
