@@ -14,4 +14,4 @@ If you wish to save the translations, just select-all when done (ctrl+a), copy t
 
 Experimental: language codes options available; default is &lang=en-US
 
-I am not responsible if this app fails to work or whatever else. it is provided as-is without warranty or support.
+I am not responsible if this app fails to work or whatever else. It is provided as-is without warranty or support. I do not take responsibility for any liability.
