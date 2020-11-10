@@ -48,6 +48,10 @@
 			margin:0;
 		}
 		
+		a {
+			text-transform: none;
+		}
+		
 	</style>
 </head>
 <body>
@@ -80,6 +84,8 @@
 	
 	if (urlParams.has("room")){
 		roomID = urlParams.get("room");
+	} else if (urlParams.has("ROOM")){
+		roomID = urlParams.get("ROOM");
 	} else {
 		window.location.href = "./speechin";
 	}

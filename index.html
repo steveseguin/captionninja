@@ -48,9 +48,10 @@
 			margin:0;
 		}
 		
-		a{
+		a {
 			color:white;
 			font-size:1.2em;
+			text-transform: none;
 		}
 	</style>
 </head>
@@ -76,8 +77,8 @@
 	<script>
 	
 	function updateURL(param, force=false) {
-		var para = param.split('=')[0];
-		if (!(urlParams.has(para)) || (force)){
+		var para = param.split('='); 
+		if (!(urlParams.has(para[0].toLowerCase()))){
 			if (history.pushState){
 				
 				var arr = window.location.href.split('?');
@@ -89,6 +90,17 @@
 				}
 				
 				window.history.pushState({path:newurl},'',newurl);
+			}
+		} else if (force){
+			if (history.pushState){
+				var href = new URL(window.location.href);
+				if (para.length==1){
+					href.searchParams.set(para[0].toLowerCase(), "");
+				} else {
+					href.searchParams.set(para[0].toLowerCase(), para[1]);
+				}
+				log(href.toString());
+				window.history.pushState({path:href.toString()},'',href.toString());
 			}
 		}
 	}
@@ -126,6 +138,8 @@
 	
 	if (urlParams.has("room")){
 		roomID = urlParams.get("room");
+	} else if (urlParams.has("ROOM")){
+		roomID = urlParams.get("ROOM");
 	} else {
 		roomID = generateStreamID();
 		updateURL("room="+roomID);
