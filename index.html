@@ -63,7 +63,7 @@
 	<br /><br />
 	To use this app, accept the microphone permissions on page load and then just say something outloud.
 	<br /><br />
-	Please note that this app uses your default microphone as the audio input source. You can't change the default audio source from within the app, but  you can change it at your system level by changing the default recording device. You can also change audio sources by using a Virtual Audio Cable, <a href='https://www.vb-audio.com/Cable/'> such as this one.</a> Using it, it becomes possible to select other sources, including microphones, speakers, and other applications.
+	Please note that this app uses your default microphone as the audio input source. You sometimes can change the default audio source via the browser's setting, but you can also change it at your system level by changing the default recording device. You can also change audio sources by using a Virtual Audio Cable, <a href='https://www.vb-audio.com/Cable/'> such as this one.</a> Using it, it becomes possible to select other sources, including microphones, speakers, and other applications.
 	<br /><br />
 	Using Google Chrome is strongly recommended for best results.
 	<br /><br />
@@ -167,7 +167,16 @@
       /* clipboard write failed */
     });
 
+	var apiKey = false;
 	var socket = new WebSocket("wss://api.action.wtf:666");
+	if (urlParams.has("pie")){
+		
+		var apiKey = urlParams.get("pie") || "ZCu96UFf9ezeQeClK7BOCkq6Q0x0lxWAPJcgxjz5";  // get an API key from https://www.piesocket.com/ for a free API server of your own
+		socket = new WebSocket("wss://us-nyc-1.websocket.me/v3/"+roomID+"?api_key="+apiKey);
+		
+		document.getElementById("shareLink").href= url+"/overlay?room="+roomID+"&pie="+apiKey;
+		document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID+"&pie="+apiKey;
+	} 
 		
 	socket.onclose = function (){
 		setTimeout(function(){window.location.reload(true);},100);
