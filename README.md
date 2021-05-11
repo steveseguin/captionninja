@@ -14,4 +14,7 @@ If you wish to save the translations, just select-all when done (ctrl+a), copy t
 
 Experimental: language codes options available; default is &lang=en-US
 
+You can sign up at https://www.piesocket.com/ for a free account if you wish to use your own API server for transferring data. You can use the API key given to specify that via the URL in Caption.Ninja, such as:
+`https://caption.ninja/?room=XLk5tqU&pie=ZCu96UFf9ezeQeClK7BOCkq6Q0x0lxWAPJcgxjz5`
+
 I am not responsible if this app fails to work or whatever else. It is provided as-is without warranty or support. I do not take responsibility for any liability.
