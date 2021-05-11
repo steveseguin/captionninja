@@ -37,7 +37,7 @@
 			font-size: 3.2em;
 			line-height: 1.1em;
 			letter-spacing: 0.0em;
-			text-transform: uppercase;
+			
 			padding: 0em;
 			text-shadow: 0.05em 0.05em 0px rgba(0,0,0,1);
 		}
@@ -90,6 +90,10 @@
 		window.location.href = "./speechin";
 	}
 	
+	var clearOnNew = false;
+	if (urlParams.has("clear")){
+		clearOnNew = true;
+	}
 	
 	//var counter=0;
 	var idle = null;
@@ -115,17 +119,24 @@
 				if ("interm" in data){
 					document.getElementById("interm").innerHTML=data.interm;
 				} else {
-					document.getElementById("output").innerHTML+=data.final;
+					if (clearOnNew){
+						document.getElementById("output").innerHTML=data.final;
+					} else {
+						document.getElementById("output").innerHTML+=data.final;
+					}
 					document.getElementById("interm").innerHTML="";
 					
 				}
-				if (idle){
-					clearInterval(idle);
+				
+				if (!clearOnNew){
+					if (idle){
+						clearInterval(idle);
+					}
+					idle = setTimeout(function(){
+						document.getElementById("output").innerHTML="";
+						document.getElementById("interm").innerHTML="";
+					},5000);
 				}
-				idle = setTimeout(function(){
-					document.getElementById("output").innerHTML="";
-					document.getElementById("interm").innerHTML="";
-				},5000);
 			//}
 		}
 	});

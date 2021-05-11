@@ -1,0 +1,214 @@
+<html>
+<head>
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+	<meta content="utf-8" http-equiv="encoding" />
+	<meta name="copyright" content="&copy; 2020 Steve Seguin" />
+	<link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon" />
+	<!-- Primary Meta Tags -->
+	<title>CAPTION.Ninja</title>
+	<meta name="title" content="CAPTION.Ninja" />
+	<meta name="description" content="This is a free-to-use captioning tool for OBS. Speech-to-text is done using Machine Learning" />
+	<meta name="author" content="Steve Seguin" />
+	
+	<style>
+		@font-face {
+		  font-family: 'Cousine';
+		  src: url('fonts/Cousine-Bold.ttf') format('truetype');
+		}
+	
+		body {
+			margin:0;
+			padding:0 10px;
+			height:100%;
+			border: 0;
+			display: flex;
+			flex-direction: column-reverse;
+			position:absolute;
+			bottom:0;
+			overflow:hidden;
+			width: 100%;
+		}
+
+		.output {
+			margin:0;
+			color: black;
+			font-family: Cousine, monospace;
+			font-size: 3.2em;
+			line-height: 1.1em;
+			letter-spacing: 0.0em;
+			text-transform: uppercase;
+			padding: 0em;
+		}
+		
+		.output span { 
+			padding: 8px 8px 0px 8px;
+			margin:0;
+			display: block;
+		}
+		
+		#interm {
+			color:blue;
+			margin:5px;
+		}
+		
+		a {
+			color:blue;
+			font-size:1.2em;
+			text-transform: none;
+		}
+		
+		input {
+			width: 100%;
+		
+			padding: 20px;
+			margin: 10px 0;
+			font-size: 2em;
+		}
+	</style>
+</head>
+<body>
+	<input type="textarea" id="userinput" />
+	<div id="interm" class="output">
+		<font style='color:black;font-size:60%;line-height: 1.4em;' ><div >This is a free-to-use captioning tool.</div></font><font style='color:black;font-size:30%;line-height: 1.4em;' >
+		<div ><br /><br />
+			The output of this app is mirrored here: <a id="shareLink" href="overlay.html" target='_blank'>*ERROR GENERATING LINK*</a>. Add it to OBS as a browser source overlay if wishing to use it for a live stream.
+		</div></font>
+		<br /><br />
+	</div>
+	<div id="output" class="output"></div>
+	
+	<script>
+	
+	function updateURL(param, force=false) {
+		var para = param.split('='); 
+		if (!(urlParams.has(para[0].toLowerCase()))){
+			if (history.pushState){
+				
+				var arr = window.location.href.split('?');
+				var newurl;
+				if (arr.length > 1 && arr[1] !== '') {
+					newurl = window.location.href + '&' +param;
+				} else {
+					newurl = window.location.href + '?' +param;
+				}
+				
+				window.history.pushState({path:newurl},'',newurl);
+			}
+		} else if (force){
+			if (history.pushState){
+				var href = new URL(window.location.href);
+				if (para.length==1){
+					href.searchParams.set(para[0].toLowerCase(), "");
+				} else {
+					href.searchParams.set(para[0].toLowerCase(), para[1]);
+				}
+				log(href.toString());
+				window.history.pushState({path:href.toString()},'',href.toString());
+			}
+		}
+	}
+
+	
+	(function (w) {
+		w.URLSearchParams = w.URLSearchParams || function (searchString) {
+			var self = this;
+			self.searchString = searchString;
+			self.get = function (name) {
+				var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(self.searchString);
+				if (results == null) {
+					return null;
+				}
+				else {
+					return decodeURI(results[1]) || 0;
+				}
+			};
+		};
+
+	})(window);
+	var urlParams = new URLSearchParams(window.location.search);
+	
+	
+	function generateStreamID(){
+		var text = "";
+		var possible = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+		for (var i = 0; i < 7; i++){
+			text += possible.charAt(Math.floor(Math.random() * possible.length));
+		}
+		return text;
+	};
+	
+	var roomID = "test";
+	
+	if (urlParams.has("room")){
+		roomID = urlParams.get("room");
+	} else if (urlParams.has("ROOM")){
+		roomID = urlParams.get("ROOM");
+	} else {
+		roomID = generateStreamID();
+		updateURL("room="+roomID);
+	}
+	
+	
+	var counter=0;
+	var url = document.URL.substr(0,document.URL.lastIndexOf('/'));
+	
+	document.getElementById("shareLink").href= url+"/overlay?room="+roomID;
+	document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID;
+
+	navigator.clipboard.writeText(url+"/textout?room="+roomID).then(() => {
+      /* clipboard successfully set */
+    }, () => {
+      /* clipboard write failed */
+    });
+
+	var socket = new WebSocket("wss://api.action.wtf:666");
+		
+	socket.onclose = function (){
+		setTimeout(function(){window.location.reload(true);},100);
+	};
+	
+	socket.onopen = function (){
+		socket.send(JSON.stringify({"join":roomID}));
+	}
+	
+	
+	function interResults(){
+		counter+=1;
+		var interim_transcript = document.getElementById("userinput").value;
+		document.getElementById("interm").innerHTML = interim_transcript;
+		try {
+			socket.send(JSON.stringify({"msg":true, "interm":"<span>"+interim_transcript+"</span><br />", "id":counter}));
+		} catch(e){
+			interim_transcript="";
+		}
+	}
+		
+	function finalResults(){
+		counter+=1;
+		var final_transcript = document.getElementById("userinput").value;
+		try {
+			if (final_transcript==""){
+				socket.send(JSON.stringify({"msg":true, "final":"<br />", "id":counter}));
+			} else {
+				socket.send(JSON.stringify({"msg":true, "final":"<span>"+final_transcript+"</span><br />", "id":counter}));
+			}
+		} catch(e){
+			final_transcript="";
+		}
+		document.getElementById("output").innerHTML+="<span>"+final_transcript+"</span>";
+		document.getElementById("interm").innerHTML="";
+		document.getElementById("userinput").value = "";
+	}
+				
+	document.getElementById("userinput").addEventListener("keyup", function(event) {
+		if (event.code === 'Enter') {
+			finalResults();
+		} else {
+			interResults();
+		}
+	});
+	
+	</script>
+	</body>
+</html>
