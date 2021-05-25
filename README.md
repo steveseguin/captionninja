@@ -19,7 +19,7 @@ If you wish to save the translations, just select-all when done (ctrl+a), copy t
 
 Add it to OBS, VMix or other studio software as a browser source overlay if wishing to use it for a live stream. It also works with the Electron Capture app, which can allow you to pin the app on-top of other apps on your desktop with ease. https://github.com/steveseguin/electroncapture
 
-### Language Codes
+### Language codes
 Language codes options available; default is `&lang=en-US`.  Just change the en-ES to a language code of your choosing.  A list of codes is here: https://cloud.google.com/speech-to-text/docs/languages
 
 ### Self-hosting
