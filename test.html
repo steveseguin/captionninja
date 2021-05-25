@@ -1,4 +1,5 @@
 <html>
+	
 <head>
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
@@ -37,7 +38,7 @@
 			font-size: 3.2em;
 			line-height: 1.1em;
 			letter-spacing: 0.0em;
-			
+			text-transform: uppercase;
 			padding: 0em;
 			text-shadow: 0.05em 0.05em 0px rgba(0,0,0,1);
 		}
@@ -48,24 +49,9 @@
 			margin:0;
 		}
 		
-		a {
+		a{
 			color:white;
 			font-size:1.2em;
-			text-transform: none;
-		}
-		
-		.github {
-			background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAAAXNSR0IArs4c6QAAAd5JREFUOE+d1MurjlEUBvDfIZQZShEGmMhQiZGZlAlyK4eEAZHcyiVRyq1cUq5FwsD1MJGJiT/AzEzRcR8xMnGOW89pv9q9fScfe/J977o8e61nP2v16HzGYBWWYA4mlbBPeI5HuI9v7fSeDnircRqTh7msMX/ALtyr42rAEbiAzX8BaruTsx0/46gBL/0HWAMe0G01YNq8Xbz5PYuN2ISvCHc5oWEsruA69mJF8a0Mr6kwD/C64mw3zpSgCfjc6nE8vhRbAE+U/+8xI4DrcKNKOol9XfJ4CimgOb0BfIilxfIds/GyS8BZeIGRJf5BAN9gWjE8xcIuwZqwZ1hQPvoDOIBRxRCiN/wj4C30lpyBNmAmYNk/Aj7G4pIz2G75I6Y2Iu0CONwlZ2Ldcl+rqmjvWhdgCdmCi1Xs0KOsxc3C5WDhcw8uI9+dzugyVZFNw3/i1jTCfoVIJmo/VDiJeJ9gPX4U1CRHs4swrnXTO8xsZjlAd9GP+WU1zcPxckGde7WMZbvy5eirl8N5bMUxHMSvYdo9igMt3znsiK29vuLI1ojYU+2dwmWdnwv3V4YskozfUAGdFmzaz4KdgiM43KomNGTW32JnGd0/IZ0A48wrhpPMdFZ+feZievjqpILf7lRg3csIRqAAAAAASUVORK5CYII=");
-			background-color: #FFF !important;
-			width: 4px;
-			height: 12px;
-			background-repeat: no-repeat;
-			display: inline-block;
-			top: 2px;
-			position: relative;
-			left: 2px;
-			filter: invert(100%);
-			-webkit-filter: invert(100%);
 		}
 	</style>
 </head>
@@ -77,19 +63,22 @@
 	<br /><br />
 	To use this app, accept the microphone permissions on page load and then just say something outloud.
 	<br /><br />
-	Please note that this app uses your default microphone as the audio input source. You sometimes can change the default audio source via the browser's setting, but you can also change it at your system level by changing the default recording device. You can also change audio sources by using a Virtual Audio Cable, <a href='https://www.vb-audio.com/Cable/'> such as this one.</a> Using it, it becomes possible to select other sources, including microphones, speakers, and other applications.
+	Please note that this app uses your default microphone as the audio input source. You can't change the default audio source from within the app, but  you can change it at your system level by changing the default recording device. You can also change audio sources by using a Virtual Audio Cable, <a href='https://www.vb-audio.com/Cable/'> such as this one.</a> Using it, it becomes possible to select other sources, including microphones, speakers, and other applications.
 	<br /><br />
 	Using Google Chrome is strongly recommended for best results.
 	<br /><br />
 	If you wish to save the translations, just select-all when done (CTRL+A), copy the selected text(CTRL+C), pasting it into text editor (CTRL+V).
 	<br /><br />
-	Update URL to change the <a href="https://cloud.google.com/speech-to-text/docs/languages" target="_blank">Language; Codes here</a><br /><br />
-	More options and details <a href='https://github.com/steveseguin/captionninja'>on Github <span class="github"></span></a></span></font><br /><br /></div><div id="output" class="output"></div>
+	Experimental: <a href="https://cloud.google.com/speech-to-text/docs/languages" target="_blank">Language Codes</a><br /><br />
+	</span></font>
+	<br /><br />
+	</div>
+	<div id="output" class="output"></div>
 	<script>
 	
 	function updateURL(param, force=false) {
-		var para = param.split('='); 
-		if (!(urlParams.has(para[0].toLowerCase()))){
+		var para = param.split('=')[0];
+		if (!(urlParams.has(para)) || (force)){
 			if (history.pushState){
 				
 				var arr = window.location.href.split('?');
@@ -101,17 +90,6 @@
 				}
 				
 				window.history.pushState({path:newurl},'',newurl);
-			}
-		} else if (force){
-			if (history.pushState){
-				var href = new URL(window.location.href);
-				if (para.length==1){
-					href.searchParams.set(para[0].toLowerCase(), "");
-				} else {
-					href.searchParams.set(para[0].toLowerCase(), para[1]);
-				}
-				log(href.toString());
-				window.history.pushState({path:href.toString()},'',href.toString());
 			}
 		}
 	}
@@ -149,8 +127,6 @@
 	
 	if (urlParams.has("room")){
 		roomID = urlParams.get("room");
-	} else if (urlParams.has("ROOM")){
-		roomID = urlParams.get("ROOM");
 	} else {
 		roomID = generateStreamID();
 		updateURL("room="+roomID);
@@ -178,16 +154,7 @@
       /* clipboard write failed */
     });
 
-	var apiKey = false;
 	var socket = new WebSocket("wss://api.action.wtf:666");
-	if (urlParams.has("pie")){
-		
-		var apiKey = urlParams.get("pie") || "ZCu96UFf9ezeQeClK7BOCkq6Q0x0lxWAPJcgxjz5";  // get an API key from https://www.piesocket.com/ for a free API server of your own
-		socket = new WebSocket("wss://us-nyc-1.websocket.me/v3/"+roomID+"?api_key="+apiKey);
-		
-		document.getElementById("shareLink").href= url+"/overlay?room="+roomID+"&pie="+apiKey;
-		document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID+"&pie="+apiKey;
-	} 
 		
 	socket.onclose = function (){
 		setTimeout(function(){window.location.reload(true);},100);
@@ -241,8 +208,8 @@
 					}
 				}
 				
-				//final_transcript = final_transcript.toUpperCase();
-				//interim_transcript = interim_transcript.toUpperCase();
+				final_transcript = final_transcript.toUpperCase();
+				interim_transcript = interim_transcript.toUpperCase();
 				
 				if (final_transcript){
 					console.log("FINAL:", final_transcript);
