@@ -19,6 +19,25 @@ If you wish to save the translations, just select-all when done (ctrl+a), copy t
 
 Add it to OBS, VMix or other studio software as a browser source overlay if wishing to use it for a live stream. It also works with the Electron Capture app, which can allow you to pin the app on-top of other apps on your desktop with ease. https://github.com/steveseguin/electroncapture
 
+### Changing the font-size and more
+If wishing to change the CSS, you can self-host JUST the overlay.html file, modify it, and load that into your browser. You can still use the main website for capture, and just have different variations of the overlay.html file locally.  
+
+If using OBS, you can also just load output into that, and change the CSS style via the browser-source style-sheet section.   You can just change the following, to be whatever you want, and use that as the CSS in OBS browser source.
+
+```
+.output {
+    margin: 0;
+    background-color: #0000;
+    color: white;
+    font-family: Cousine, monospace;
+    font-size: 3.2em;
+    line-height: 1.1em;
+    letter-spacing: 0.0em;
+    padding: 0em;
+    text-shadow: 0.05em 0.05em 0px rgb(0 0 0);
+}
+```
+
 ### Language codes
 Language codes options available; default is `&lang=en-US`.  Just change the en-ES to a language code of your choosing.  A list of codes is here: https://cloud.google.com/speech-to-text/docs/languages
 
