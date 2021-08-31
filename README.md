@@ -14,7 +14,7 @@ Please note that this app uses your default microphone as the audio input source
 
 Using Google Chrome is strongly recommended for best results.
 
-If you wish to save the translations, just select-all when done (ctrl+a), copy the selected text(ctrl+c), pasting it into text editor (ctrl+v).
+If you wish to save the transcriptions, just select-all when done (ctrl+a), copy the selected text(ctrl+c), pasting it into text editor (ctrl+v).
 
 ### Studio integration
 
@@ -42,15 +42,23 @@ If using OBS, you can also just load output into that, and change the CSS style 
 ### Language codes
 Language codes options available; default is `&lang=en-US`.  Just change the en-ES to a language code of your choosing.  A list of codes is here: https://cloud.google.com/speech-to-text/docs/languages
 
+### Translation from Language A to Language B in real-time
+
+There is an option for converting from the input langauge to another language, but it is experimental. While it works, it's a bit slow, prone to errors, and it may get even slower over time. Pull-requests that might improvement it are welcomed.
+
+To access the translation-enabled version, see this file: https://caption.ninja/translate. At the top bar (the google translate bar), select the language you wish to translate to. The overlay page remains unchanged.  Text once translated will be deleted from the page, but it will be sent to the overlay page as normal.
+
+### Manual text entry
+Manual text entry mode is also supported via https://caption.ninja/manual.html
+
+You can enter with your keybaord text overlays, instead of using automatic transcription.  Uses the same overlay output page, and both automatic and automatic can be used together if needed; funneling to the same overlay page even.
+
 ### Self-hosting
 You can sign up at https://www.piesocket.com/ for a free account if you wish to use your own API server for transferring data. You can use the API key given to specify that via the URL in Caption.Ninja, such as:
 
 ```https://caption.ninja/?room=XLk5tqU&pie=ZCu96UFf9ezeQeClK7BOCkq6Q0x0lxWAPJcgxjz5```
 
 You can also deploy your own basic websocket server with this code: https://github.com/steveseguin/websocket_server/
-
-### Manual text entry
-Manual text entry mode is also supported via https://caption.ninja/manual.html
 
 ### Disclaimers
 I am not responsible if this app fails to work or whatever else. It is provided as-is without warranty or support. I do not take responsibility for any liability.
