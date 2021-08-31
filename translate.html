@@ -10,6 +10,8 @@
 	<meta name="title" content="CAPTION.Ninja" />
 	<meta name="description" content="This is a free-to-use captioning tool for OBS. Speech-to-text is done using Machine Learning" />
 	<meta name="author" content="Steve Seguin" />
+	<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
 	
 	<style>
 		@font-face {
@@ -70,6 +72,7 @@
 	</style>
 </head>
 <body>
+	<div id="google_translate_element"></div>
 	
 	<div id="interm" class="output">
 	<font style='font-size:60%;line-height: 1.4em;' ><span >This is a free-to-use captioning tool.</span></font><font style='font-size:30%;line-height: 1.4em;' ><span ><br /><br />
@@ -86,6 +89,10 @@
 	Update URL to change the <a href="https://cloud.google.com/speech-to-text/docs/languages" target="_blank">Language; Codes here</a><br /><br />
 	More options and details <a href='https://github.com/steveseguin/captionninja'>on Github <span class="github"></span></a></span></font><br /><br /></div><div id="output" class="output"></div>
 	<script>
+	
+	function googleTranslateElementInit() {
+	  new google.translate.TranslateElement({pageLanguage: 'en'}, 'google_translate_element');
+	}
 	
 	function updateURL(param, force=false) {
 		var para = param.split('='); 
@@ -115,6 +122,41 @@
 			}
 		}
 	}
+
+	var counter=0;
+	
+	function onElementInsertedTwitch(containerSelector, callback) {
+	var onMutationsObserved = function(mutations) {
+		var currentCounter = 0;
+		mutations.forEach(function(mutation) {
+			if (mutation.addedNodes.length) {
+				for (var i = 0, len = mutation.addedNodes.length; i < len; i++) {
+					if ((mutation.addedNodes[i].nodeName == "FONT") && (mutation.addedNodes[i].parentNode.nodeName == "SPAN")){
+						console.log(mutation.addedNodes[i]);
+						currentCounter+=1;
+						if (currentCounter != counter){return;}
+						console.warn(mutation.addedNodes[i]);
+						var textMsg = "<span>"+mutation.addedNodes[i].innerText+"</span>";
+						socket.send(JSON.stringify({"msg":true, "final":textMsg, "id":counter}));
+						document.querySelectorAll(containerSelector)[0].innerHTML = "";
+						break;
+					}
+				}
+			}
+		});
+	};
+	var target = document.querySelectorAll(containerSelector)[0];
+	var config = { childList: true, subtree: true };
+	var MutationObserver = window.MutationObserver || window.WebKitMutationObserver;
+	var observer = new MutationObserver(onMutationsObserved);
+	observer.observe(target, config);
+}
+
+	onElementInsertedTwitch("#output", function(element){
+	  processMessage(element);
+	});
+	
+
 
 	
 	(function (w) {
@@ -166,7 +208,7 @@
 	console.log("Language: "+myLang);
 		
 				
-	var counter=0;
+	
 	var url = document.URL.substr(0,document.URL.lastIndexOf('/'));
 	
 	document.getElementById("shareLink").href= url+"/overlay?room="+roomID;
@@ -198,7 +240,6 @@
 	}
 	
 	var final_transcript = '';
-	var interim_transcript = "";
 	var idle = null;
 	setup();
 	function setup(){
@@ -207,9 +248,8 @@
 			if (myLang){
 				recognition.lang = myLang;
 			}
-			recognition.continuous = true;
-			recognition.interimResults = true;
-			
+			recognition.continuous = false;
+			recognition.interimResults = false;
 			
 			recognition.onstart = function(){
 				console.log("started transcription");
@@ -227,57 +267,24 @@
 				counter+=1;
 				var interim_transcript = '';
 				if(typeof(event.results) == 'undefined'){
-					//console.log("ended");
-					//recognition.onend = null;
-					//recognition.stop();
 					console.log(event);
 					return;
 				}
 				for(var i = event.resultIndex; i < event.results.length; ++i){
 					if(event.results[i].isFinal){
 						final_transcript += event.results[i][0].transcript;
-					} else {
-						interim_transcript += event.results[i][0].transcript;
-					}
+					} 
 				}
-				
-				//final_transcript = final_transcript.toUpperCase();
-				//interim_transcript = interim_transcript.toUpperCase();
 				
 				if (final_transcript){
 					console.log("FINAL:", final_transcript);
 					//final_transcript = final_transcript.split(" ");
-					final_transcript = "<span id='final_"+counter+"'>"+final_transcript+"</span><br />";
+					final_transcript = "<span>"+final_transcript+"</span>";
 					
 					document.getElementById("output").innerHTML+=final_transcript;
 					document.getElementById("interm").innerHTML="";
 					
-					try {
-						socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter}));
-						final_transcript="";
-						interim_transcript="";
-					} catch(e){
-					
-					}
-					
-				} else {
-					console.log("INTERM:", interim_transcript);
-					interim_transcript = "<span>"+interim_transcript+"</span><br />";
-					document.getElementById("interm").innerHTML=interim_transcript;
-					try {
-						socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter}));
-					} catch(e){
-					    interim_transcript="";
-					}
-				}
-				
-				//if (idle){
-				//	clearInterval(idle);
-				//}
-				//idle = setTimeout(function(){
-				//	document.getElementById("output").innerHTML="";
-				//	document.getElementById("interm").innerHTML="";
-				//},10000);
+				} 
 				
 			};
 			

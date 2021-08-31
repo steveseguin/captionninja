@@ -156,7 +156,7 @@
 	document.getElementById("shareLink").href= url+"/overlay?room="+roomID;
 	document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID;
 
-	navigator.clipboard.writeText(url+"/textout?room="+roomID).then(() => {
+	navigator.clipboard.writeText(url+"/overlay?room="+roomID).then(() => {
       /* clipboard successfully set */
     }, () => {
       /* clipboard write failed */
@@ -166,8 +166,8 @@
 	var socket = new WebSocket("wss://api.action.wtf:666");
 	if (urlParams.has("pie")){
 		
-		var apiKey = urlParams.get("pie") || "ZCu96UFf9ezeQeClK7BOCkq6Q0x0lxWAPJcgxjz5";  // get an API key from https://www.piesocket.com/ for a free API server of your own
-		socket = new WebSocket("wss://us-nyc-1.websocket.me/v3/"+roomID+"?api_key="+apiKey);
+		var apiKey = urlParams.get("pie") || "0khtlN7R7ISHZzFiyfK49Q9zAm93Wti5xpbW9qjg";  // get an API key from https://www.piesocket.com/ for a free API server of your own
+		socket = new WebSocket("wss://free3.piesocket.com/v3/"+roomID+"?api_key="+apiKey);
 		
 		document.getElementById("shareLink").href= url+"/overlay?room="+roomID+"&pie="+apiKey;
 		document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID+"&pie="+apiKey;
