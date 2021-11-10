@@ -84,8 +84,71 @@
 	If you wish to save the transcription, just select-all when done (CTRL+A), copy the selected text(CTRL+C), pasting it into text editor (CTRL+V).
 	<br /><br />
 	Update URL to change the <a href="https://cloud.google.com/speech-to-text/docs/languages" target="_blank">Language; Codes here</a><br /><br />
-	More options and details <a href='https://github.com/steveseguin/captionninja'>on Github <span class="github"></span></a></span></font><br /><br /></div><div id="output" class="output"></div>
+	More options and details <a href='https://github.com/steveseguin/captionninja'>on Github <span class="github"></span></a></span></font><br /><br /></div>
+	
+	<div id="output" class="output"></div>
+	
 	<script>
+	
+	function download(filename, text) {
+	  var element = document.createElement('a');
+	  element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+	  element.setAttribute('download', filename);
+
+	  element.style.display = 'none';
+	  document.body.appendChild(element);
+
+	  element.click();
+
+	  document.body.removeChild(element);
+	}
+	
+	function getOldStorage() {
+
+		var values = [],
+			keys = Object.keys(localStorage),
+			i = keys.length;
+
+		while ( i-- ) {
+			values.push( localStorage.getItem(keys[i]) );
+		}
+
+		return values;
+	}
+	
+	function removeStorage(cname){
+		localStorage.removeItem(cname);
+	}
+
+	function setStorage(cname, cvalue, exdays=999){ // not actually a cookie
+		var now = new Date();
+		var item = {
+			value: cvalue,
+			expiry: now.getTime() + (exdays * 24 * 60 * 60 * 1000),
+		};
+		try{
+			localStorage.setItem(cname, JSON.stringify(item));
+		}catch(e){errorlog(e);}
+	}
+
+	function getStorage(cname) {
+		try {
+			var itemStr = localStorage.getItem(cname);
+		} catch(e){
+			errorlog(e);
+			return;
+		}
+		if (!itemStr) {
+			return "";
+		}
+		var item = JSON.parse(itemStr);
+		var now = new Date();
+		if (now.getTime() > item.expiry) {
+			localStorage.removeItem(cname);
+			return "";
+		}
+		return item.value;
+	}
 	
 	function updateURL(param, force=false) {
 		var para = param.split('='); 
@@ -164,10 +227,40 @@
 	}
 	
 	console.log("Language: "+myLang);
-		
+	
+	var srtFile = "";
+	var timestamp_start = null
+	var timestamp_stop = null
+	var timestamp_intern  = null;
+	var logcounter=0;
 				
 	var counter=0;
+	
 	var url = document.URL.substr(0,document.URL.lastIndexOf('/'));
+	
+	
+	var oldSaves = Object.keys(localStorage);
+	if (oldSaves.length){
+		for (var i =0;i<oldSaves.length;i++){
+			if (oldSaves[i].startsWith("transcription_"+roomID+"_")){
+				try {
+					var button = document.createElement("button");
+					button.onclick = function(){
+						var srtFile = getStorage(this.dataset.key);
+						download(this.dataset.key+".srt", srtFile);
+					};
+					button.dataset.key = oldSaves[i];
+					button.innerHTML = "Download saved transcription file: "+oldSaves[i];
+					
+				//	button.style.position = "fixed";
+				//	button.style.top = "0";
+				//	button.style.left = "0";
+					
+					document.body.prepend(button);
+				}catch(e){console.error(e);}
+			}
+		}
+	}
 	
 	document.getElementById("shareLink").href= url+"/overlay?room="+roomID;
 	document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID;
@@ -179,7 +272,7 @@
     });
 
 	var apiKey = false;
-	var socket = new WebSocket("wss://api.action.wtf:666");
+	var socket = new WebSocket("wss://api.caption.ninja:443");
 	if (urlParams.has("pie")){
 		
 		var apiKey = urlParams.get("pie") || "0khtlN7R7ISHZzFiyfK49Q9zAm93Wti5xpbW9qjg";  // get an API key from https://www.piesocket.com/ for a free API server of your own
@@ -199,6 +292,7 @@
 	
 	var final_transcript = '';
 	var interim_transcript = "";
+	var final_transcript_raw = "";
 	var idle = null;
 	setup();
 	function setup(){
@@ -233,40 +327,93 @@
 					console.log(event);
 					return;
 				}
+				
 				for(var i = event.resultIndex; i < event.results.length; ++i){
 					if(event.results[i].isFinal){
-						final_transcript += event.results[i][0].transcript;
+						final_transcript_raw += event.results[i][0].transcript;
 					} else {
 						interim_transcript += event.results[i][0].transcript;
 					}
 				}
 				
-				//final_transcript = final_transcript.toUpperCase();
+				//final_transcript_raw = final_transcript_raw.toUpperCase();
 				//interim_transcript = interim_transcript.toUpperCase();
 				
-				if (final_transcript){
-					console.log("FINAL:", final_transcript);
+				if (final_transcript_raw){
+					console.log("FINAL:", final_transcript_raw);
 					//final_transcript = final_transcript.split(" ");
-					final_transcript = "<span id='final_"+counter+"'>"+final_transcript+"</span><br />";
+					final_transcript = "<span id='final_"+counter+"'>"+final_transcript_raw+"</span><br />";
 					
 					document.getElementById("output").innerHTML+=final_transcript;
 					document.getElementById("interm").innerHTML="";
 					
 					try {
+						if (timestamp_start===null){
+							timestamp_start = Date.now();
+							timestamp_intern = Date.now();
+						}
+						timestamp_stop = Date.now();
+						timestamp_stop = Date.now() - timestamp_start;
+						
+						var date = new Date(0);
+						date.setSeconds(timestamp_stop/1000);
+						timestamp_stop = date.toISOString().replace(".",",").replace("1970-01-01T","");
+						timestamp_stop = timestamp_stop.substring(0, timestamp_stop.length - 1);
+						
+						timestamp_intern -= timestamp_start;
+						var date = new Date(0);
+						date.setSeconds(timestamp_intern/1000);
+						timestamp_intern = date.toISOString().replace(".",",").replace("1970-01-01T","");
+						timestamp_intern = timestamp_intern.substring(0, timestamp_intern.length - 1);
+					} catch(e){console.error(e);}
+					
+					try {
+						logcounter+=1;
+						srtFile += logcounter + "\n";
+						srtFile += timestamp_intern + " --\> " + timestamp_stop + "\n";
+						timestamp_intern=null;
+						srtFile += ">> " + final_transcript_raw + "\n\n";
+						setStorage("transcription_"+roomID+"_"+timestamp_start, srtFile, 1);
+						
+						if (logcounter===1){
+							var button = document.createElement("button");
+							button.onclick = function(){
+								download("transcription_"+roomID+"_"+timestamp_start+".srt", srtFile);
+							};
+							button.innerHTML = "Download transcription";
+							button.style.position = "fixed";
+							button.style.top = "0";
+							button.style.left = "0";
+							
+							document.body.appendChild(button);
+						}
+						
+					} catch(e){console.error(e);}
+				
+					
+					try {
 						socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter}));
 						final_transcript="";
 						interim_transcript="";
+						final_transcript_raw="";
 					} catch(e){
-					
+						console.error(e);
 					}
 					
 				} else {
+					if (timestamp_start===null){
+						timestamp_start = Date.now();
+					}
+					if (timestamp_intern===null){
+						timestamp_intern = Date.now();
+					}
 					console.log("INTERM:", interim_transcript);
 					interim_transcript = "<span>"+interim_transcript+"</span><br />";
 					document.getElementById("interm").innerHTML=interim_transcript;
 					try {
 						socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter}));
 					} catch(e){
+						console.error(e);
 					    interim_transcript="";
 					}
 				}
