@@ -91,7 +91,8 @@
 	<script>
 	
 	function googleTranslateElementInit() {
-	  new google.translate.TranslateElement({pageLanguage: 'en'}, 'google_translate_element');
+	  var myShortLang = myLang.substr(0,myLang.indexOf('-'));
+	  new google.translate.TranslateElement({pageLanguage: myShortLang}, 'google_translate_element');
 	}
 	
 	function updateURL(param, force=false) {
