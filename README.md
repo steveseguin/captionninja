@@ -42,7 +42,7 @@ If using OBS, you can also just load output into that, and change the CSS style 
 
 If the font you wish to use is not a standard web/system font, you can still use custom fonts without needing to edit code by loading the font via Base64.
 
-You can use th tool (https://hellogreg.github.io/woff2base/) to generate the base64 font, which is compatible with woff and ttf font-files, such as: https://www.dafont.com/de/atari-st-8x16-system-font.font
+You can use this tool (https://hellogreg.github.io/woff2base/) or this tool (https://transfonter.org/) to generate the base64 font from fonts such as: https://www.dafont.com/de/atari-st-8x16-system-font.font
 
 To then load the font, we can apply it to our OBS browser source settings as a custom CSS entry, like so:
 
