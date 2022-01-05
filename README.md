@@ -61,6 +61,8 @@ body {
 ````
 THe base64 string will be quite long; this is normal.
 
+![image](https://user-images.githubusercontent.com/2575698/148278504-06552891-d011-43dd-993d-13322c879ede.png)
+
 
 ### Language codes
 Language codes options available; default is `&lang=en-US`.  Just change the en-ES to a language code of your choosing.  A list of codes is here: https://cloud.google.com/speech-to-text/docs/languages
