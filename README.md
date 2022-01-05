@@ -61,7 +61,7 @@ body {
 ````
 THe base64 string will be quite long; this is normal.
 
-![image](https://user-images.githubusercontent.com/2575698/148278504-06552891-d011-43dd-993d-13322c879ede.png)
+![image](https://user-images.githubusercontent.com/2575698/148278546-2b0e25b8-cb31-45fa-b043-937d108db76e.png)
 
 
 ### Language codes
