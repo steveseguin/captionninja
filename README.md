@@ -39,6 +39,29 @@ If using OBS, you can also just load output into that, and change the CSS style 
 }
 ```
 
+If the font you wish to use is not a standard web/system font, you can still use custom fonts without needing to edit code by loading the font via Base64.
+
+You can use th tool (https://hellogreg.github.io/woff2base/) to generate the base64 font, which is compatible with woff and ttf font-files, such as: https://www.dafont.com/de/atari-st-8x16-system-font.font
+
+To then load the font, we can apply it to our OBS browser source settings as a custom CSS entry, like so:
+
+```
+body { 
+  background-color: rgba(0, 0, 0, 0); margin: 0px auto; overflow: hidden; 
+}
+.output{
+ font-family: "Atari ST 8x16 System Font", Cousine, monospace;
+}
+@font-face { 
+  font-family: "Atari ST 8x16 System Font";
+  font-weight: 100 900;
+  font-style: normal italic;
+  src: url(data:application/octet-stream;base64,AAEAAAAOAIAAAwBgRkZUTWXP4NIAAIdkAAAAHEdERUYADwAeAACHRAAAAB5PUy8yY0WLpAAAAWgAAABgY21hcJmJPykAAAPUAAAD7mN2dCAANQP1AAAHxAAAAARnYXNw//8AAwAAhzwAAAAIZ2x5Zpiad3sAAAnMAAB1NGhlYWT70........AAAwBgRkZUTWIKM=);
+}
+````
+THe base64 string will be quite long; this is normal.
+
+
 ### Language codes
 Language codes options available; default is `&lang=en-US`.  Just change the en-ES to a language code of your choosing.  A list of codes is here: https://cloud.google.com/speech-to-text/docs/languages
 
