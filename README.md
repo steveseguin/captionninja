@@ -59,7 +59,7 @@ body {
   src: url(data:application/octet-stream;base64,AAEAAAAOAIAAAwBgRkZUTWXP4NIAAIdkAAAAHEdERUYADwAeAACHRAAAAB5PUy8yY0WLpAAAAWgAAABgY21hcJmJPykAAAPUAAAD7mN2dCAANQP1AAAHxAAAAARnYXNw//8AAwAAhzwAAAAIZ2x5Zpiad3sAAAnMAAB1NGhlYWT70........AAAwBgRkZUTWIKM=);
 }
 ````
-THe base64 string will be quite long; this is normal.
+The base64 string will be quite long; this is normal.
 
 ![image](https://user-images.githubusercontent.com/2575698/148278546-2b0e25b8-cb31-45fa-b043-937d108db76e.png)
 
