@@ -38,6 +38,7 @@ If using OBS, you can also just load output into that, and change the CSS style 
     text-shadow: 0.05em 0.05em 0px rgb(0 0 0);
 }
 ```
+##### Custom non-standard fonts
 
 If the font you wish to use is not a standard web/system font, you can still use custom fonts without needing to edit code by loading the font via Base64.
 
