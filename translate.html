@@ -156,8 +156,6 @@
 	  processMessage(element);
 	});
 	
-
-
 	
 	(function (w) {
 		w.URLSearchParams = w.URLSearchParams || function (searchString) {
@@ -279,7 +277,6 @@
 				if (final_transcript){
 					console.log("FINAL:", final_transcript);
 					//final_transcript = final_transcript.split(" ");
-					final_transcript = "<span>"+final_transcript+"</span>";
 					
 					document.getElementById("output").innerHTML+=final_transcript;
 					document.getElementById("interm").innerHTML="";

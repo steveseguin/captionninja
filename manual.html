@@ -138,6 +138,12 @@
 		return text;
 	};
 	
+	var label = false;
+	
+	if (urlParams.has("label")){
+		label = urlParams.get("label");
+	} 
+	
 	var roomID = "test";
 	
 	if (urlParams.has("room")){
@@ -163,10 +169,10 @@
     }); 
 
 	var apiKey = false;
-	var socket = new WebSocket("wss://api.action.wtf:666");
+	var socket = new WebSocket("wss://api.caption.ninja:443");
 	if (urlParams.has("pie")){
 		
-		var apiKey = urlParams.get("pie") || "0khtlN7R7ISHZzFiyfK49Q9zAm93Wti5xpbW9qjg";  // get an API key from https://www.piesocket.com/ for a free API server of your own
+		var apiKey = urlParams.get("pie") || "0khtlN7R7ISHZzFiyfK49Q9zAm93Wti5xpbW9qjg";  // get an API key from https://www.piesocket.com/ for a free API server of your own (pie seems to no longer be free? sorry)
 		socket = new WebSocket("wss://free3.piesocket.com/v3/"+roomID+"?api_key="+apiKey);
 		
 		document.getElementById("shareLink").href= url+"/overlay?room="+roomID+"&pie="+apiKey;
@@ -192,7 +198,7 @@
 		var interim_transcript = document.getElementById("userinput").value;
 		document.getElementById("interm").innerHTML = interim_transcript;
 		try {
-			socket.send(JSON.stringify({"msg":true, "interm":"<span>"+interim_transcript+"</span><br />", "id":counter}));
+			socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "label":label}));
 		} catch(e){
 			interim_transcript="";
 		}
@@ -203,14 +209,14 @@
 		var final_transcript = document.getElementById("userinput").value;
 		try {
 			if (final_transcript==""){
-				socket.send(JSON.stringify({"msg":true, "final":"<br />", "id":counter}));
+				socket.send(JSON.stringify({"msg":true, "final":"", "id":counter, "label":label}));
 			} else {
-				socket.send(JSON.stringify({"msg":true, "final":"<span>"+final_transcript+"</span><br />", "id":counter}));
+				socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter, "label":label}));
 			}
 		} catch(e){
 			final_transcript="";
 		}
-		document.getElementById("output").innerHTML+="<span>"+final_transcript+"</span>";
+		document.getElementById("output").innerHTML+=final_transcript;
 		document.getElementById("interm").innerHTML="";
 		document.getElementById("userinput").value = "";
 	}
