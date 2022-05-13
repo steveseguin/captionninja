@@ -79,6 +79,19 @@ Manual text entry mode is also supported via https://caption.ninja/manual.html
 
 You can enter with your keybaord text overlays, instead of using automatic transcription.  Uses the same overlay output page, and both automatic and automatic can be used together if needed; funneling to the same overlay page even.
 
+### Adding labels
+
+Add &label=xxx to the capture page to give the outbound messages a label. (index.html?label=steve) This label will appear on the overlay page.
+
+By default, labels will be input-santized, so special characters will be converted to just text, but you can accept HTML/CSS within the label if you add &html to the overlay page.  This decreases the security of the overlay page, but increases its stylistic flexiblity.
+
+For example, this will make the display name bold on the output.
+```
+https://caption.ninja/?room=abc123&label=<b>steve</b>
+https://caption.ninja/overlay?room=abc123&html
+```
+![image](https://user-images.githubusercontent.com/2575698/168219952-827734a2-75bd-45bc-9d8d-f0d7a98fe96c.png)
+
 ### Self-hosting
 You can sign up at https://www.piesocket.com/ for a free account if you wish to use your own API server for transferring data. You can use the API key given to specify that via the URL in Caption.Ninja, such as:
 
