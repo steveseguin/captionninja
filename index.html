@@ -198,6 +198,14 @@
 	})(window);
 	var urlParams = new URLSearchParams(window.location.search);
 	
+	var sanitize = function(string) {
+		var temp = document.createElement('div');
+		temp.innerText = string;
+		temp.innerText = temp.innerHTML;
+		temp = temp.textContent || temp.innerText || "";
+		temp = temp.substring(0, Math.min(temp.length, 500));
+		return temp.trim();
+	};
 	
 	function generateStreamID(){
 		var text = "";
@@ -218,6 +226,13 @@
 		roomID = generateStreamID();
 		updateURL("room="+roomID);
 	}
+	
+	var label = false;
+	
+	if (urlParams.has("label")){
+		label = urlParams.get("label");
+		//label = sanitize(label);
+	} 
 	
 	var myLang = "en-US";
 	if (urlParams.has("lang")){
@@ -275,7 +290,7 @@
 	var socket = new WebSocket("wss://api.caption.ninja:443");
 	if (urlParams.has("pie")){
 		
-		var apiKey = urlParams.get("pie") || "0khtlN7R7ISHZzFiyfK49Q9zAm93Wti5xpbW9qjg";  // get an API key from https://www.piesocket.com/ for a free API server of your own
+		var apiKey = urlParams.get("pie") || "0khtlN7R7ISHZzFiyfK49Q9zAm93Wti5xpbW9qjg";  // get an API key from https://www.piesocket.com/ for a free API server of your own (pie no longer is free? sorry)
 		socket = new WebSocket("wss://free3.piesocket.com/v3/"+roomID+"?api_key="+apiKey);
 		
 		document.getElementById("shareLink").href= url+"/overlay?room="+roomID+"&pie="+apiKey;
@@ -290,9 +305,12 @@
 		socket.send(JSON.stringify({"join":roomID}));
 	}
 	
+	
+	
+	
 	var final_transcript = '';
 	var interim_transcript = "";
-	var final_transcript_raw = "";
+	
 	var idle = null;
 	setup();
 	function setup(){
@@ -330,21 +348,15 @@
 				
 				for(var i = event.resultIndex; i < event.results.length; ++i){
 					if(event.results[i].isFinal){
-						final_transcript_raw += event.results[i][0].transcript;
+						final_transcript += sanitize(event.results[i][0].transcript);
 					} else {
-						interim_transcript += event.results[i][0].transcript;
+						interim_transcript += sanitize(event.results[i][0].transcript);
 					}
 				}
 				
-				//final_transcript_raw = final_transcript_raw.toUpperCase();
-				//interim_transcript = interim_transcript.toUpperCase();
-				
-				if (final_transcript_raw){
-					console.log("FINAL:", final_transcript_raw);
-					//final_transcript = final_transcript.split(" ");
-					final_transcript = "<span id='final_"+counter+"'>"+final_transcript_raw+"</span><br />";
-					
-					document.getElementById("output").innerHTML+=final_transcript;
+				if (final_transcript){
+					console.log("FINAL:", final_transcript);
+					document.getElementById("output").innerHTML+="<span id='final_"+counter+"'>"+final_transcript+"</span><br />";
 					document.getElementById("interm").innerHTML="";
 					
 					try {
@@ -372,7 +384,7 @@
 						srtFile += logcounter + "\n";
 						srtFile += timestamp_intern + " --\> " + timestamp_stop + "\n";
 						timestamp_intern=null;
-						srtFile += ">> " + final_transcript_raw + "\n\n";
+						srtFile += ">> " + final_transcript + "\n\n";
 						setStorage("transcription_"+roomID+"_"+timestamp_start, srtFile, 1);
 						
 						if (logcounter===1){
@@ -392,10 +404,13 @@
 				
 					
 					try {
-						socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter}));
+						if (label){
+							socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter, "label":label}));
+						} else {
+							socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter}));
+						}
 						final_transcript="";
 						interim_transcript="";
-						final_transcript_raw="";
 					} catch(e){
 						console.error(e);
 					}
@@ -408,14 +423,20 @@
 						timestamp_intern = Date.now();
 					}
 					console.log("INTERM:", interim_transcript);
-					interim_transcript = "<span>"+interim_transcript+"</span><br />";
-					document.getElementById("interm").innerHTML=interim_transcript;
+					document.getElementById("interm").innerHTML="<span>"+interim_transcript+"</span><br />";
+					
 					try {
-						socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter}));
+						if (label){
+							socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "label":label}));
+						} else {
+							socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter}));
+						}
 					} catch(e){
 						console.error(e);
 					    interim_transcript="";
 					}
+					
+					
 				}
 				
 				//if (idle){
