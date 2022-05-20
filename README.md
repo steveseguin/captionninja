@@ -16,7 +16,7 @@ Using Google Chrome is strongly recommended for best results.
 
 The text-to-speech service will only work for one session per browser. If you try to load multiple text-to-speech tabs at a time, they will all stop working for a period of time. You can have as many overlay/viewer pages loaded as you want however.
 
-If you wish to save the transcriptions, just select-all when done (ctrl+a), copy the selected text(ctrl+c), pasting it into text editor (ctrl+v).  A download button might also appear on the page, which may download the transcription as a file as well.
+If you wish to save the transcriptions, just select-all when done (ctrl+a), copy the selected text(ctrl+c), pasting it into text editor (ctrl+v).  A download button might also appear on the page, which may download the transcription as a srt caption file as well.
 
 ### Studio integration
 
