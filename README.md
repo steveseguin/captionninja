@@ -14,6 +14,8 @@ Please note that this app uses your default microphone as the audio input source
 
 Using Google Chrome is strongly recommended for best results.
 
+The text-to-speech service will only work for one session per browser. If you try to load multiple text-to-speech tabs at a time, they will all stop working for a period of time. You can have as many overlay/viewer pages loaded as you want however.
+
 If you wish to save the transcriptions, just select-all when done (ctrl+a), copy the selected text(ctrl+c), pasting it into text editor (ctrl+v).
 
 ### Studio integration
@@ -93,11 +95,12 @@ https://caption.ninja/overlay?room=abc123&html
 ![image](https://user-images.githubusercontent.com/2575698/168219952-827734a2-75bd-45bc-9d8d-f0d7a98fe96c.png)
 
 ### Self-hosting
-You can sign up at https://www.piesocket.com/ for a free account if you wish to use your own API server for transferring data. You can use the API key given to specify that via the URL in Caption.Ninja, such as:
 
-```https://caption.ninja/?room=XLk5tqU&pie=ZCu96UFf9ezeQeClK7BOCkq6Q0x0lxWAPJcgxjz5```
+Self-hosting is possible to do for free. You can fork this Github repository, use Github pages to host the website for free, and then modify the website code as needed. This is useful for custom styling the site, creating a custom domain name, or specifying a private websocket forwarding service to use.  This app is compatible with generic websocket forwarding services.
 
-You can also deploy your own basic websocket server with this code: https://github.com/steveseguin/websocket_server/
+You can deploy your own basic websocket server with this code: https://github.com/steveseguin/websocket_server/  Hosting this server code on Amazon AWS or Google Cloud can be done for free as a micro server instance in most cases; pretty straight forward for someone technical. The websocket code is used for forwarding the messages from capture page to overlay display page; self-hosting the server code can provide a sense of added privacy.
+
+The actual voice to text transcriptions are done usually on Google cloud servers, so it's not possible in most cases to fully-self host the service, although some devices, like Pixel smartphones, may do on-device voice to text rather than using the Google cloud.
 
 ### Disclaimers
 I am not responsible if this app fails to work or whatever else. It is provided as-is without warranty or support. I do not take responsibility for any liability.
