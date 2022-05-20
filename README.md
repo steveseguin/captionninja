@@ -3,9 +3,7 @@
 This is a free-to-use captioning tool.
 
 Demo video here: https://www.youtube.com/watch?v=v7172QO8z6c
-
-![image](https://user-images.githubusercontent.com/2575698/169529784-17a8d2b6-c105-4cae-8fd8-11a3f47aabac.png)
-
+![image](https://user-images.githubusercontent.com/2575698/169529892-8764c5df-354c-4fad-85e5-c8ecfec4cc95.png)
 
 ### How to use
 
