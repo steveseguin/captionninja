@@ -58,6 +58,7 @@
 	
 	<div id="interm" class="output"></div>
 	<div id="output" class="output"></div>
+	<div id="status" style="display:none;"></div>
 	<script>
 	
 	(function (w) {
@@ -74,11 +75,145 @@
 				}
 			};
 		};
-
 	})(window);
 	var urlParams = new URLSearchParams(window.location.search);
 	
+	let worker;
+	let modelRegistry;
+	let version;
+
+	let supportedFromCodes = {};
+	let supportedToCodes = {};
+	let currentTo = null;
+
+	const status = function(message){document.getElementById("status").innerText = message;}
+
+	const langs = { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+		"bg": "Bulgarian",
+		"cs": "Czech",
+		"nl": "Dutch",
+		"en": "English",
+		"et": "Estonian",
+		"de": "German",
+		"fr": "French",
+		"is": "Icelandic",
+		"it": "Italian",
+		"nb": "Norwegian Bokmål",
+		"nn": "Norwegian Nynorsk",
+		"fa": "Persian",
+		"pl": "Polish",
+		"pt": "Portuguese",
+		"ru": "Russian",
+		"es": "Spanish",
+		"uk": "Ukrainian"
+	};
 	
+	function updateURL(param, force=false) {
+		var para = param.split('='); 
+		if (!(urlParams.has(para[0].toLowerCase()))){
+			if (history.pushState){
+				
+				var arr = window.location.href.split('?');
+				var newurl;
+				if (arr.length > 1 && arr[1] !== '') {
+					newurl = window.location.href + '&' +param;
+				} else {
+					newurl = window.location.href + '?' +param;
+				}
+				
+				window.history.pushState({path:newurl},'',newurl);
+			}
+		} else if (force){
+			if (history.pushState){
+				var href = new URL(window.location.href);
+				if (para.length==1){
+					href.searchParams.set(para[0].toLowerCase(), "");
+				} else {
+					href.searchParams.set(para[0].toLowerCase(), para[1]);
+				}
+				log(href.toString());
+				window.history.pushState({path:href.toString()},'',href.toString());
+			}
+		}
+	}
+	
+	
+	var langTo = false;
+	if (urlParams.has("translate") || urlParams.has("lang") || urlParams.has("ln") ){
+		var myLang = urlParams.get("translate") || urlParams.get("lang") || urlParams.get("ln") ||  "en";
+		langTo = myLang.split("-")[0];
+		console.log("Language: "+langTo);
+	}
+
+	
+	if (langTo){
+		var langFrom = "en";
+		if (window.Worker) {
+			worker = new Worker("worker.js");
+			worker.postMessage(["import"]);
+		}
+
+		var translateCall = (text, meta) => { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+			if (!text.trim().length) return;
+			const paragraphs = text.split("\n");
+			worker.postMessage(["translate", langFrom, langTo, paragraphs, meta]);
+		};
+
+		worker.onmessage = function (e) {
+			if (e.data[0] === "translate_reply" && e.data[1]) {
+			
+				if (!e.data[2]){
+					document.getElementById("output").innerText = e.data[1].join("<br /><br />");
+				} else if (e.data[2].final){
+					e.data[2].final = e.data[1].join("<br /><br />");
+					processReply(e.data[2]);
+				} else if (e.data[2].interm){
+					e.data[2].interm = e.data[1].join("<br /><br />");
+					processReply(e.data[2]);
+				} else {
+					document.getElementById("output").innerText = e.data[1].join("<br /><br />");
+				}
+			} else if (e.data[0] === "load_model_reply" && e.data[1]) {
+				status(e.data[1]);
+			} else if (e.data[0] === "import_reply" && e.data[1]) {
+				modelRegistry = e.data[1];
+				version = e.data[2];
+				init();
+			}
+		};
+
+		var isSupported = (lngFrom, lngTo) => {
+			return true; //(`${lngFrom}${lngTo}` in modelRegistry) || ((`${lngFrom}en` in modelRegistry) && (`en${lngTo}` in modelRegistry))
+		}
+
+		var loadModel = () => {
+			if (langFrom !== langTo) {
+				status(`Installing model...`);
+				console.log(`Loading model '${langFrom}${langTo}'`);
+				worker.postMessage(["load_model", langFrom, langTo]);
+			} else {
+				console.log("No model loaded yet");
+				// do nothing.
+			}
+		};
+
+		function init() { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+			// parse supported languages and model types (prod or dev)
+			supportedFromCodes["en"] = "prod";
+			supportedToCodes["en"] = "prod";
+			for (const [langPair, value] of Object.entries(modelRegistry)) {
+				const firstLang = langPair.substring(0, 2);
+				const secondLang = langPair.substring(2, 4);
+				if (firstLang !== "en") supportedFromCodes[firstLang] = value.model.modelType;
+				if (secondLang !== "en") supportedToCodes[secondLang] = value.model.modelType;
+			}
+
+			loadModel();
+		}
+	} else {
+		var translateCall = console.log;
+	}
+	////////
 	
 	var roomID = "test";
 	
@@ -93,6 +228,11 @@
 	var clearOnNew = false;
 	if (urlParams.has("clear")){
 		clearOnNew = true;
+	}
+	
+	var timeoutSpeed = 5000;
+	if (urlParams.has("showtime")){
+		timeoutSpeed = parseInt(urlParams.get("showtime")) || 0;
 	}
 	
 	var allowHTML = false;
@@ -118,6 +258,25 @@
 		socket.send(JSON.stringify({"join":roomID}));
 	}
 	
+	socket.addEventListener('message', function (event) {
+		
+		if (event.data){
+			var data = JSON.parse(event.data);
+			if (langTo && data.ln){
+				//if (data.final)
+					if (langFrom !== data.ln.split("-")[0]){
+						langFrom = data.ln.split("-")[0];
+						console.log("Loading model");
+						loadModel();
+					}
+					translateCall(data.final || data.interm, data);
+				//}
+			} else {
+				processReply(data);
+			}
+		}
+	});
+	
 	var lastLabel = "";
 	var label = ""
 	
@@ -133,50 +292,47 @@
 		return temp.trim();
 	};
 	
-	socket.addEventListener('message', function (event) {
-		if (event.data){
-			var data = JSON.parse(event.data);
+	
+	
+	function processReply(data){
 			
-			var newLabel = false;
-			
-			if (data.label){
-				console.log(data.label);
-				try {
-					data.label = sanitize(data.label);
-					data.label = data.label.replaceAll('_', ' ');
-					label = "<span class='label'>"+data.label+": </span>";
-				} catch (e) {
-					return;
-				}
-			} else {
-				label = "";
-			}
-			console.log(label);
-			console.log(data);
+		var newLabel = false;
 		
-			if ("interm" in data){
-				document.getElementById("interm").innerHTML = label+"<span>"+sanitize(data.interm)+"</span><br/>";
-			} else if ("final" in data){
-				if (clearOnNew){
-					document.getElementById("output").innerHTML = label+"<span>"+sanitize(data.final)+"</span><br/>";
-				} else {
-					document.getElementById("output").innerHTML += label+"<span>"+sanitize(data.final)+"</span><br/>";
-				} 
-				document.getElementById("interm").innerHTML="";
-				
+		if (data.label){
+			console.log(data.label);
+			try {
+				data.label = sanitize(data.label);
+				data.label = data.label.replaceAll('_', ' ');
+				label = "<span class='label'>"+data.label+": </span>";
+			} catch (e) {
+				return;
 			}
-			
-			if (!clearOnNew){
-				if (idle){
-					clearInterval(idle);
-				}
+		} else {
+			label = "";
+		}
+		if ("interm" in data){
+			document.getElementById("interm").innerHTML = label+"<span>"+sanitize(data.interm)+"</span><br/>";
+		} else if ("final" in data){
+			if (clearOnNew || data.c){
+				document.getElementById("output").innerHTML = label+"<span>"+sanitize(data.final)+"</span><br/>";
+			} else {
+				document.getElementById("output").innerHTML += label+"<span>"+sanitize(data.final)+"</span><br/>";
+			} 
+			document.getElementById("interm").innerHTML="";
+		}
+		
+		if (!clearOnNew){
+			if (idle){
+				clearInterval(idle);
+			}
+			if (timeoutSpeed){
 				idle = setTimeout(function(){
 					document.getElementById("output").innerHTML="";
 					document.getElementById("interm").innerHTML="";
-				},5000);
+				},timeoutSpeed);
 			}
 		}
-	});
+	}
 	
 	socket.onclose = function (){
 		setTimeout(function(){window.location.reload(true);},100);

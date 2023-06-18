@@ -17,6 +17,9 @@
 		  src: url('fonts/Cousine-Bold.ttf') format('truetype');
 		}
 	
+		button {
+			max-width: 600px;
+		}
 		body {
 			margin:0;
 			padding:0 10px;
@@ -82,6 +85,8 @@
 	Using Google Chrome is strongly recommended for best results.
 	<br /><br />
 	If you wish to save the transcription, just select-all when done (CTRL+A), copy the selected text(CTRL+C), pasting it into text editor (CTRL+V).
+	<br /><br />
+	If you wish to translate to another language, you can try the <a href='./translate'>experimental translation version here</a> or add &translate={bg,cs,nl,en,et,de,fr,is,it,nb,nn,fa,pl,pt,ru,es,uk} to the overlay page.
 	<br /><br />
 	Update URL to change the <a href="https://cloud.google.com/speech-to-text/docs/languages" target="_blank">Language; Codes here</a><br /><br />
 	More options and details <a href='https://github.com/steveseguin/captionninja'>on Github <span class="github"></span></a></span></font><br /><br /></div>
@@ -257,22 +262,24 @@
 	var oldSaves = Object.keys(localStorage);
 	if (oldSaves.length){
 		for (var i =0;i<oldSaves.length;i++){
-			if (oldSaves[i].startsWith("transcription_"+roomID+"_")){
-				try {
-					var button = document.createElement("button");
-					button.onclick = function(){
-						var srtFile = getStorage(this.dataset.key);
-						download(this.dataset.key+".srt", srtFile);
-					};
-					button.dataset.key = oldSaves[i];
-					button.innerHTML = "Download saved transcription file: "+oldSaves[i];
-					
-				//	button.style.position = "fixed";
-				//	button.style.top = "0";
-				//	button.style.left = "0";
-					
-					document.body.prepend(button);
-				}catch(e){console.error(e);}
+			if (oldSaves.length - 1== i){
+				if (oldSaves[i].startsWith("transcription_"+roomID+"_")){
+					try {
+						var button = document.createElement("button");
+						button.onclick = function(){
+							var srtFile = getStorage(this.dataset.key);
+							download(this.dataset.key+".srt", srtFile);
+							localStorage.removeItem(this.dataset.key);
+							
+						};
+						button.dataset.key = oldSaves[i];
+						button.innerHTML = "Download previous saved transcription";
+						
+						document.body.prepend(button);
+					}catch(e){console.error(e);}
+				}
+			} else if (oldSaves[i].startsWith("transcription_"+roomID+"_")){
+				localStorage.removeItem(i);
 			}
 		}
 	}
@@ -307,7 +314,7 @@
 	
 	
 	
-	
+	var ends = 0;
 	var final_transcript = '';
 	var interim_transcript = "";
 	
@@ -325,6 +332,9 @@
 			
 			recognition.onstart = function(){
 				console.log("started transcription");
+				setTimeout(function(){
+					ends = 0;
+				}, 2000);
 				
 			};
 			recognition.onerror = function(event){
@@ -333,6 +343,12 @@
 			recognition.onend = function(e){
 				console.log(e);
 				console.log("Stopped transcription");
+				if (event.type === "end"){
+					ends +=1;
+				}
+				if (ends > 3){
+					alert("WARNING: Cannot enable transcription service\n\nThe service will fail completely if more than one transcription session is currently active on your computer.\n\nPlease close other Caption.Ninja tabs or other transcription services and then wait a few minutes before retrying.");
+				}
 				setup();
 			};
 			recognition.onresult = function(event){
@@ -405,9 +421,9 @@
 					
 					try {
 						if (label){
-							socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter, "label":label}));
+							socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter, "label":label, "ln": myLang}));
 						} else {
-							socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter}));
+							socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter, "ln": myLang}));
 						}
 						final_transcript="";
 						interim_transcript="";
@@ -427,16 +443,14 @@
 					
 					try {
 						if (label){
-							socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "label":label}));
+							socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "label":label, "ln": myLang}));
 						} else {
-							socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter}));
+							socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "ln": myLang}));
 						}
 					} catch(e){
 						console.error(e);
 					    interim_transcript="";
 					}
-					
-					
 				}
 				
 				//if (idle){

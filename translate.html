@@ -6,11 +6,10 @@
 	<meta name="copyright" content="&copy; 2020 Steve Seguin" />
 	<link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon" />
 	<!-- Primary Meta Tags -->
-	<title>CAPTION.Ninja</title>
+	<title>CAPTION.Ninja - translate</title>
 	<meta name="title" content="CAPTION.Ninja" />
 	<meta name="description" content="This is a free-to-use captioning tool for OBS. Speech-to-text is done using Machine Learning" />
 	<meta name="author" content="Steve Seguin" />
-	<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
 	
 	<style>
@@ -20,28 +19,29 @@
 		}
 	
 		body {
-			margin:0;
-			padding:0 10px;
+			margin:15px;
+			padding:15px;
 			height:100%;
 			border: 0;
-			display: flex;
-			flex-direction: column-reverse;
-			position:absolute;
+			display: block;
+			
 			bottom:0;
 			overflow:hidden;
+			
+			font-family: Cousine, monospace;
+			
 		}
 
 		.output {
 			margin:0;
 			background-color: #0000;
-			color: white;
-			font-family: Cousine, monospace;
+			color: black;
 			font-size: 3.2em;
 			line-height: 1.1em;
 			letter-spacing: 0.0em;
 			
 			padding: 0em;
-			text-shadow: 0.05em 0.05em 0px rgba(0,0,0,1);
+			text-shadow: 0.05em 0.05em 0px rgba(255,255,255,1);
 		}
 		
 		.output span { 
@@ -51,7 +51,7 @@
 		}
 		
 		a {
-			color:white;
+			color:blue;
 			font-size:1.2em;
 			text-transform: none;
 		}
@@ -69,226 +69,411 @@
 			filter: invert(100%);
 			-webkit-filter: invert(100%);
 		}
+		div {
+			display:block;
+			
+		}
+		textarea {
+			display:block;
+			width: 700px;
+		}
 	</style>
 </head>
 <body>
-	<div id="google_translate_element"></div>
-	
-	<div id="interm" class="output">
-	<font style='font-size:60%;line-height: 1.4em;' ><span >This is a free-to-use captioning tool.</span></font><font style='font-size:30%;line-height: 1.4em;' ><span ><br /><br />
-	The output of this app is mirrored here: <a id="shareLink" href="overlay.html" target='_blank'>*ERROR GENERATING LINK*</a>. Add it to OBS as a browser source overlay if wishing to use it for a live stream.
+
+	<h3>This is a free-to-use captioning, transcription, and translation tool.</h3>
+	The overlay-friendly output of the text is mirrored here: <a id="shareLink" href="overlay.html" target='_blank'>*ERROR GENERATING LINK*</a>.
 	<br /><br />
 	To use this app, accept the microphone permissions on page load and then just say something outloud.
 	<br /><br />
 	Please note that this app uses your default microphone as the audio input source. You sometimes can change the default audio source via the browser's setting, but you can also change it at your system level by changing the default recording device. You can also change audio sources by using a Virtual Audio Cable, <a href='https://www.vb-audio.com/Cable/'> such as this one.</a> Using it, it becomes possible to select other sources, including microphones, speakers, and other applications.
 	<br /><br />
-	Using Google Chrome is strongly recommended for best results.
+	The translation component is based on code from Mozilla <a href="https://github.com/mozilla/translate">https://github.com/mozilla/translate</a>. If your language is missing though, or you want better results, I have a version <a href='https://caption.ninja/translate_premium' target='_blank'>powered by Google Cloud Translation here</a>.
 	<br /><br />
-	If you wish to save the transcription, just select-all when done (CTRL+A), copy the selected text(CTRL+C), pasting it into text editor (CTRL+V).
-	<br /><br />
-	Update URL to change the <a href="https://cloud.google.com/speech-to-text/docs/languages" target="_blank">Language; Codes here</a><br /><br />
-	More options and details <a href='https://github.com/steveseguin/captionninja'>on Github <span class="github"></span></a></span></font><br /><br /></div><div id="output" class="output"></div>
-	<script>
+	<label>
+	  From
+	  <select id="lang-from" title="Set input language via the URL `&lang=en-US` option" name="from" class="lang-select"></select>
+	</label>
 	
-	function googleTranslateElementInit() {
-	  new google.translate.TranslateElement({pageLanguage: 'en'}, 'google_translate_element');
-	}
+	 <label>
+	  To
+	  <select id="lang-to" name="to" class="lang-select"></select>
+	</label>
 	
-	function updateURL(param, force=false) {
-		var para = param.split('='); 
-		if (!(urlParams.has(para[0].toLowerCase()))){
-			if (history.pushState){
-				
-				var arr = window.location.href.split('?');
-				var newurl;
-				if (arr.length > 1 && arr[1] !== '') {
-					newurl = window.location.href + '&' +param;
-				} else {
-					newurl = window.location.href + '?' +param;
-				}
-				
-				window.history.pushState({path:newurl},'',newurl);
-			}
-		} else if (force){
-			if (history.pushState){
-				var href = new URL(window.location.href);
-				if (para.length==1){
-					href.searchParams.set(para[0].toLowerCase(), "");
-				} else {
-					href.searchParams.set(para[0].toLowerCase(), para[1]);
-				}
-				log(href.toString());
-				window.history.pushState({path:href.toString()},'',href.toString());
-			}
-		}
-	}
-
-	var counter=0;
+	 <label>
+	 Translate with added context?
+	 <input type="checkbox" id="fullContext" />
+	 </label>
+	 <br /><br />
+	<div class="footer" id="status"></div>
+	<textarea id="input" name="input"></textarea>
+	<br />
+	<div id="output" class="output"></div>
 	
-	function onElementInsertedTwitch(containerSelector, callback) {
-	var onMutationsObserved = function(mutations) {
-		var currentCounter = 0;
-		mutations.forEach(function(mutation) {
-			if (mutation.addedNodes.length) {
-				for (var i = 0, len = mutation.addedNodes.length; i < len; i++) {
-					if ((mutation.addedNodes[i].nodeName == "FONT") && (mutation.addedNodes[i].parentNode.nodeName == "SPAN")){
-						console.log(mutation.addedNodes[i]);
-						currentCounter+=1;
-						if (currentCounter != counter){return;}
-						console.warn(mutation.addedNodes[i]);
-						var textMsg = "<span>"+mutation.addedNodes[i].innerText+"</span>";
-						socket.send(JSON.stringify({"msg":true, "final":textMsg, "id":counter}));
-						document.querySelectorAll(containerSelector)[0].innerHTML = "";
-						break;
-					}
-				}
+<script>
+	
+	
+(function (w) {
+	w.URLSearchParams = w.URLSearchParams || function (searchString) {
+		var self = this;
+		self.searchString = searchString;
+		self.get = function (name) {
+			var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(self.searchString);
+			if (results == null) {
+				return null;
 			}
-		});
+			else {
+				return decodeURI(results[1]) || 0;
+			}
+		};
 	};
-	var target = document.querySelectorAll(containerSelector)[0];
-	var config = { childList: true, subtree: true };
-	var MutationObserver = window.MutationObserver || window.WebKitMutationObserver;
-	var observer = new MutationObserver(onMutationsObserved);
-	observer.observe(target, config);
+
+})(window);
+var urlParams = new URLSearchParams(window.location.search);
+	
+	
+let worker;
+let modelRegistry;
+let version;
+
+const status = function(message){document.getElementById("status").innerText = message;}
+
+
+const langs = { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+    "bg": "Bulgarian",
+    "cs": "Czech",
+    "nl": "Dutch",
+    "en": "English",
+    "et": "Estonian",
+    "de": "German",
+    "fr": "French",
+    "is": "Icelandic",
+    "it": "Italian",
+    "nb": "Norwegian Bokmål",
+    "nn": "Norwegian Nynorsk",
+    "fa": "Persian",
+    "pl": "Polish",
+    "pt": "Portuguese",
+    "ru": "Russian",
+    "es": "Spanish",
+    "uk": "Ukrainian"
+};
+
+
+var myLang = navigator.language || "en-US";
+if (urlParams.has("lang")){
+	myLang = urlParams.get("lang");
+} else {
+	updateURL("lang="+myLang);
+}
+var myLangCode = myLang.split("-")[0].toLowerCase();
+
+var targetCode = "de";
+if (myLangCode == "de"){
+	targetCode = "en";
 }
 
-	onElementInsertedTwitch("#output", function(element){
-	  processMessage(element);
-	});
-	
-	
-	(function (w) {
-		w.URLSearchParams = w.URLSearchParams || function (searchString) {
-			var self = this;
-			self.searchString = searchString;
-			self.get = function (name) {
-				var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(self.searchString);
-				if (results == null) {
-					return null;
-				}
-				else {
-					return decodeURI(results[1]) || 0;
-				}
-			};
-		};
+if (urlParams.has("translate") || urlParams.has("target")){
+	targetCode = urlParams.get("translate") || urlParams.get("target") || targetCode;
+	targetCode = targetCode.split("-")[0].toLowerCase();
+} else {
+	updateURL("translate="+targetCode);
+}
 
-	})(window);
-	var urlParams = new URLSearchParams(window.location.search);
+console.log("Language: "+myLang);
+
+
+const langFrom = document.getElementById("lang-from");
+const langTo = document.getElementById("lang-to");
+
+let supportedFromCodes = {};
+let supportedToCodes = {};
+let currentTo = null;
+
+if (window.Worker) {
+    worker = new Worker("worker.js");
+    worker.postMessage(["import"]);
+}
+
+const translateCall = (text) => {
+    if (!text.trim().length) return;
+    const paragraphs = text.split("\n");
+    const lngFrom = langFrom.value;
+    const lngTo = langTo.value;
+    worker.postMessage(["translate", lngFrom, lngTo, paragraphs, null]);
+};
+
+var label = false;
 	
-	
-	function generateStreamID(){
-		var text = "";
-		var possible = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-		for (var i = 0; i < 7; i++){
-			text += possible.charAt(Math.floor(Math.random() * possible.length));
+if (urlParams.has("label")){
+	label = urlParams.get("label");
+	//label = sanitize(label);
+} 
+
+var counter = 0;
+worker.onmessage = function (e) { // // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+    if (e.data[0] === "translate_reply" && e.data[1]) {
+        document.getElementById("output").innerText = e.data[1].join("<br /><br />");
+		counter+=1;
+		if (label){
+			socket.send(JSON.stringify({"msg":true, "final":e.data[1].join("\n\n"), "id":counter, "label":label, "c": document.getElementById("fullContext").checked, "ln": myLang}));
+		} else {
+			socket.send(JSON.stringify({"msg":true, "final":e.data[1].join("\n\n"), "id":counter, "c": document.getElementById("fullContext").checked, "ln": myLang}));
 		}
-		return text;
-	};
-	
-	var roomID = "test";
-	
-	if (urlParams.has("room")){
-		roomID = urlParams.get("room");
-	} else if (urlParams.has("ROOM")){
-		roomID = urlParams.get("ROOM");
-	} else {
-		roomID = generateStreamID();
-		updateURL("room="+roomID);
-	}
-	
-	var myLang = "en-US";
-	if (urlParams.has("lang")){
-		myLang = urlParams.get("lang");
-	} else {
-		updateURL("lang="+myLang);
-	}
-	
-	console.log("Language: "+myLang);
-		
-				
-	
-	var url = document.URL.substr(0,document.URL.lastIndexOf('/'));
-	
-	document.getElementById("shareLink").href= url+"/overlay?room="+roomID;
-	document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID;
+    } else if (e.data[0] === "load_model_reply" && e.data[1]) {
+        status(e.data[1]);
+        //translateCall();
+    } else if (e.data[0] === "import_reply" && e.data[1]) {
+        modelRegistry = e.data[1];
+        version = e.data[2];
+        init();
+    }
+};
 
-	navigator.clipboard.writeText(url+"/overlay?room="+roomID).then(() => {
-      /* clipboard successfully set */
-    }, () => {
-      /* clipboard write failed */
-    });
+const isSupported = (lngFrom, lngTo) => {
+    return true; //(`${lngFrom}${lngTo}` in modelRegistry) || ((`${lngFrom}en` in modelRegistry) && (`en${lngTo}` in modelRegistry))
+}
 
-	var apiKey = false;
-	var socket = new WebSocket("wss://api.caption.ninja:443");
-	if (urlParams.has("pie")){
-		
-		var apiKey = urlParams.get("pie") || "0khtlN7R7ISHZzFiyfK49Q9zAm93Wti5xpbW9qjg";  // get an API key from https://www.piesocket.com/ for a free API server of your own
-		socket = new WebSocket("wss://free3.piesocket.com/v3/"+roomID+"?api_key="+apiKey);
-		
-		document.getElementById("shareLink").href= url+"/overlay?room="+roomID+"&pie="+apiKey;
-		document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID+"&pie="+apiKey;
-	} 
-		
-	socket.onclose = function (){
-		setTimeout(function(){window.location.reload(true);},100);
-	};
-	
-	socket.onopen = function (){
-		socket.send(JSON.stringify({"join":roomID}));
+const loadModel = () => { // // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+    const lngFrom = langFrom.value;
+    const lngTo = langTo.value;
+    if (lngFrom !== lngTo) {
+        if (!isSupported(lngFrom, lngTo)) {
+            status("Language pair is not supported");
+            document.getElementById("output").innerText = "";
+            return;
+        }
+
+        status(`Installing model...`);
+        console.log(`Loading model '${lngFrom}${lngTo}'`);
+        worker.postMessage(["load_model", lngFrom, lngTo]);
+    } else {
+        const input = document.getElementById("input").value;
+        document.getElementById("output").innerText = "";
+    }
+};
+
+const findFirstSupportedTo = () => {
+    return Object.entries(supportedToCodes).find(([code, ]) => code !== langFrom.value)[0]
+}
+
+langFrom.addEventListener("change", e => {  // // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+    const setToCode = (currentTo !== langFrom.value)
+      ? currentTo
+      : findFirstSupportedTo();
+	  
+	myLangCode = langFrom.value.split("-")[0];
+	if (myLangCode in supportedFromCodes) {
+		console.log("guessing input language is", myLangCode);
+		setFromCode = myLangCode;
 	}
+	recognition.stop(); // restarts with the new lang
+    
+    setLangs(langTo, supportedToCodes, setToCode, langFrom.value);
+    loadModel();
+});
+
+langTo.addEventListener("change", e => {
+    currentTo = langTo.value;
+    loadModel();
+});
+
+const setLangs = (selector, langsToSet, value, exlcude) => {
+    selector.innerHTML = "";
+    for (const [code, type] of Object.entries(langsToSet)) {
+        if (code === exlcude) continue;
+        let name = langs[code];
+        if (type === "dev") name += " (Beta)";
+        selector.innerHTML += "<option value='"+code+"'>"+name+"</option>";
+    }
+    selector.value = value;
+}
+
+function init() {  // // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+    // parse supported languages and model types (prod or dev)
+    supportedFromCodes["en"] = "prod";
+    supportedToCodes["en"] = "prod";
+    for (const [langPair, value] of Object.entries(modelRegistry)) {
+        const firstLang = langPair.substring(0, 2);
+        const secondLang = langPair.substring(2, 4);
+        if (firstLang !== "en") supportedFromCodes[firstLang] = value.model.modelType;
+        if (secondLang !== "en") supportedToCodes[secondLang] = value.model.modelType;
+    }
+
+    // try to guess input language from user agent
+    let setFromCode = "en";
+    if (myLang) {
+        myLangCode = myLang.split("-")[0];
+        if (myLangCode in supportedFromCodes) {
+            console.log("guessing input language is", myLangCode);
+            setFromCode = myLangCode;
+        }
+    }
+    setLangs(langFrom, supportedFromCodes, setFromCode, null);
+
+    // find first output lang that *isn't* input language
+    const setToCode = targetCode;
+    setLangs(langTo, supportedToCodes, setToCode, setFromCode);
+    currentTo = setToCode;
+
+    // load this model
+    loadModel();
+}
 	
-	var final_transcript = '';
-	var idle = null;
-	setup();
-	function setup(){
-		if ('webkitSpeechRecognition' in window){
-			var recognition = new webkitSpeechRecognition();
-			if (myLang){
-				recognition.lang = myLang;
+	
+	
+function updateURL(param, force=false) {
+	var para = param.split('='); 
+	if (!(urlParams.has(para[0].toLowerCase()))){
+		if (history.pushState){
+			
+			var arr = window.location.href.split('?');
+			var newurl;
+			if (arr.length > 1 && arr[1] !== '') {
+				newurl = window.location.href + '&' +param;
+			} else {
+				newurl = window.location.href + '?' +param;
 			}
-			recognition.continuous = false;
-			recognition.interimResults = false;
 			
-			recognition.onstart = function(){
-				console.log("started transcription");
-				
-			};
-			recognition.onerror = function(event){
-				console.log(event);
-			};
-			recognition.onend = function(e){
-				console.log(e);
-				console.log("Stopped transcription");
-				setup();
-			};
-			recognition.onresult = function(event){
-				counter+=1;
-				var interim_transcript = '';
-				if(typeof(event.results) == 'undefined'){
-					console.log(event);
-					return;
-				}
-				for(var i = event.resultIndex; i < event.results.length; ++i){
-					if(event.results[i].isFinal){
-						final_transcript += event.results[i][0].transcript;
-					} 
-				}
-				
-				if (final_transcript){
-					console.log("FINAL:", final_transcript);
-					//final_transcript = final_transcript.split(" ");
-					
-					document.getElementById("output").innerHTML+=final_transcript;
-					document.getElementById("interm").innerHTML="";
-					
-				} 
-				
-			};
-			
-			//recognition.lang = 'en-US';
-			recognition.start();
+			window.history.pushState({path:newurl},'',newurl);
+		}
+	} else if (force){
+		if (history.pushState){
+			var href = new URL(window.location.href);
+			if (para.length==1){
+				href.searchParams.set(para[0].toLowerCase(), "");
+			} else {
+				href.searchParams.set(para[0].toLowerCase(), para[1]);
+			}
+			log(href.toString());
+			window.history.pushState({path:href.toString()},'',href.toString());
 		}
 	}
-	</script>
+}
+
+function generateStreamID(){
+	var text = "";
+	var possible = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+	for (var i = 0; i < 7; i++){
+		text += possible.charAt(Math.floor(Math.random() * possible.length));
+	}
+	return text;
+};
+
+var roomID = "test";
+
+if (urlParams.has("room")){
+	roomID = urlParams.get("room");
+} else if (urlParams.has("ROOM")){
+	roomID = urlParams.get("ROOM");
+} else {
+	roomID = generateStreamID();
+	updateURL("room="+roomID);
+}
+
+
+var url = document.URL.substr(0,document.URL.lastIndexOf('/'));
+
+document.getElementById("shareLink").href= url+"/overlay?room="+roomID;
+document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID;
+
+navigator.clipboard.writeText(url+"/overlay?room="+roomID).then(() => {
+  /* clipboard successfully set */
+}, () => {
+  /* clipboard write failed */
+});
+
+var socket = new WebSocket("wss://api.caption.ninja:443");
+
+socket.onclose = function (){
+	setTimeout(function(){window.location.reload(true);},100);
+};
+
+socket.onopen = function (){
+	socket.send(JSON.stringify({"join":roomID}));
+}
+
+var final_transcript = '';
+var last_transcription  = "";
+var second_transcription = "";
+var idle = null;
+var recognition = null;
+setup();
+var ends = 0;
+
+function setup(){
+	if ('webkitSpeechRecognition' in window){
+		recognition = new webkitSpeechRecognition();
+		if (myLang && myLangCode){
+			if (myLang.split("-")[0] == myLangCode){
+				recognition.lang = myLang;
+			} else {
+				recognition.lang = myLangCode;
+			}
+		} else if (myLangCode){
+			recognition.lang = myLangCode;
+		} else if (myLang){
+			recognition.lang = myLang;
+		}
+		recognition.continuous = false;
+		recognition.interimResults = false;
+		
+		recognition.onstart = function(){
+			console.log("started transcription");
+			setTimeout(function(){
+				ends = 0;
+			}, 2000);
+			
+		};
+		recognition.onerror = function(event){
+			console.error(event);
+			
+		};
+		recognition.onend = function(e){
+			console.log(e);
+			console.log("Stopped transcription");
+			
+			if (event.type === "end"){
+				ends +=1;
+			}
+			if (ends > 3){
+				alert("WARNING: Cannot enable transcription service\n\nThe service will fail completely if more than one transcription session is currently active on your computer.\n\nPlease close other Caption.Ninja tabs or other transcription services and then wait a few minutes before retrying.");
+			}
+			setup();
+		};
+		recognition.onresult = function(event){
+			counter+=1;
+			var interim_transcript = '';
+			if(typeof(event.results) == 'undefined'){
+				console.log(event);
+				return;
+			}
+			
+			for(var i = event.resultIndex; i < event.results.length; ++i){
+				if(event.results[i].isFinal){
+					final_transcript += event.results[i][0].transcript;
+				} 
+			}
+			
+			if (final_transcript){
+				console.log("FINAL:", final_transcript);
+				document.getElementById("input").value = final_transcript;
+				if (document.getElementById("fullContext").checked){
+					translateCall(second_transcription + last_transcription +final_transcript);
+				} else {
+					translateCall(final_transcript);
+				}
+				second_transcription = last_transcription;
+				last_transcription = final_transcript+". ";
+				final_transcript = "";
+			} 
+			
+		};
+		
+		//recognition.lang = 'en-US';
+		recognition.start();
+	}
+}
+</script>
 	</body>
 </html>
