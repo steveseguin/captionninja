@@ -96,6 +96,10 @@ https://caption.ninja/overlay?room=abc123&html
 ```
 ![image](https://user-images.githubusercontent.com/2575698/168219952-827734a2-75bd-45bc-9d8d-f0d7a98fe96c.png)
 
+### Other random commands
+
+`&showtime=5000" , to specify how long messages stay visible on the overlay.html page.  Time in milliseconds, and setting it to 0 will disable the auto-hiding of messages entirely.
+
 ### Self-hosting
 
 Self-hosting is possible to do for free. You can fork this Github repository, use Github pages to host the website for free, and then modify the website code as needed. This is useful for custom styling the site, creating a custom domain name, or specifying a private websocket forwarding service to use.  This app is compatible with generic websocket forwarding services.
