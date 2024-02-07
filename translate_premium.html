@@ -1,0 +1,694 @@
+<html>
+<head>
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+	<meta content="utf-8" http-equiv="encoding" />
+	<meta name="copyright" content="&copy; 2020 Steve Seguin" />
+	<link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon" />
+	<!-- Primary Meta Tags -->
+	<title>CAPTION.Ninja - translate</title>
+	<meta name="title" content="CAPTION.Ninja" />
+	<meta name="description" content="This is a free-to-use captioning tool for OBS. Speech-to-text is done using Machine Learning" />
+	<meta name="author" content="Steve Seguin" />
+
+	
+	<style>
+		@font-face {
+		  font-family: 'Cousine';
+		  src: url('fonts/Cousine-Bold.ttf') format('truetype');
+		}
+	
+		body {
+			margin:15px;
+			padding:15px;
+			height:100%;
+			border: 0;
+			display: block;
+			
+			bottom:0;
+			overflow:hidden;
+			
+			font-family: Cousine, monospace;
+			
+		}
+
+		.output {
+			margin:0;
+			background-color: #0000;
+			color: black;
+			font-size: 3.2em;
+			line-height: 1.1em;
+			letter-spacing: 0.0em;
+			
+			padding: 0em;
+			text-shadow: 0.05em 0.05em 0px rgba(255,255,255,1);
+		}
+		
+		.output span { 
+			background-color: black; 
+			padding: 8px 8px 0px 8px;
+			margin:0;
+		}
+		
+		a {
+			color:blue;
+			font-size:1.2em;
+			text-transform: none;
+		}
+		
+		.github {
+			background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAAAXNSR0IArs4c6QAAAd5JREFUOE+d1MurjlEUBvDfIZQZShEGmMhQiZGZlAlyK4eEAZHcyiVRyq1cUq5FwsD1MJGJiT/AzEzRcR8xMnGOW89pv9q9fScfe/J977o8e61nP2v16HzGYBWWYA4mlbBPeI5HuI9v7fSeDnircRqTh7msMX/ALtyr42rAEbiAzX8BaruTsx0/46gBL/0HWAMe0G01YNq8Xbz5PYuN2ISvCHc5oWEsruA69mJF8a0Mr6kwD/C64mw3zpSgCfjc6nE8vhRbAE+U/+8xI4DrcKNKOol9XfJ4CimgOb0BfIilxfIds/GyS8BZeIGRJf5BAN9gWjE8xcIuwZqwZ1hQPvoDOIBRxRCiN/wj4C30lpyBNmAmYNk/Aj7G4pIz2G75I6Y2Iu0CONwlZ2Ldcl+rqmjvWhdgCdmCi1Xs0KOsxc3C5WDhcw8uI9+dzugyVZFNw3/i1jTCfoVIJmo/VDiJeJ9gPX4U1CRHs4swrnXTO8xsZjlAd9GP+WU1zcPxckGde7WMZbvy5eirl8N5bMUxHMSvYdo9igMt3znsiK29vuLI1ojYU+2dwmWdnwv3V4YskozfUAGdFmzaz4KdgiM43KomNGTW32JnGd0/IZ0A48wrhpPMdFZ+feZievjqpILf7lRg3csIRqAAAAAASUVORK5CYII=");
+			background-color: #FFF !important;
+			width: 4px;
+			height: 12px;
+			background-repeat: no-repeat;
+			display: inline-block;
+			top: 2px;
+			position: relative;
+			left: 2px;
+			filter: invert(100%);
+			-webkit-filter: invert(100%);
+		}
+		div {
+			display:block;
+			
+		}
+		textarea {
+			display:block;
+			width: 700px;
+		}
+	</style>
+</head>
+<body>
+
+	<h3>This is a premium version of the captioning tool, with enhanced speech-to-text transcription & language translation.</h3>
+	
+	The overlay-friendly output of the translated text is mirrored here: <a id="shareLink" href="overlay.html" target='_blank'>*ERROR GENERATING LINK*</a>.
+	<br /><br />
+	To use this app, accept the microphone permissions on page load and then just say something outloud. Once working, enable the transcription.
+	<br /><br />
+	Please note that this app uses your default microphone as the audio input source. 
+	You sometimes can change the default audio source via the browser's setting, but you can also change it at your system level by changing the default recording device. 
+	You can also change audio sources by using a Virtual Audio Cable, <a href='https://www.vb-audio.com/Cable/'> such as this one.</a> 
+	Using it, it becomes possible to select other sources, including microphones, speakers, and other applications.
+	<br /><br />
+	The translation is powered by Google Cloud Translation, which <a href='https://console.cloud.google.com/apis/api/translate.googleapis.com/credentials' target="_blank">requires an API key.</a> (add &key=xxxxxxx to the URL to specify it). <br /><br /><div style='color:red'>I no longer offer access with my own API key, due to heavy and costly abuse.</div> You will need to get your own Google API key if you wish to use this premium version of the service.
+	<br /><br />
+	<label>
+	  From
+	  <select id="lang-from" title="Set input language via the URL `&lang=en-US` option" name="from" class="lang-select"></select>
+	</label>
+	
+	 <label>
+	  To
+	  <select id="lang-to" name="to" class="lang-select"></select>
+	</label>
+	 <label>
+	 <input type="checkbox" id="fullContext" />
+	 Translate with added context?
+	</label>
+	 <label>
+	 <input type="checkbox" id="enabledTranscription" />
+	  <span style='color:green;'><b>Start</b></span> Translation Output
+	 </label>
+	 <span id="whosekey"></span>
+	 <br /><br />
+	<div class="footer" id="status"></div>
+	<textarea id="input" name="input"></textarea>
+	<br />
+	<div id="output" class="output"></div>
+	
+<script>
+	
+	
+(function (w) {
+	w.URLSearchParams = w.URLSearchParams || function (searchString) {
+		var self = this;
+		self.searchString = searchString;
+		self.get = function (name) {
+			var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(self.searchString);
+			if (results == null) {
+				return null;
+			}
+			else {
+				return decodeURI(results[1]) || 0;
+			}
+		};
+	};
+
+})(window);
+var urlParams = new URLSearchParams(window.location.search);
+	
+	
+let version;
+
+const status = function(message){document.getElementById("status").innerText = message;}
+
+// Optionally, enter an API key from the Google API Console.  You will need to ensure it has Google Cloud Translation enabled / added for it.
+// https://console.developers.google.com/apis/credentials
+
+var apiKey = ""; // put your API key in there
+
+var langs = { 
+    "aa": "Afar",
+    "ab": "Abkhazian",
+    "ae": "Avestan",
+    "af": "Afrikaans",
+    "ak": "Akan",
+    "am": "Amharic",
+    "an": "Aragonese",
+    "ar": "Arabic",
+    "as": "Assamese",
+    "av": "Avaric",
+    "ay": "Aymara",
+    "az": "Azerbaijani",
+    "ba": "Bashkir",
+    "be": "Belarusian",
+    "bg": "Bulgarian",
+    "bh": "Bihari languages",
+    "bi": "Bislama",
+    "bm": "Bambara",
+    "bn": "Bengali",
+    "bo": "Tibetan",
+    "br": "Breton",
+    "bs": "Bosnian",
+    "ca": "Catalan; Valencian",
+    "ce": "Chechen",
+    "ch": "Chamorro",
+    "co": "Corsican",
+    "cr": "Cree",
+    "cs": "Czech",
+    "cu": "Church Slavic; Old Slavonic; Church Slavonic; Old Bulgarian; Old Church Slavonic",
+    "cv": "Chuvash",
+    "cy": "Welsh",
+    "da": "Danish",
+    "de": "German",
+    "dv": "Divehi; Dhivehi; Maldivian",
+    "dz": "Dzongkha",
+    "ee": "Ewe",
+    "el": "Greek, Modern (1453-)",
+    "en": "English",
+    "eo": "Esperanto",
+    "es": "Spanish; Castilian",
+    "et": "Estonian",
+    "eu": "Basque",
+    "fa": "Persian",
+    "ff": "Fulah",
+    "fi": "Finnish",
+    "fj": "Fijian",
+    "fo": "Faroese",
+    "fr": "French",
+    "fy": "Western Frisian",
+    "ga": "Irish",
+    "gd": "Gaelic; Scomttish Gaelic",
+    "gl": "Galician",
+    "gn": "Guarani",
+    "gu": "Gujarati",
+    "gv": "Manx",
+    "ha": "Hausa",
+    "he": "Hebrew",
+    "hi": "Hindi",
+    "ho": "Hiri Motu",
+    "hr": "Croatian",
+    "ht": "Haitian; Haitian Creole",
+    "hu": "Hungarian",
+    "hy": "Armenian",
+    "hz": "Herero",
+    "ia": "Interlingua (International Auxiliary Language Association)",
+    "id": "Indonesian",
+    "ie": "Interlingue; Occidental",
+    "ig": "Igbo",
+    "ii": "Sichuan Yi; Nuosu",
+    "ik": "Inupiaq",
+    "io": "Ido",
+    "is": "Icelandic",
+    "it": "Italian",
+    "iu": "Inuktitut",
+    "ja": "Japanese",
+    "jv": "Javanese",
+    "ka": "Georgian",
+    "kg": "Kongo",
+    "ki": "Kikuyu; Gikuyu",
+    "kj": "Kuanyama; Kwanyama",
+    "kk": "Kazakh",
+    "kl": "Kalaallisut; Greenlandic",
+    "km": "Central Khmer",
+    "kn": "Kannada",
+    "ko": "Korean",
+    "kr": "Kanuri",
+    "ks": "Kashmiri",
+    "ku": "Kurdish",
+    "kv": "Komi",
+    "kw": "Cornish",
+    "ky": "Kirghiz; Kyrgyz",
+    "la": "Latin",
+    "lb": "Luxembourgish; Letzeburgesch",
+    "lg": "Ganda",
+    "li": "Limburgan; Limburger; Limburgish",
+    "ln": "Lingala",
+    "lo": "Lao",
+    "lt": "Lithuanian",
+    "lu": "Luba-Katanga",
+    "lv": "Latvian",
+    "mg": "Malagasy",
+    "mh": "Marshallese",
+    "mi": "Maori",
+    "mk": "Macedonian",
+    "ml": "Malayalam",
+    "mn": "Mongolian",
+    "mr": "Marathi",
+    "ms": "Malay",
+    "mt": "Maltese",
+    "my": "Burmese",
+    "na": "Nauru",
+    "nb": "Bokmål, Norwegian; Norwegian Bokmål",
+    "nd": "Ndebele, North; North Ndebele",
+    "ne": "Nepali",
+    "ng": "Ndonga",
+    "nl": "Dutch; Flemish",
+    "nn": "Norwegian Nynorsk; Nynorsk, Norwegian",
+    "no": "Norwegian",
+    "nr": "Ndebele, South; South Ndebele",
+    "nv": "Navajo; Navaho",
+    "ny": "Chichewa; Chewa; Nyanja",
+    "oc": "Occitan (post 1500)",
+    "oj": "Ojibwa",
+    "om": "Oromo",
+    "or": "Oriya",
+    "os": "Ossetian; Ossetic",
+    "pa": "Panjabi; Punjabi",
+    "pi": "Pali",
+    "pl": "Polish",
+    "ps": "Pushto; Pashto",
+    "pt": "Portuguese",
+    "qu": "Quechua",
+    "rm": "Romansh",
+    "rn": "Rundi",
+    "ro": "Romanian; Moldavian; Moldovan",
+    "ru": "Russian",
+    "rw": "Kinyarwanda",
+    "sa": "Sanskrit",
+    "sc": "Sardinian",
+    "sd": "Sindhi",
+    "se": "Northern Sami",
+    "sg": "Sango",
+    "si": "Sinhala; Sinhalese",
+    "sk": "Slovak",
+    "sl": "Slovenian",
+    "sm": "Samoan",
+    "sn": "Shona",
+    "so": "Somali",
+    "sq": "Albanian",
+    "sr": "Serbian",
+    "ss": "Swati",
+    "st": "Sotho, Southern",
+    "su": "Sundanese",
+    "sv": "Swedish",
+    "sw": "Swahili",
+    "ta": "Tamil",
+    "te": "Telugu",
+    "tg": "Tajik",
+    "th": "Thai",
+    "ti": "Tigrinya",
+    "tk": "Turkmen",
+    "tl": "Tagalog",
+    "tn": "Tswana",
+    "to": "Tonga (Tonga Islands)",
+    "tr": "Turkish",
+    "ts": "Tsonga",
+    "tt": "Tatar",
+    "tw": "Twi",
+    "ty": "Tahitian",
+    "ug": "Uighur; Uyghur",
+    "uk": "Ukrainian",
+    "ur": "Urdu",
+    "uz": "Uzbek",
+    "ve": "Venda",
+    "vi": "Vietnamese",
+    "vo": "Volapük",
+    "wa": "Walloon",
+    "wo": "Wolof",
+    "xh": "Xhosa",
+    "yi": "Yiddish",
+    "yo": "Yoruba",
+    "za": "Zhuang; Chuang",
+    "zh": "Chinese",
+    "zu": "Zulu"
+};
+
+
+if (urlParams.has("key")){
+	apiKey = urlParams.get("key") || "";
+} 
+
+function getStorage(cname) {
+	try {
+		var itemStr = localStorage.getItem(cname);
+	} catch(e){
+		errorlog(e);
+		return;
+	}
+	if (!itemStr) {
+		return "";
+	}
+	let item = JSON.parse(itemStr);
+	let now = new Date();
+	if (now.getTime() > item.expiry) {
+		localStorage.removeItem(cname);
+		return "";
+	}
+	return item.value;
+}
+
+if (!apiKey && getStorage("apiKey")){
+	apiKey = getStorage("apiKey");
+} else if (apiKey){
+	setStorage("apiKey", apiKey, 999999);
+}
+
+if (!apiKey){
+	document.getElementById("whosekey").innerText = "(please consider using your own key)";
+	document.getElementById("whosekey").style = "color: black; background-color: yellow;";
+} else {
+	document.getElementById("whosekey").innerText = "PRIVATE KEY ACTIVE";
+	document.getElementById("whosekey").style = "color: white; background-color: green;";
+}
+function removeStorage(cname){
+	localStorage.removeItem(cname);
+}
+
+function clearStorage(){
+	localStorage.clear();
+	if (!session.cleanOutput){
+		warnUser("The local storage and saved settings have been cleared", 1000);
+	}
+}
+
+function setStorage(cname, cvalue, hours=9999){ // not actually a cookie
+	let now = new Date();
+	let item = {
+		value: cvalue,
+		expiry: now.getTime() + (hours * 60 * 60 * 1000),
+	};
+	try{
+		localStorage.setItem(cname, JSON.stringify(item));
+	}catch(e){errorlog(e);}
+}
+
+
+var myLang = navigator.language || "en-US";
+
+
+if (urlParams.has("lang")){
+	myLang = urlParams.get("lang");
+} else if (getStorage("myLang")){
+	myLang = getStorage("myLang");
+} else {
+	updateURL("lang="+myLang);
+}
+var myLangCode = myLang.split("-")[0].toLowerCase();
+
+var targetCode = "de";
+if (myLangCode == "de"){
+	targetCode = "en";
+}
+
+if (getStorage("targetCode")){
+	targetCode = getStorage("targetCode");
+} 
+
+
+if (urlParams.has("translate") || urlParams.has("target")){
+	targetCode = urlParams.get("translate") || urlParams.get("target") || targetCode;
+	targetCode = targetCode.split("-")[0].toLowerCase();
+} else if (getStorage("targetCode")){
+	targetCode = getStorage("targetCode");
+} else {
+	updateURL("translate="+targetCode);
+}
+
+setStorage("targetCode", targetCode, 999999)
+setStorage("myLang", myLang, 999999);
+
+var label = false;
+if (urlParams.has("label")){
+	label = urlParams.get("label");
+} 
+
+
+const langFrom = document.getElementById("lang-from");
+const langTo = document.getElementById("lang-to");
+
+var availableLangs = {};
+
+if (apiKey){
+	var langurl = "https://www.googleapis.com/language/translate/v2/languages?key=" + apiKey;
+} else {
+	var langurl = "https://captionninjapremium.vdo.workers.dev/?ts="+Date.now();
+}
+
+fetch(langurl, {
+	method: 'GET',
+	headers: {
+		'Content-Type': 'application/json',
+		'Accept': 'application/json'
+	}
+}).then((response) => response.json()).then((data) => {
+	console.log(data);
+	var languages = data.data.languages;
+	languages.forEach(l=>{
+		availableLangs[l.language] = langs[l.language] || l.language;
+		
+		var option = document.createElement("option");
+		option.innerText = langs[l.language] || l.language;
+		option.value = l.language;
+		if (option.value == myLangCode){
+			option.selected = true;
+		}
+		langFrom.appendChild(option);
+		
+		option = document.createElement("option");
+		option.innerText = langs[l.language] || l.language;
+		option.value = l.language;
+		if (option.value == targetCode){
+			option.selected = true;
+		}
+		langTo.appendChild(option);
+	});
+	setup(); // sets up the translation
+});
+
+var counter = 0;
+
+function translate(textToTranslate) {
+	if (!document.getElementById("enabledTranscription").checked){return;}
+	
+	if (apiKey){
+	  var url = "https://www.googleapis.com/language/translate/v2/?key=" + apiKey + "&q=" + encodeURI(textToTranslate) + "&target=" + targetCode + "&source=" + myLangCode;
+	} else {
+	  var url = "https://captionninjapremium.vdo.workers.dev/?ts="+Date.now()+ "&q=" + encodeURI(textToTranslate) + "&target=" + targetCode + "&source=" + myLangCode;
+	}
+
+	fetch(url, {
+		method: 'GET',
+		headers: {
+			'Content-Type': 'application/json',
+			'Accept': 'application/json'
+		}
+	}).then((response) => response.json()).then((data) => {
+		console.log(data);
+		console.log(data.data.translations[0].translatedText);
+		updateTrans(data.data.translations[0].translatedText)
+	});
+}
+
+
+function updateTrans(data){
+	document.getElementById("output").innerHTML = data;
+	var text = document.getElementById("output").textContent || "";
+	counter+=1;
+	if (label){
+		socket.send(JSON.stringify({"msg":true, "final":text, "id":counter, "label":label, "c": document.getElementById("fullContext").checked, "ln": targetCode}));
+	} else {
+		socket.send(JSON.stringify({"msg":true, "final":text, "id":counter, "c": document.getElementById("fullContext").checked, "ln": targetCode}));
+	}
+}
+
+langFrom.addEventListener("change", e => {  // // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+	myLangCode = e.target.value;
+	console.log(myLangCode)
+	//setStorage("targetCode", targetCode, 999999)
+	if (myLang.split("-")[0].toLowerCase() !== myLangCode){
+		setStorage("myLang", myLangCode, 999999);
+		updateURL("lang="+myLangCode, true);
+		recognition.onend = null;
+		recognition.stop();
+		recognition = null;
+		setup();
+	}
+});
+
+langTo.addEventListener("change", e => {
+	targetCode = e.target.value;
+	updateURL("translate="+targetCode, true);
+	console.log(targetCode);
+	setStorage("targetCode", targetCode, 999999);
+	
+	//setStorage("myLangCode", myLangCode, 999999);
+});
+
+
+function updateURL(param, force=false) {
+	var para = param.split('='); 
+	if (!(urlParams.has(para[0].toLowerCase()))){
+		if (history.pushState){
+			
+			var arr = window.location.href.split('?');
+			var newurl;
+			if (arr.length > 1 && arr[1] !== '') {
+				newurl = window.location.href + '&' +param;
+			} else {
+				newurl = window.location.href + '?' +param;
+			}
+			
+			window.history.pushState({path:newurl},'',newurl);
+		}
+	} else if (force){
+		if (history.pushState){
+			var href = new URL(window.location.href);
+			if (para.length==1){
+				href.searchParams.set(para[0].toLowerCase(), "");
+			} else {
+				href.searchParams.set(para[0].toLowerCase(), para[1]);
+			}
+			window.history.pushState({path:href.toString()},'',href.toString());
+		}
+	}
+}
+
+function generateStreamID(){
+	var text = "";
+	var possible = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+	for (var i = 0; i < 7; i++){
+		text += possible.charAt(Math.floor(Math.random() * possible.length));
+	}
+	return text;
+};
+
+var roomID = "test";
+if (urlParams.has("room")){
+	roomID = urlParams.get("room");
+} else if (urlParams.has("ROOM")){
+	roomID = urlParams.get("ROOM");
+} else {
+	roomID = generateStreamID();
+	updateURL("room="+roomID);
+}
+
+
+var url = document.URL.substr(0,document.URL.lastIndexOf('/'));
+
+document.getElementById("shareLink").href= url+"/overlay?room="+roomID;
+document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID;
+
+navigator.clipboard.writeText(url+"/overlay?room="+roomID).then(() => {
+  /* clipboard successfully set */
+}, () => {
+  /* clipboard write failed */
+});
+
+var socket = new WebSocket("wss://api.caption.ninja:443");
+
+socket.onclose = function (){
+	setTimeout(function(){window.location.reload(true);},100);
+};
+
+socket.onopen = function (){
+	socket.send(JSON.stringify({"join":roomID}));
+}
+
+var final_transcript = '';
+var last_transcription  = "";
+var second_transcription = "";
+var idle = null;
+var recognition = null;
+var ends = 0;
+
+function setup(){
+	if ('webkitSpeechRecognition' in window){
+		console.log("Setting up webkitSpeechRecognition");
+		recognition = new webkitSpeechRecognition();
+		if (myLang && myLangCode){
+			if (myLang.split("-")[0] == myLangCode){
+				recognition.lang = myLang;
+			} else {
+				recognition.lang = myLangCode;
+			}
+		} else if (myLangCode){
+			recognition.lang = myLangCode;
+		} else if (myLang){
+			recognition.lang = myLang;
+		}
+		recognition.continuous = true;
+		recognition.interimResults = false;
+		
+		recognition.onstart = function(){
+			console.log("started transcription");
+			setTimeout(function(){
+				ends = 0;
+			}, 2000);
+			
+		};
+		recognition.onerror = function(event){
+			console.error(event);
+			
+		};
+		recognition.onend = function(e){
+			console.log(e);
+			console.log("Stopped transcription");
+			
+			if (event.type === "end"){
+				ends +=1;
+			}
+			if (ends > 3){
+				alert("WARNING: Cannot enable transcription service\n\nThe service will fail completely if more than one transcription session is currently active on your computer.\n\nPlease close other Caption.Ninja tabs or other transcription services and then wait a few minutes before retrying.");
+			} else {
+				recognition.start();
+			}
+		};
+		recognition.onresult = function(event){
+			//counter+=1;
+			var interim_transcript = '';
+			if(typeof(event.results) == 'undefined'){
+				console.log(event);
+				return;
+			}
+			
+			for(var i = event.resultIndex; i < event.results.length; ++i){
+				if(event.results[i].isFinal){
+					final_transcript += event.results[i][0].transcript;
+				} 
+			}
+			
+			if (final_transcript){
+				console.log("FINAL:", final_transcript);
+				document.getElementById("input").value = final_transcript;
+				if (document.getElementById("fullContext").checked){
+					translate(second_transcription + last_transcription +final_transcript)
+				} else {
+					translate(final_transcript);
+				}
+				second_transcription = last_transcription;
+				last_transcription = final_transcript+". ";
+				final_transcript = "";
+			} 
+			
+		};
+		
+		//recognition.lang = 'en-US';
+		recognition.start();
+	}
+}
+</script>
+</body>
+</html>
