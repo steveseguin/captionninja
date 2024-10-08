@@ -597,15 +597,30 @@ navigator.clipboard.writeText(url+"/overlay?room="+roomID).then(() => {
   /* clipboard write failed */
 });
 
-var socket = new WebSocket("wss://api.caption.ninja:443");
+var socket;
 
-socket.onclose = function (){
-	setTimeout(function(){window.location.reload(true);},100);
-};
+function connectWebSocket() {
+  socket = new WebSocket("wss://api.caption.ninja:443");
 
-socket.onopen = function (){
-	socket.send(JSON.stringify({"join":roomID}));
+  socket.onclose = function() {
+    console.log("WebSocket connection closed. Attempting to reconnect...");
+    setTimeout(connectWebSocket, 500); // Try to reconnect after 5 seconds
+  };
+
+  socket.onopen = function() {
+    console.log("WebSocket connected. Joining room...");
+    socket.send(JSON.stringify({"join":roomID}));
+  };
+
+  // Add error handling
+  socket.onerror = function(error) {
+    console.error("WebSocket error:", error);
+	setTimeout(connectWebSocket, 5000); // Try to reconnect after 5 seconds
+  };
 }
+
+// Initial connection
+connectWebSocket();
 
 var final_transcript = '';
 var last_transcription  = "";

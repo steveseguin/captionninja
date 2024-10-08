@@ -191,16 +191,16 @@ let supportedToCodes = {};
 let currentTo = null;
 
 if (window.Worker) {
-    worker = new Worker("worker.js");
+    worker = new Worker("worker.js?v=2");
     worker.postMessage(["import"]);
 }
 
-const translateCall = (text) => {
+function translateCall(text, interm=false){
     if (!text.trim().length) return;
     const paragraphs = text.split("\n");
     const lngFrom = langFrom.value;
     const lngTo = langTo.value;
-    worker.postMessage(["translate", lngFrom, lngTo, paragraphs, null]);
+    worker.postMessage(["translate", lngFrom, lngTo, paragraphs, null, interm]);
 };
 
 var label = false;
@@ -215,10 +215,19 @@ worker.onmessage = function (e) { // // https://github.com/mozilla/translate - M
     if (e.data[0] === "translate_reply" && e.data[1]) {
         document.getElementById("output").innerText = e.data[1].join("<br /><br />");
 		counter+=1;
-		if (label){
-			socket.send(JSON.stringify({"msg":true, "final":e.data[1].join("\n\n"), "id":counter, "label":label, "c": document.getElementById("fullContext").checked, "ln": myLang}));
+		
+		if (e.data[3]||false){
+			if (label){
+				socket.send(JSON.stringify({"msg":true, "interm":e.data[1].join("\n\n"), "id":counter, "label":label, "c": document.getElementById("fullContext").checked, "ln": myLang}));
+			} else {
+				socket.send(JSON.stringify({"msg":true, "interm":e.data[1].join("\n\n"), "id":counter, "c": document.getElementById("fullContext").checked, "ln": myLang}));
+			}
 		} else {
-			socket.send(JSON.stringify({"msg":true, "final":e.data[1].join("\n\n"), "id":counter, "c": document.getElementById("fullContext").checked, "ln": myLang}));
+			if (label){
+				socket.send(JSON.stringify({"msg":true, "final":e.data[1].join("\n\n"), "id":counter, "label":label, "c": document.getElementById("fullContext").checked, "ln": myLang}));
+			} else {
+				socket.send(JSON.stringify({"msg":true, "final":e.data[1].join("\n\n"), "id":counter, "c": document.getElementById("fullContext").checked, "ln": myLang}));
+			}
 		}
     } else if (e.data[0] === "load_model_reply" && e.data[1]) {
         status(e.data[1]);
@@ -383,17 +392,32 @@ navigator.clipboard.writeText(url+"/overlay?room="+roomID).then(() => {
   /* clipboard write failed */
 });
 
-var socket = new WebSocket("wss://api.caption.ninja:443");
+var socket;
 
-socket.onclose = function (){
-	setTimeout(function(){window.location.reload(true);},100);
-};
+function connectWebSocket() {
+  socket = new WebSocket("wss://api.caption.ninja:443");
 
-socket.onopen = function (){
-	socket.send(JSON.stringify({"join":roomID}));
+  socket.onclose = function() {
+    console.log("WebSocket connection closed. Attempting to reconnect...");
+    setTimeout(connectWebSocket, 500); // Try to reconnect after 5 seconds
+  };
+
+  socket.onopen = function() {
+    console.log("WebSocket connected. Joining room...");
+    socket.send(JSON.stringify({"join":roomID}));
+  };
+
+  // Add error handling
+  socket.onerror = function(error) {
+    console.error("WebSocket error:", error);
+	setTimeout(connectWebSocket, 5000); // Try to reconnect after 5 seconds
+  };
 }
 
-var final_transcript = '';
+// Initial connection
+connectWebSocket();
+
+var transcript = '';
 var last_transcription  = "";
 var second_transcription = "";
 var idle = null;
@@ -416,7 +440,7 @@ function setup(){
 			recognition.lang = myLang;
 		}
 		recognition.continuous = false;
-		recognition.interimResults = false;
+		recognition.interimResults = true;
 		
 		recognition.onstart = function(){
 			console.log("started transcription");
@@ -444,29 +468,39 @@ function setup(){
 		recognition.onresult = function(event){
 			counter+=1;
 			var interim_transcript = '';
+			
 			if(typeof(event.results) == 'undefined'){
 				console.log(event);
 				return;
 			}
 			
+			var isFinal = false;
 			for(var i = event.resultIndex; i < event.results.length; ++i){
-				if(event.results[i].isFinal){
-					final_transcript += event.results[i][0].transcript;
+				if (event.results[i].isFinal){
+					isFinal = true;
+				}
+				if (event.results[i][0].transcript){
+					transcript += event.results[i][0].transcript;
 				} 
 			}
 			
-			if (final_transcript){
-				console.log("FINAL:", final_transcript);
-				document.getElementById("input").value = final_transcript;
-				if (document.getElementById("fullContext").checked){
-					translateCall(second_transcription + last_transcription +final_transcript);
-				} else {
-					translateCall(final_transcript);
+			if (transcript){
+				if (isFinal){
+					console.log("final transcript:", transcript);
 				}
-				second_transcription = last_transcription;
-				last_transcription = final_transcript+". ";
-				final_transcript = "";
+				document.getElementById("input").value = transcript;
+				if (document.getElementById("fullContext").checked){
+					translateCall(second_transcription + last_transcription +transcript, !isFinal);
+				} else {
+					translateCall(transcript, !isFinal);
+				}
+				if (isFinal){
+					second_transcription = last_transcription;
+					last_transcription = transcript+". ";
+				}
+				transcript = "";
 			} 
+			
 			
 		};
 		

@@ -153,23 +153,22 @@
 			worker.postMessage(["import"]);
 		}
 
-		var translateCall = (text, meta) => { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+		var translateCall = (text, meta, interm=false) => { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
 			if (!text.trim().length) return;
 			const paragraphs = text.split("\n");
-			worker.postMessage(["translate", langFrom, langTo, paragraphs, meta]);
+			worker.postMessage(["translate", langFrom, langTo, paragraphs, meta, interm]);
 		};
 
 		worker.onmessage = function (e) {
 			if (e.data[0] === "translate_reply" && e.data[1]) {
-			
 				if (!e.data[2]){
 					document.getElementById("output").innerText = e.data[1].join("<br /><br />");
 				} else if (e.data[2].final){
 					e.data[2].final = e.data[1].join("<br /><br />");
-					processReply(e.data[2]);
+					processReply(e.data[2], (e.data[3]||false));
 				} else if (e.data[2].interm){
 					e.data[2].interm = e.data[1].join("<br /><br />");
-					processReply(e.data[2]);
+					processReply(e.data[2], (e.data[3]||false));
 				} else {
 					document.getElementById("output").innerText = e.data[1].join("<br /><br />");
 				}
@@ -242,21 +241,31 @@
 	
 	//var counter=0;
 	var idle = null;
-	
-	var socket = new WebSocket("wss://api.caption.ninja:443");
-	if (urlParams.has("pie")){
-		var apiKey = urlParams.get("pie") || "0khtlN7R7ISHZzFiyfK49Q9zAm93Wti5xpbW9qjg";  // get an API key from https://www.piesocket.com/ for a free API server of your own
-		socket = new WebSocket("wss://free3.piesocket.com/v3/"+roomID+"?api_key="+apiKey);
-	} 
-	
-		
-	socket.onclose = function (){
-		setTimeout(function(){window.location.reload(true);},100);
-	};
-	
-	socket.onopen = function (){
+
+	var socket;
+
+	function connectWebSocket() {
+	  socket = new WebSocket("wss://api.caption.ninja:443");
+
+	  socket.onclose = function() {
+		console.log("WebSocket connection closed. Attempting to reconnect...");
+		setTimeout(connectWebSocket, 500); // Try to reconnect after 5 seconds
+	  };
+
+	  socket.onopen = function() {
+		console.log("WebSocket connected. Joining room...");
 		socket.send(JSON.stringify({"join":roomID}));
+	  };
+
+	  // Add error handling
+	  socket.onerror = function(error) {
+		console.error("WebSocket error:", error);
+		setTimeout(connectWebSocket, 5000); // Try to reconnect after 5 seconds
+	  };
 	}
+
+	// Initial connection
+	connectWebSocket();
 	
 	socket.addEventListener('message', function (event) {
 		
@@ -269,7 +278,7 @@
 						console.log("Loading model");
 						loadModel();
 					}
-					translateCall(data.final || data.interm, data);
+					translateCall(data.final || data.interm, data, data.interm||false);
 				//}
 			} else {
 				processReply(data);
@@ -295,7 +304,6 @@
 	
 	
 	function processReply(data){
-			
 		var newLabel = false;
 		
 		if (data.label){
@@ -310,6 +318,7 @@
 		} else {
 			label = "";
 		}
+		console.log(data);
 		if ("interm" in data){
 			document.getElementById("interm").innerHTML = label+"<span>"+sanitize(data.interm)+"</span><br/>";
 		} else if ("final" in data){

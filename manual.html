@@ -169,29 +169,31 @@
     }); 
 
 	var apiKey = false;
-	var socket = new WebSocket("wss://api.caption.ninja:443");
-	if (urlParams.has("pie")){
-		
-		var apiKey = urlParams.get("pie") || "0khtlN7R7ISHZzFiyfK49Q9zAm93Wti5xpbW9qjg";  // get an API key from https://www.piesocket.com/ for a free API server of your own (pie seems to no longer be free? sorry)
-		socket = new WebSocket("wss://free3.piesocket.com/v3/"+roomID+"?api_key="+apiKey);
-		
-		document.getElementById("shareLink").href= url+"/overlay?room="+roomID+"&pie="+apiKey;
-		document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID+"&pie="+apiKey;
-		navigator.clipboard.writeText( url+"/overlay?room="+roomID+"&pie="+apiKey).then(() => {
-		  /* clipboard successfully set */
-		}, () => {
-		  /* clipboard write failed */
-		});
-	} 
-		
-	socket.onclose = function (){
-		setTimeout(function(){window.location.reload(true);},100);
-	};
-	
-	socket.onopen = function (){
+
+	var socket;
+
+	function connectWebSocket() {
+	  socket = new WebSocket("wss://api.caption.ninja:443");
+
+	  socket.onclose = function() {
+		console.log("WebSocket connection closed. Attempting to reconnect...");
+		setTimeout(connectWebSocket, 500); // Try to reconnect after 5 seconds
+	  };
+
+	  socket.onopen = function() {
+		console.log("WebSocket connected. Joining room...");
 		socket.send(JSON.stringify({"join":roomID}));
+	  };
+
+	  // Add error handling
+	  socket.onerror = function(error) {
+		console.error("WebSocket error:", error);
+		setTimeout(connectWebSocket, 5000); // Try to reconnect after 5 seconds
+	  };
 	}
-	
+
+	// Initial connection
+	connectWebSocket();
 	
 	function interResults(){
 		counter+=1;
