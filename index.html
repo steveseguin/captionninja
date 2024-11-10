@@ -70,62 +70,77 @@
 			filter: invert(100%);
 			-webkit-filter: invert(100%);
 		}
+		.small-text-container {
+			background-color: black;
+			padding: 10px;
+			margin-top: 10px;
+		}
 	</style>
 </head>
 <body>
-	
 	<div id="interm" class="output">
-	<font style='font-size:60%;line-height: 1.4em;' ><span >This is a free-to-use captioning tool.</span></font><font style='font-size:30%;line-height: 1.4em;' ><span ><br /><br />
-	The output of this app is mirrored here: <a id="shareLink" href="overlay.html" target='_blank'>*ERROR GENERATING LINK*</a>. Add it to OBS as a browser source overlay if wishing to use it for a live stream.
-	<br /><br />
-	To use this app, accept the microphone permissions on page load and then just say something outloud.
-	<br /><br />
-	Please note that this app uses your default microphone as the audio input source. You sometimes can change the default audio source via the browser's setting, but you can also change it at your system level by changing the default recording device. You can also change audio sources by using a Virtual Audio Cable, <a href='https://www.vb-audio.com/Cable/'> such as this one.</a> Using it, it becomes possible to select other sources, including microphones, speakers, and other applications.
-	<br /><br />
-	Using Google Chrome is strongly recommended for best results.
-	<br /><br />
-	If you wish to save the transcription, just select-all when done (CTRL+A), copy the selected text(CTRL+C), pasting it into text editor (CTRL+V).
-	<br /><br />
-	If you wish to translate to another language, you can try the <a href='./translate'>experimental translation version here</a> or add &translate={bg,cs,nl,en,et,de,fr,is,it,nb,nn,fa,pl,pt,ru,es,uk} to the overlay page.
-	<br /><br />
-	Update URL to change the <a href="https://cloud.google.com/speech-to-text/docs/languages" target="_blank">Language; Codes here</a><br /><br />
-	More options and details <a href='https://github.com/steveseguin/captionninja'>on Github <span class="github"></span></a></span></font><br /><br /></div>
+	<font style='font-size:60%;line-height: 1.4em;'><span>Welcome to CAPTION.Ninja - A Free Captioning Tool</span></font>
+	<div class="small-text-container">
+		<font style='font-size:30%;line-height: 1.4em;'>
+		<span>
+		<br />
+		<strong>📖 Quick Start:</strong>
+		<ol>
+			<li>Accept the microphone permissions when prompted.</li>
+			<li>Start speaking - your words will appear as captions.</li>
+			<li>For live streaming, add this link to OBS as a browser source overlay: 👉 <a id="shareLink" href="overlay.html" target='_blank'>*ERROR GENERATING LINK*</a></li>
+		</ol>
+
+		<strong>💡 Tips:</strong>
+		<ul>
+			<li>Use Google Chrome for best results.</li>
+			<li>To save the transcription: Select all (CTRL+A), copy (CTRL+C), and paste into a text editor (CTRL+V).</li>
+			<li>Change languages by updating the URL. <a href="https://cloud.google.com/speech-to-text/docs/languages" target="_blank">View language codes here</a></li>
+		</ul>
+
+		<strong>🔬🛠️ Advanced Features:</strong>
+		<ul>
+			<li>Try our <a href='./translate'>LIVE TRANSLATION version here</a>❗</li>
+			<li>Use a <a href='https://www.vb-audio.com/Cable/'>Virtual Audio Cable</a> to caption from other audio sources</li>
+			<li>Add &translate={bg,cs,nl,en,et,de,fr,is,it,nb,nn,fa,pl,pt,ru,es,uk} to the overlay page URL for translation</li>
+		</ul>
+
+		<strong>🆘 Need Help?</strong>
+		<ul>
+			<li>Check out more options and details on <a href='https://github.com/steveseguin/captionninja'>GitHub <span class="github"></span></a></li>
+			<li>Ask for help on <a href='https://discord.vdo.ninja'>our Discord server<span class="discord"></span></a> - @steve for help there</li>
+		</ul>
+		</span>
+		</font>
+	</div>
+	<br />
+	</div>
 	
 	<div id="output" class="output"></div>
 	
 	<script>
-	
 	function download(filename, text) {
 	  var element = document.createElement('a');
 	  element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
 	  element.setAttribute('download', filename);
-
 	  element.style.display = 'none';
 	  document.body.appendChild(element);
-
 	  element.click();
-
 	  document.body.removeChild(element);
 	}
-	
 	function getOldStorage() {
-
 		var values = [],
 			keys = Object.keys(localStorage),
 			i = keys.length;
-
 		while ( i-- ) {
 			values.push( localStorage.getItem(keys[i]) );
 		}
-
 		return values;
 	}
-	
 	function removeStorage(cname){
 		localStorage.removeItem(cname);
 	}
-
-	function setStorage(cname, cvalue, exdays=999){ // not actually a cookie
+	function setStorage(cname, cvalue, exdays=999){
 		var now = new Date();
 		var item = {
 			value: cvalue,
@@ -135,7 +150,6 @@
 			localStorage.setItem(cname, JSON.stringify(item));
 		}catch(e){errorlog(e);}
 	}
-
 	function getStorage(cname) {
 		try {
 			var itemStr = localStorage.getItem(cname);
@@ -154,12 +168,10 @@
 		}
 		return item.value;
 	}
-	
 	function updateURL(param, force=false) {
-		var para = param.split('='); 
+		var para = param.split('=');
 		if (!(urlParams.has(para[0].toLowerCase()))){
 			if (history.pushState){
-				
 				var arr = window.location.href.split('?');
 				var newurl;
 				if (arr.length > 1 && arr[1] !== '') {
@@ -167,7 +179,6 @@
 				} else {
 					newurl = window.location.href + '?' +param;
 				}
-				
 				window.history.pushState({path:newurl},'',newurl);
 			}
 		} else if (force){
@@ -183,8 +194,6 @@
 			}
 		}
 	}
-
-	
 	(function (w) {
 		w.URLSearchParams = w.URLSearchParams || function (searchString) {
 			var self = this;
@@ -199,19 +208,15 @@
 				}
 			};
 		};
-
 	})(window);
 	var urlParams = new URLSearchParams(window.location.search);
-	
 	var sanitize = function(string) {
 		var temp = document.createElement('div');
-		temp.innerText = string;
-		temp.innerText = temp.innerHTML;
-		temp = temp.textContent || temp.innerText || "";
-		temp = temp.substring(0, Math.min(temp.length, 500));
-		return temp.trim();
+		temp.textContent = string;
+		return temp.textContent
+			.substring(0, Math.min(temp.textContent.length, 500))
+			.trim();
 	};
-	
 	function generateStreamID(){
 		var text = "";
 		var possible = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
@@ -220,9 +225,7 @@
 		}
 		return text;
 	};
-	
 	var roomID = "test";
-	
 	if (urlParams.has("room")){
 		roomID = urlParams.get("room");
 	} else if (urlParams.has("ROOM")){
@@ -231,34 +234,24 @@
 		roomID = generateStreamID();
 		updateURL("room="+roomID);
 	}
-	
 	var label = false;
-	
 	if (urlParams.has("label")){
 		label = urlParams.get("label");
-		//label = sanitize(label);
-	} 
-	
+	}
 	var myLang = "en-US";
 	if (urlParams.has("lang")){
 		myLang = urlParams.get("lang");
 	} else {
 		updateURL("lang="+myLang);
 	}
-	
 	console.log("Language: "+myLang);
-	
 	var srtFile = "";
 	var timestamp_start = null
 	var timestamp_stop = null
 	var timestamp_intern  = null;
 	var logcounter=0;
-				
 	var counter=0;
-	
 	var url = document.URL.substr(0,document.URL.lastIndexOf('/'));
-	
-	
 	var oldSaves = Object.keys(localStorage);
 	if (oldSaves.length){
 		for (var i =0;i<oldSaves.length;i++){
@@ -270,11 +263,9 @@
 							var srtFile = getStorage(this.dataset.key);
 							download(this.dataset.key+".srt", srtFile);
 							localStorage.removeItem(this.dataset.key);
-							
 						};
 						button.dataset.key = oldSaves[i];
 						button.innerHTML = "Download previous saved transcription";
-						
 						document.body.prepend(button);
 					}catch(e){console.error(e);}
 				}
@@ -283,65 +274,60 @@
 			}
 		}
 	}
-	
 	document.getElementById("shareLink").href= url+"/overlay?room="+roomID;
 	document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID;
-
 	navigator.clipboard.writeText(url+"/overlay?room="+roomID).then(() => {
-      /* clipboard successfully set */
     }, () => {
-      /* clipboard write failed */
     });
-
 	var apiKey = false;
-	
 	var socket;
-	
 	function connectWebSocket() {
-	  socket = new WebSocket("wss://api.caption.ninja:443");
-
-	  socket.onclose = function() {
-		console.log("WebSocket connection closed. Attempting to reconnect...");
-		setTimeout(connectWebSocket, 500); // Try to reconnect after 5 seconds
-	  };
-
-	  socket.onopen = function() {
-		console.log("WebSocket connected. Joining room...");
-		socket.send(JSON.stringify({"join":roomID}));
-	  };
-
-	  // Add error handling
-	  socket.onerror = function(error) {
-		console.error("WebSocket error:", error);
-		setTimeout(connectWebSocket, 5000); // Try to reconnect after 5 seconds
-	  };
+	    if (socket) {
+			socket.close();
+			socket = null;
+		}
+		socket = new WebSocket("wss://api.caption.ninja:443");
+		socket.onclose = function() {
+			console.log("WebSocket connection closed. Attempting to reconnect...");
+			setTimeout(connectWebSocket, 500);
+		};
+		socket.onopen = function() {
+			console.log("WebSocket connected. Joining room...");
+			socket.send(JSON.stringify({"join":roomID}));
+		};
+		socket.onerror = function(error) {
+			console.error("WebSocket error:", error);
+			if (socket) {
+				socket.close();
+				socket = null;
+			}
+			setTimeout(connectWebSocket, 5000);
+		};
 	}
-
-	// Initial connection
 	connectWebSocket();
-	
 	var ends = 0;
 	var final_transcript = '';
 	var interim_transcript = "";
-	
+	var recognition = null;
 	var idle = null;
 	setup();
 	function setup(){
 		if ('webkitSpeechRecognition' in window){
-			var recognition = new webkitSpeechRecognition();
+			if (recognition) {
+				recognition.onend = null;
+				recognition.abort();
+			}
+			recognition = new webkitSpeechRecognition();
 			if (myLang){
 				recognition.lang = myLang;
 			}
 			recognition.continuous = true;
 			recognition.interimResults = true;
-			
-			
 			recognition.onstart = function(){
 				console.log("started transcription");
 				setTimeout(function(){
 					ends = 0;
 				}, 2000);
-				
 			};
 			recognition.onerror = function(event){
 				console.log(event);
@@ -349,7 +335,7 @@
 			recognition.onend = function(e){
 				console.log(e);
 				console.log("Stopped transcription");
-				if (event.type === "end"){
+				if (e.type === "end"){
 					ends +=1;
 				}
 				if (ends > 3){
@@ -361,26 +347,22 @@
 				counter+=1;
 				var interim_transcript = '';
 				if(typeof(event.results) == 'undefined'){
-					//console.log("ended");
-					//recognition.onend = null;
-					//recognition.stop();
-					console.log(event);
 					return;
 				}
-				
+				let new_final_transcript = '';
 				for(var i = event.resultIndex; i < event.results.length; ++i){
 					if(event.results[i].isFinal){
-						final_transcript += sanitize(event.results[i][0].transcript);
+						new_final_transcript += ' ' + sanitize(event.results[i][0].transcript);
 					} else {
-						interim_transcript += sanitize(event.results[i][0].transcript);
+						interim_transcript += " " +sanitize(event.results[i][0].transcript);
+						interim_transcript = interim_transcript.trim();
 					}
 				}
-				
+				final_transcript = new_final_transcript.trim();
 				if (final_transcript){
 					console.log("FINAL:", final_transcript);
 					document.getElementById("output").innerHTML+="<span id='final_"+counter+"'>"+final_transcript+"</span><br />";
 					document.getElementById("interm").innerHTML="";
-					
 					try {
 						if (timestamp_start===null){
 							timestamp_start = Date.now();
@@ -388,19 +370,16 @@
 						}
 						timestamp_stop = Date.now();
 						timestamp_stop = Date.now() - timestamp_start;
-						
 						var date = new Date(0);
 						date.setSeconds(timestamp_stop/1000);
 						timestamp_stop = date.toISOString().replace(".",",").replace("1970-01-01T","");
 						timestamp_stop = timestamp_stop.substring(0, timestamp_stop.length - 1);
-						
 						timestamp_intern -= timestamp_start;
 						var date = new Date(0);
 						date.setSeconds(timestamp_intern/1000);
 						timestamp_intern = date.toISOString().replace(".",",").replace("1970-01-01T","");
 						timestamp_intern = timestamp_intern.substring(0, timestamp_intern.length - 1);
 					} catch(e){console.error(e);}
-					
 					try {
 						logcounter+=1;
 						srtFile += logcounter + "\n";
@@ -408,7 +387,6 @@
 						timestamp_intern=null;
 						srtFile += ">> " + final_transcript + "\n\n";
 						setStorage("transcription_"+roomID+"_"+timestamp_start, srtFile, 1);
-						
 						if (logcounter===1){
 							var button = document.createElement("button");
 							button.onclick = function(){
@@ -418,13 +396,9 @@
 							button.style.position = "fixed";
 							button.style.top = "0";
 							button.style.left = "0";
-							
 							document.body.appendChild(button);
 						}
-						
 					} catch(e){console.error(e);}
-				
-					
 					try {
 						if (label){
 							socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter, "label":label, "ln": myLang}));
@@ -433,10 +407,12 @@
 						}
 						final_transcript="";
 						interim_transcript="";
+						timestamp_start = null;
+						timestamp_stop = null;
+						timestamp_intern = null;
 					} catch(e){
 						console.error(e);
 					}
-					
 				} else {
 					if (timestamp_start===null){
 						timestamp_start = Date.now();
@@ -446,7 +422,6 @@
 					}
 					console.log("INTERM:", interim_transcript);
 					document.getElementById("interm").innerHTML="<span>"+interim_transcript+"</span><br />";
-					
 					try {
 						if (label){
 							socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "label":label, "ln": myLang}));
@@ -458,18 +433,7 @@
 					    interim_transcript="";
 					}
 				}
-				
-				//if (idle){
-				//	clearInterval(idle);
-				//}
-				//idle = setTimeout(function(){
-				//	document.getElementById("output").innerHTML="";
-				//	document.getElementById("interm").innerHTML="";
-				//},10000);
-				
 			};
-			
-			//recognition.lang = 'en-US';
 			recognition.start();
 		}
 	}

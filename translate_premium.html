@@ -12,35 +12,60 @@
 	<meta name="author" content="Steve Seguin" />
 
 	
-	<style>
+<style>
 		@font-face {
 		  font-family: 'Cousine';
 		  src: url('fonts/Cousine-Bold.ttf') format('truetype');
 		}
 	
+		:root {
+		  --primary-color: #2498Eb;
+		  --secondary-color: #2c3e50;
+		  --background-color: #0000;
+		  --text-color: #333;
+		  --border-radius: 4px;
+		  --cc-background: #000000;
+		  --cc-text-color: #ffffff;
+		  --cc-font-size: 24px;
+		  --cc-line-height: 1.2;
+		}
+
 		body {
-			margin:15px;
-			padding:15px;
-			height:100%;
-			border: 0;
-			display: block;
-			
-			bottom:0;
-			overflow:hidden;
-			
-			font-family: Cousine, monospace;
-			
+		  font-family: 'Arial', sans-serif;
+		  line-height: 1.6;
+		  color: var(--text-color);
+		  background-color: var(--background-color);
+		  margin: 0;
+		  padding: 20px;
+		}
+
+		h3 {
+		  color: var(--secondary-color);
+		  border-bottom: 2px solid var(--primary-color);
+		  padding-bottom: 10px;
+		}
+
+		a {
+		  color: var(--primary-color);
+		  text-decoration: none;
+		  font-weight:600;
+		  transition: color 0.3s ease;
+		}
+
+		a:hover {
+		  color: var(--secondary-color);
 		}
 
 		.output {
-			margin:0;
-			background-color: #0000;
+			font-family: Cousine, monospace;
+			margin-top:15px;
 			color: black;
+			min-height: 120px;
 			font-size: 3.2em;
 			line-height: 1.1em;
 			letter-spacing: 0.0em;
-			
 			padding: 0em;
+			padding-top:10px;
 			text-shadow: 0.05em 0.05em 0px rgba(255,255,255,1);
 		}
 		
@@ -49,11 +74,77 @@
 			padding: 8px 8px 0px 8px;
 			margin:0;
 		}
+
+		/* Add this new style for the caption container */
+		#caption-container {
+		  position: relative;
+		  width: 100%;
+		  height: 200px; /* Adjust as needed */
+		  overflow: hidden;
+		  background-color: var(--cc-background);
+		}
+
+		select, input[type="checkbox"] {
+		  margin: 10px 0;
+		}
+
+		select {
+		  padding: 5px;
+		  border-radius: var(--border-radius);
+		  border: 1px solid #ddd;
+		}
+
+		label {
+		  display: inline-block;
+		  margin-right: 15px;
+		}
+
+		textarea {
+		  width: 700px;
+		  display:block;
+		  padding: 10px;
+		  border: 1px solid #ddd;
+		  border-radius: var(--border-radius);
+		  height: 70px;
+		  resize: all;
+		}
 		
-		a {
-			color:blue;
-			font-size:1.2em;
-			text-transform: none;
+		#status {
+		  margin-top: 10px;
+		  font-style: italic;
+		  color: var(--secondary-color);
+		}
+
+		#whosekey {
+		  display: inline-block;
+		  padding: 5px 10px;
+		  border-radius: var(--border-radius);
+		  font-weight: bold;
+		}
+
+		#whosekey[style*="yellow"] {
+		  background-color: #ffeeba;
+		  color: #856404;
+		}
+
+		#whosekey[style*="green"] {
+		  background-color: #d4edda;
+		  color: #155724;
+		}
+
+		/* Responsive design */
+		@media (max-width: 768px) {
+		  body {
+			padding: 10px;
+		  }
+		  
+		  textarea {
+			width: calc(100% - 20px);
+		  }
+		  
+		  .output span {
+			font-size: calc(var(--cc-font-size) * 0.8);
+		  }
 		}
 		
 		.github {
@@ -73,10 +164,7 @@
 			display:block;
 			
 		}
-		textarea {
-			display:block;
-			width: 700px;
-		}
+
 	</style>
 </head>
 <body>
@@ -92,14 +180,13 @@
 	You can also change audio sources by using a Virtual Audio Cable, <a href='https://www.vb-audio.com/Cable/'> such as this one.</a> 
 	Using it, it becomes possible to select other sources, including microphones, speakers, and other applications.
 	<br /><br />
-	The translation is powered by Google Cloud Translation, which <a href='https://console.cloud.google.com/apis/api/translate.googleapis.com/credentials' target="_blank">requires an API key.</a> (add &key=xxxxxxx to the URL to specify it). <br /><br /><div style='color:red'>I no longer offer access with my own API key, due to heavy and costly abuse.</div> You will need to get your own Google API key if you wish to use this premium version of the service.
+	The translation is powered by Google Cloud Translation, which <a href='https://console.cloud.google.com/apis/api/translate.googleapis.com/credentials' target="_blank">requires an API key. Get yours here.</a> Once you have it, add <b>&key=xxxxxxx</b> to this page's URL to set it. <br /><br /> You will need to get your own Google API key if you wish to use this premium version of the service. <a href='./translate'>The non-premium version is free of course.</a> Check out more options and details on <a href='https://github.com/steveseguin/captionninja'>GitHub</a>.
 	<br /><br />
 	<label>
 	  From
 	  <select id="lang-from" title="Set input language via the URL `&lang=en-US` option" name="from" class="lang-select"></select>
 	</label>
-	
-	 <label>
+	<label>
 	  To
 	  <select id="lang-to" name="to" class="lang-select"></select>
 	</label>
@@ -107,11 +194,15 @@
 	 <input type="checkbox" id="fullContext" />
 	 Translate with added context?
 	</label>
-	 <label>
-	 <input type="checkbox" id="enabledTranscription" />
-	  <span style='color:green;'><b>Start</b></span> Translation Output
-	 </label>
-	 <span id="whosekey"></span>
+	<label>
+    <input type="checkbox" id="enabledTranscription" />
+     <span style='color:green;'><b>Start</b></span> Translation Output (💸)
+    </label>
+    <label>
+    <input type="checkbox" id="incrementalUpdates" />
+     Enable incremental updates (💸💸💸)
+    </label>
+    <span id="whosekey"></span>
 	 <br /><br />
 	<div class="footer" id="status"></div>
 	<textarea id="input" name="input"></textarea>
@@ -119,8 +210,6 @@
 	<div id="output" class="output"></div>
 	
 <script>
-	
-	
 (function (w) {
 	w.URLSearchParams = w.URLSearchParams || function (searchString) {
 		var self = this;
@@ -135,21 +224,12 @@
 			}
 		};
 	};
-
 })(window);
 var urlParams = new URLSearchParams(window.location.search);
-	
-	
 let version;
-
 const status = function(message){document.getElementById("status").innerText = message;}
-
-// Optionally, enter an API key from the Google API Console.  You will need to ensure it has Google Cloud Translation enabled / added for it.
-// https://console.developers.google.com/apis/credentials
-
-var apiKey = ""; // put your API key in there
-
-var langs = { 
+var apiKey = "";
+var langs = {
     "aa": "Afar",
     "ab": "Abkhazian",
     "ae": "Avestan",
@@ -335,12 +415,9 @@ var langs = {
     "zh": "Chinese",
     "zu": "Zulu"
 };
-
-
 if (urlParams.has("key")){
 	apiKey = urlParams.get("key") || "";
-} 
-
+}
 function getStorage(cname) {
 	try {
 		var itemStr = localStorage.getItem(cname);
@@ -359,15 +436,13 @@ function getStorage(cname) {
 	}
 	return item.value;
 }
-
 if (!apiKey && getStorage("apiKey")){
 	apiKey = getStorage("apiKey");
 } else if (apiKey){
 	setStorage("apiKey", apiKey, 999999);
 }
-
 if (!apiKey){
-	document.getElementById("whosekey").innerText = "(please consider using your own key)";
+	document.getElementById("whosekey").innerText = "(you'll need to specify own API key first to use)";
 	document.getElementById("whosekey").style = "color: black; background-color: yellow;";
 } else {
 	document.getElementById("whosekey").innerText = "PRIVATE KEY ACTIVE";
@@ -376,15 +451,13 @@ if (!apiKey){
 function removeStorage(cname){
 	localStorage.removeItem(cname);
 }
-
 function clearStorage(){
 	localStorage.clear();
 	if (!session.cleanOutput){
 		warnUser("The local storage and saved settings have been cleared", 1000);
 	}
 }
-
-function setStorage(cname, cvalue, hours=9999){ // not actually a cookie
+function setStorage(cname, cvalue, hours=9999){
 	let now = new Date();
 	let item = {
 		value: cvalue,
@@ -394,11 +467,7 @@ function setStorage(cname, cvalue, hours=9999){ // not actually a cookie
 		localStorage.setItem(cname, JSON.stringify(item));
 	}catch(e){errorlog(e);}
 }
-
-
 var myLang = navigator.language || "en-US";
-
-
 if (urlParams.has("lang")){
 	myLang = urlParams.get("lang");
 } else if (getStorage("myLang")){
@@ -407,17 +476,13 @@ if (urlParams.has("lang")){
 	updateURL("lang="+myLang);
 }
 var myLangCode = myLang.split("-")[0].toLowerCase();
-
 var targetCode = "de";
 if (myLangCode == "de"){
 	targetCode = "en";
 }
-
 if (getStorage("targetCode")){
 	targetCode = getStorage("targetCode");
-} 
-
-
+}
 if (urlParams.has("translate") || urlParams.has("target")){
 	targetCode = urlParams.get("translate") || urlParams.get("target") || targetCode;
 	targetCode = targetCode.split("-")[0].toLowerCase();
@@ -426,27 +491,25 @@ if (urlParams.has("translate") || urlParams.has("target")){
 } else {
 	updateURL("translate="+targetCode);
 }
-
 setStorage("targetCode", targetCode, 999999)
 setStorage("myLang", myLang, 999999);
-
 var label = false;
 if (urlParams.has("label")){
 	label = urlParams.get("label");
-} 
-
-
+}
+var counter = 0;
+let activeRequest = null;
+let requestTimeout = null;
+let lastRequestTime = 0;
+const REQUEST_TIMEOUT = 3000;
 const langFrom = document.getElementById("lang-from");
 const langTo = document.getElementById("lang-to");
-
 var availableLangs = {};
-
 if (apiKey){
 	var langurl = "https://www.googleapis.com/language/translate/v2/languages?key=" + apiKey;
 } else {
 	var langurl = "https://captionninjapremium.vdo.workers.dev/?ts="+Date.now();
 }
-
 fetch(langurl, {
 	method: 'GET',
 	headers: {
@@ -455,10 +518,13 @@ fetch(langurl, {
 	}
 }).then((response) => response.json()).then((data) => {
 	console.log(data);
+	if (data.error){
+		alert(data.error.message);
+		return;
+	}
 	var languages = data.data.languages;
 	languages.forEach(l=>{
 		availableLangs[l.language] = langs[l.language] || l.language;
-		
 		var option = document.createElement("option");
 		option.innerText = langs[l.language] || l.language;
 		option.value = l.language;
@@ -466,7 +532,6 @@ fetch(langurl, {
 			option.selected = true;
 		}
 		langFrom.appendChild(option);
-		
 		option = document.createElement("option");
 		option.innerText = langs[l.language] || l.language;
 		option.value = l.language;
@@ -475,49 +540,227 @@ fetch(langurl, {
 		}
 		langTo.appendChild(option);
 	});
-	setup(); // sets up the translation
+	setup();
 });
-
-var counter = 0;
-
-function translate(textToTranslate) {
-	if (!document.getElementById("enabledTranscription").checked){return;}
-	
-	if (apiKey){
-	  var url = "https://www.googleapis.com/language/translate/v2/?key=" + apiKey + "&q=" + encodeURI(textToTranslate) + "&target=" + targetCode + "&source=" + myLangCode;
-	} else {
-	  var url = "https://captionninjapremium.vdo.workers.dev/?ts="+Date.now()+ "&q=" + encodeURI(textToTranslate) + "&target=" + targetCode + "&source=" + myLangCode;
-	}
-
-	fetch(url, {
-		method: 'GET',
-		headers: {
-			'Content-Type': 'application/json',
-			'Accept': 'application/json'
-		}
-	}).then((response) => response.json()).then((data) => {
-		console.log(data);
-		console.log(data.data.translations[0].translatedText);
-		updateTrans(data.data.translations[0].translatedText)
-	});
+const getCachedTranslation = (url) => {
+    try {
+        const cached = localStorage.getItem('translation_' + url);
+        if (cached) {
+            const { data, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
+                return data?.translations?.[0]?.translatedText || null;
+            }
+            localStorage.removeItem('translation_' + url);
+        }
+    } catch (e) {
+        console.error('Cache error:', e);
+    }
+    return null;
+};
+function cacheTranslation(url, data) {
+  try {
+  console.log("cacheTranslation");
+    localStorage.setItem('translation_' + url, JSON.stringify({
+      data: data,
+      timestamp: Date.now()
+    }));
+  } catch (e) {
+    console.error('Cache storage error:', e);
+    try {
+      const keys = Object.keys(localStorage);
+      for (let key of keys) {
+        if (key.startsWith('translation_')) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch (e) {
+      console.error('Cache cleanup error:', e);
+    }
+  }
 }
-
-
-function updateTrans(data){
-	document.getElementById("output").innerHTML = data;
+let lastRequest = {
+    text: null,
+    timestamp: 0,
+    translation: null
+};
+const RATE_LIMIT = {
+    minTimeBetweenRequests: 250,
+    lastRequestTime: 0
+};
+async function translateIncremental(textToTranslate) {
+    if (!textToTranslate?.trim() || !document.getElementById("enabledTranscription").checked) {
+        return;
+    }
+    const incrementalEnabled = document.getElementById("incrementalUpdates").checked;
+    const useContext = document.getElementById("fullContext").checked;
+    if (textToTranslate === lastRequest.text) {
+        const timeSinceLastRequest = Date.now() - lastRequest.timestamp;
+        if (timeSinceLastRequest < 2000) {
+            console.log('Skipping duplicate request:', textToTranslate);
+            if (lastRequest.translation) {
+                updateTrans(lastRequest.translation, incrementalEnabled);
+            }
+            return;
+        }
+    }
+    const now = Date.now();
+    const timeSinceLastRequest = now - RATE_LIMIT.lastRequestTime;
+    if (timeSinceLastRequest < RATE_LIMIT.minTimeBetweenRequests) {
+        const delayNeeded = RATE_LIMIT.minTimeBetweenRequests - timeSinceLastRequest;
+        await new Promise(resolve => setTimeout(resolve, delayNeeded));
+    }
+    RATE_LIMIT.lastRequestTime = now;
+    if (activeRequest) {
+        activeRequest.abort();
+        activeRequest = null;
+    }
+    if (requestTimeout) {
+        clearTimeout(requestTimeout);
+        requestTimeout = null;
+    }
+    const url = apiKey
+        ? `https://www.googleapis.com/language/translate/v2/?key=${apiKey}&q=${encodeURI(textToTranslate)}&target=${targetCode}&source=${myLangCode}`
+        : `https://captionninjapremium.vdo.workers.dev/?ts=${Date.now()}&q=${encodeURI(textToTranslate)}&target=${targetCode}&source=${myLangCode}`;
+    const cachedData = getCachedTranslation(url);
+    if (cachedData) {
+        console.log('Using cached translation for:', textToTranslate);
+        lastRequest = {
+            text: textToTranslate,
+            timestamp: Date.now(),
+            translation: cachedData
+        };
+        updateTrans(cachedData, incrementalEnabled);
+        return;
+    }
+    const controller = new AbortController();
+    activeRequest = controller;
+    lastRequestTime = Date.now();
+    requestTimeout = setTimeout(() => {
+        if (activeRequest === controller) {
+            console.log('Request timeout for:', textToTranslate);
+            controller.abort();
+            activeRequest = null;
+            requestTimeout = null;
+        }
+    }, REQUEST_TIMEOUT);
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            signal: controller.signal
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (!data?.data?.translations?.[0]) {
+            throw new Error('Invalid response format from translation service');
+        }
+        const translatedText = data.data.translations[0].translatedText;
+        cacheTranslation(url, data.data);
+        lastRequest = {
+            text: textToTranslate,
+            timestamp: Date.now(),
+            translation: translatedText
+        };
+        updateTrans(translatedText, incrementalEnabled);
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            console.log('Request was aborted');
+            return;
+        }
+        console.error('Translation error:', error);
+        if (error.message.includes('HTTP error! status: 429')) {
+            const checkbox = document.getElementById("incrementalUpdates");
+            if (checkbox?.checked) {
+                checkbox.checked = false;
+                alert('Incremental updates have been automatically disabled due to rate limiting.');
+            }
+            RATE_LIMIT.minTimeBetweenRequests *= 2;
+        }
+        const now = Date.now();
+        if (!window.lastErrorTime || (now - window.lastErrorTime) > 5000) {
+            window.lastErrorTime = now;
+            handleTranslationError(error);
+        }
+        if (incrementalEnabled && window.lastSuccessfulTranslation) {
+            updateTrans(window.lastSuccessfulTranslation, true);
+        }
+    } finally {
+        if (activeRequest === controller) {
+            activeRequest = null;
+        }
+        if (requestTimeout) {
+            clearTimeout(requestTimeout);
+            requestTimeout = null;
+        }
+    }
+}
+function handleTranslationError(error) {
+    if (error instanceof TypeError && error.message.includes('CORS')) {
+        alert('CORS Error: Unable to access the translation service.\n\n' +
+              '1. Missing or invalid API key\n' +
+              '2. Browser security restrictions\n' +
+              '3. Service being temporarily unavailable\n\n' +
+              'Please check your API key or try again later.');
+    } else if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        alert('Network Error: Unable to connect to the translation service.\n\n' +
+              'This might be due to:\n' +
+              '1. No internet connection\n' +
+              '2. Website / IP denied access (CORS)\n' +
+              '3. Missing or invalid API key\n' +
+              '4. Service being down\n' +
+              'Please check your internet connection and try again.');
+    } else if (error.message.includes('HTTP error! status: 403')) {
+        alert('Authorization Error: Unable to access the translation service.\n\n' +
+              'This is likely due to:\n' +
+              '1. Invalid API key\n' +
+              '2. API key not having proper permissions\n' +
+              '3. API quota exceeded\n\n' +
+              'Please check your API key configuration.');
+    } else if (error.message.includes('HTTP error! status: 429')) {
+        alert('Rate Limit Error: Too many requests to the translation service.\n\n' +
+              'Please wait a moment before trying again.\n\n' +
+              'Consider disabling incremental updates to reduce API calls.');
+    } else if (error.message.includes('Invalid response format')) {
+        alert('Error: Received an unexpected response from the translation service.\n\n' +
+              'Please try again later or contact support if the issue persists.');
+    } else {
+        alert('Translation Error: ' + error.message + '\n\n' +
+              'Please try again later or contact support if the issue persists.\n\n' +
+              'If this persists, try disabling incremental updates.');
+    }
+}
+function updateTrans(translatedText, isIncremental) {
+	window.lastSuccessfulTranslation = translatedText;
+	document.getElementById("output").innerHTML = translatedText;
 	var text = document.getElementById("output").textContent || "";
-	counter+=1;
-	if (label){
-		socket.send(JSON.stringify({"msg":true, "final":text, "id":counter, "label":label, "c": document.getElementById("fullContext").checked, "ln": targetCode}));
+	counter += 1;
+	if (label) {
+		socket.send(JSON.stringify({
+			"msg": true,
+			[isIncremental ? "interm" : "final"]: text,
+			"id": counter,
+			"label": label,
+			"c": document.getElementById("fullContext").checked,
+			"ln": targetCode
+		}));
 	} else {
-		socket.send(JSON.stringify({"msg":true, "final":text, "id":counter, "c": document.getElementById("fullContext").checked, "ln": targetCode}));
+		socket.send(JSON.stringify({
+			"msg": true,
+			[isIncremental ? "interm" : "final"]: text,
+			"id": counter,
+			"c": document.getElementById("fullContext").checked,
+			"ln": targetCode
+		}));
 	}
 }
-
-langFrom.addEventListener("change", e => {  // // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+langFrom.addEventListener("change", e => {
 	myLangCode = e.target.value;
 	console.log(myLangCode)
-	//setStorage("targetCode", targetCode, 999999)
 	if (myLang.split("-")[0].toLowerCase() !== myLangCode){
 		setStorage("myLang", myLangCode, 999999);
 		updateURL("lang="+myLangCode, true);
@@ -527,22 +770,16 @@ langFrom.addEventListener("change", e => {  // // https://github.com/mozilla/tra
 		setup();
 	}
 });
-
 langTo.addEventListener("change", e => {
 	targetCode = e.target.value;
 	updateURL("translate="+targetCode, true);
 	console.log(targetCode);
 	setStorage("targetCode", targetCode, 999999);
-	
-	//setStorage("myLangCode", myLangCode, 999999);
 });
-
-
 function updateURL(param, force=false) {
-	var para = param.split('='); 
+	var para = param.split('=');
 	if (!(urlParams.has(para[0].toLowerCase()))){
 		if (history.pushState){
-			
 			var arr = window.location.href.split('?');
 			var newurl;
 			if (arr.length > 1 && arr[1] !== '') {
@@ -550,7 +787,6 @@ function updateURL(param, force=false) {
 			} else {
 				newurl = window.location.href + '?' +param;
 			}
-			
 			window.history.pushState({path:newurl},'',newurl);
 		}
 	} else if (force){
@@ -565,7 +801,6 @@ function updateURL(param, force=false) {
 		}
 	}
 }
-
 function generateStreamID(){
 	var text = "";
 	var possible = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
@@ -574,7 +809,6 @@ function generateStreamID(){
 	}
 	return text;
 };
-
 var roomID = "test";
 if (urlParams.has("room")){
 	roomID = urlParams.get("room");
@@ -584,51 +818,50 @@ if (urlParams.has("room")){
 	roomID = generateStreamID();
 	updateURL("room="+roomID);
 }
-
-
 var url = document.URL.substr(0,document.URL.lastIndexOf('/'));
-
 document.getElementById("shareLink").href= url+"/overlay?room="+roomID;
 document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID;
-
 navigator.clipboard.writeText(url+"/overlay?room="+roomID).then(() => {
-  /* clipboard successfully set */
 }, () => {
-  /* clipboard write failed */
 });
-
 var socket;
-
 function connectWebSocket() {
   socket = new WebSocket("wss://api.caption.ninja:443");
-
   socket.onclose = function() {
     console.log("WebSocket connection closed. Attempting to reconnect...");
-    setTimeout(connectWebSocket, 500); // Try to reconnect after 5 seconds
+    setTimeout(connectWebSocket, 500);
   };
-
   socket.onopen = function() {
     console.log("WebSocket connected. Joining room...");
     socket.send(JSON.stringify({"join":roomID}));
   };
-
-  // Add error handling
   socket.onerror = function(error) {
     console.error("WebSocket error:", error);
-	setTimeout(connectWebSocket, 5000); // Try to reconnect after 5 seconds
+	setTimeout(connectWebSocket, 5000);
   };
 }
-
-// Initial connection
 connectWebSocket();
-
 var final_transcript = '';
 var last_transcription  = "";
 var second_transcription = "";
 var idle = null;
 var recognition = null;
 var ends = 0;
-
+document.getElementById("incrementalUpdates").addEventListener("change", function(e) {
+    if (recognition) {
+		recognition.onend = null;
+		recognition.stop();
+		recognition = null;
+		setup();
+    }
+});
+var sanitize = function(string) {
+	var temp = document.createElement('div');
+	temp.textContent = string;
+	return temp.textContent
+		.substring(0, Math.min(temp.textContent.length, 500))
+		.trim();
+};
 function setup(){
 	if ('webkitSpeechRecognition' in window){
 		console.log("Setting up webkitSpeechRecognition");
@@ -645,23 +878,19 @@ function setup(){
 			recognition.lang = myLang;
 		}
 		recognition.continuous = true;
-		recognition.interimResults = false;
-		
+		recognition.interimResults = document.getElementById("incrementalUpdates").checked;
 		recognition.onstart = function(){
 			console.log("started transcription");
 			setTimeout(function(){
 				ends = 0;
 			}, 2000);
-			
 		};
 		recognition.onerror = function(event){
 			console.error(event);
-			
 		};
 		recognition.onend = function(e){
 			console.log(e);
 			console.log("Stopped transcription");
-			
 			if (event.type === "end"){
 				ends +=1;
 			}
@@ -671,36 +900,55 @@ function setup(){
 				recognition.start();
 			}
 		};
-		recognition.onresult = function(event){
-			//counter+=1;
-			var interim_transcript = '';
-			if(typeof(event.results) == 'undefined'){
-				console.log(event);
+		recognition.onresult = function(event) {
+			let interim_transcript = '';
+			if (typeof(event.results) == 'undefined') {
+				console.log('Undefined results in event:', event);
 				return;
 			}
-			
 			for(var i = event.resultIndex; i < event.results.length; ++i){
 				if(event.results[i].isFinal){
-					final_transcript += event.results[i][0].transcript;
-				} 
-			}
-			
-			if (final_transcript){
-				console.log("FINAL:", final_transcript);
-				document.getElementById("input").value = final_transcript;
-				if (document.getElementById("fullContext").checked){
-					translate(second_transcription + last_transcription +final_transcript)
+					final_transcript += sanitize(event.results[i][0].transcript);
 				} else {
-					translate(final_transcript);
+					interim_transcript += " " +sanitize(event.results[i][0].transcript);
+					interim_transcript = interim_transcript.trim();
 				}
-				second_transcription = last_transcription;
-				last_transcription = final_transcript+". ";
-				final_transcript = "";
-			} 
-			
+			}
+			if (final_transcript || (interim_transcript && document.getElementById("incrementalUpdates").checked)) {
+				let currentText = final_transcript || interim_transcript;
+				console.log("Processing text:", currentText, "Final:", !!final_transcript);
+				if (document.getElementById("fullContext").checked) {
+					let fullText = [];
+					if (second_transcription?.trim()) {
+						fullText.push(second_transcription.trim().replace(/\.?$/, '.'));
+					}
+					if (last_transcription?.trim()) {
+						fullText.push(last_transcription.trim().replace(/\.?$/, '.'));
+					}
+					if (currentText?.trim()) {
+						fullText.push(currentText.trim().replace(/\.?$/, '.'));
+					}
+					document.getElementById("input").value = fullText.join('\n');
+					let contextText = fullText.join(' ');
+					console.log("Translating with context:", contextText);
+					translateIncremental(contextText);
+				} else {
+					document.getElementById("input").value = currentText;
+					translateIncremental(currentText);
+				}
+				if (final_transcript) {
+					if (currentText.trim()) {
+						second_transcription = last_transcription;
+						last_transcription = currentText.trim().replace(/\.?$/, '.') + ' ';
+						final_transcript = '';
+						console.log("Updated context state:", {
+							second: second_transcription,
+							last: last_transcription
+						});
+					}
+				}
+			}
 		};
-		
-		//recognition.lang = 'en-US';
 		recognition.start();
 	}
 }
