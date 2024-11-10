@@ -1,6 +1,6 @@
 # CAPTION.Ninja
 
-This is a free-to-use captioning, transcription, and live translation tool.
+This is a free-to-use captioning, transcription, and real-time translation tool.
 
 Demo video here: https://www.youtube.com/watch?v=v7172QO8z6c
 
