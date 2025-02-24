@@ -116,14 +116,24 @@ You can deploy your own basic websocket server with this code: https://github.co
 
 The actual voice to text transcriptions are done usually on Google cloud servers, so it's not possible in most cases to fully-self host the service, although some devices, like Pixel smartphones, may do on-device voice to text rather than using the Google cloud.
 
+The Mozilla-powered translation component can be deployed from https://github.com/mozilla/translate -- you'll need to deploy that yourself also, and edit the worker file, to use your own deployment of that service though. That's out of scope of this repo though. Primarily just the CAPTION.Ninja client side code is provided here.
+
 ### Disclaimers
-I am not responsible if this app fails to work or whatever else. It is provided as-is without warranty or support. I do not take responsibility for any liability.
+I am not responsible if this app fails to work, service violations, or whatever else. It is provided as-is without warranty or support. I do not take responsibility for any liability.
+
+You are responsible for your own premium service API keys and fees.
+
+Private data may be made available to Google, Microsoft, and other cloud providers, for the purpose of providing their services. Data is also sent over a hosted websocket channel, which can be publicly listened to by anyone if they know the session/room ID, but this hosted websocket server does not collect said messaging data -- it's just routed.
+
+That said, things change, and problems occur, so you accept any risks to using this service.
 
 ### License
 
-The free translation component is powered by Mozilla Translate:
+Fonts are provided with their own license; apache 2.0 I believe, but confirm yourself.
+
+The free translation component is powered by Mozilla Translate; this includes the worker and wasm files located in this folder. You'll want to deploy it yourself probably if self-hosting.
 https://github.com/mozilla/translate - MPL 2.0 - Mozilla
 
-As such, to keep in spirit of that project, code contributed by in this repo is also made available as MPL 2.0.
+As per CAPTION.NInja, to keep in spirit of what Mozilla has created, the code here contributed as part of this CAPTION.Ninja project is also made available as MPL 2.0. 
 
 
