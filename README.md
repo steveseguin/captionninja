@@ -6,6 +6,14 @@ Demo video here: https://www.youtube.com/watch?v=v7172QO8z6c
 
 ![image](https://user-images.githubusercontent.com/2575698/169529892-8764c5df-354c-4fad-85e5-c8ecfec4cc95.png)
 
+### Need support?
+
+Free support is available at https://discord.vdo.ninja
+
+Poke @steve for help there; feel free to leave a message on #miscellaneous or #vdo-ninja-support
+
+I don't always notice issues created in this Github repo, as I'm very busy.  If you can't reach me on Discord either, please email me at steve@seguin.email, however support is limited and not guarenteed. 
+
 ### How to use
 
 To use this app, accept the microphone permissions on page load and then just say something outloud.
