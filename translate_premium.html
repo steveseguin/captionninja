@@ -164,7 +164,25 @@
 			display:block;
 			
 		}
+	   .toggle-button {
+		  background-color: var(--primary-color);
+		  color: white;
+		  border: none;
+		  padding: 10px 20px;
+		  border-radius: var(--border-radius);
+		  cursor: pointer;
+		  font-weight: bold;
+		  transition: background-color 0.3s ease;
+		  margin: 10px 0;
+		}
 
+		.toggle-button:hover {
+		  background-color: var(--secondary-color);
+		}
+
+		.toggle-button.paused {
+		  background-color: #dc3545;
+		}
 	</style>
 </head>
 <body>
@@ -202,6 +220,7 @@
     <input type="checkbox" id="incrementalUpdates" />
      Enable incremental updates (💸💸💸)
     </label>
+	<button id="toggleTranscription" class="toggle-button">Pause Transcription</button>
     <span id="whosekey"></span>
 	 <br /><br />
 	<div class="footer" id="status"></div>
@@ -497,6 +516,22 @@ var label = false;
 if (urlParams.has("label")){
 	label = urlParams.get("label");
 }
+let isPaused = false;
+const toggleButton = document.getElementById('toggleTranscription');
+
+toggleButton.addEventListener('click', () => {
+  isPaused = !isPaused;
+  
+  if (isPaused) {
+	recognition.stop();
+	toggleButton.textContent = 'Resume Transcription';
+	toggleButton.classList.add('paused');
+  } else {
+	recognition.start();
+	toggleButton.textContent = 'Pause Transcription';
+	toggleButton.classList.remove('paused');
+  }
+});
 var counter = 0;
 let activeRequest = null;
 let requestTimeout = null;
@@ -824,23 +859,59 @@ document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID;
 navigator.clipboard.writeText(url+"/overlay?room="+roomID).then(() => {
 }, () => {
 });
+
 var socket;
-function connectWebSocket() {
-  socket = new WebSocket("wss://api.caption.ninja:443");
-  socket.onclose = function() {
-    console.log("WebSocket connection closed. Attempting to reconnect...");
-    setTimeout(connectWebSocket, 500);
-  };
-  socket.onopen = function() {
-    console.log("WebSocket connected. Joining room...");
-    socket.send(JSON.stringify({"join":roomID}));
-  };
-  socket.onerror = function(error) {
-    console.error("WebSocket error:", error);
-	setTimeout(connectWebSocket, 5000);
-  };
+let retryCount = 0;
+const maxRetryDelay = 30000; // Maximum delay of 30 seconds
+const baseDelay = 1000; // Start with 1 second delay after first immediate retry
+
+function getRetryDelay() {
+	if (retryCount === 0) {
+		return 0; // First retry is immediate
+	}
+	// Exponential backoff: baseDelay * 2^(retryCount-1)
+	const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), maxRetryDelay);
+	return delay;
 }
+
+function connectWebSocket() {
+	if (socket) {
+		socket.close();
+		socket = null;
+	}
+
+	socket = new WebSocket("wss://api.caption.ninja:443");
+
+	socket.onclose = function() {
+		console.log("WebSocket connection closed. Attempting to reconnect...");
+		const delay = getRetryDelay();
+		console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
+		setTimeout(connectWebSocket, delay);
+		retryCount++;
+	};
+
+	socket.onopen = function() {
+		console.log("WebSocket connected. Joining room...");
+		// Reset retry count on successful connection
+		retryCount = 0;
+		socket.send(JSON.stringify({"join":roomID}));
+	};
+
+	socket.onerror = function(error) {
+		console.error("WebSocket error:", error);
+		if (socket) {
+			socket.close();
+			socket = null;
+		}
+		const delay = getRetryDelay();
+		console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
+		setTimeout(connectWebSocket, delay);
+		retryCount++;
+	};
+}
+
 connectWebSocket();
+
 var final_transcript = '';
 var last_transcription  = "";
 var second_transcription = "";
@@ -889,15 +960,42 @@ function setup(){
 			console.error(event);
 		};
 		recognition.onend = function(e){
+			if (isPaused){return;}
 			console.log(e);
 			console.log("Stopped transcription");
+
+			// Save any pending transcript before restarting
+			let currentInterim = document.getElementById("input").value.trim();
+			if (currentInterim) {
+				console.log("Processing interrupted transcript:", currentInterim);
+				
+				if (document.getElementById("fullContext").checked) {
+					let fullText = [];
+					if (second_transcription?.trim()) {
+						fullText.push(second_transcription.trim().replace(/\.?$/, '.'));
+					}
+					if (last_transcription?.trim()) {
+						fullText.push(last_transcription.trim().replace(/\.?$/, '.'));
+					}
+					fullText.push(currentInterim.trim().replace(/\.?$/, '.'));
+					
+					second_transcription = last_transcription;
+					last_transcription = currentInterim.trim().replace(/\.?$/, '.') + ' ';
+					
+					translateIncremental(fullText.join(' '), false);
+				} else {
+					translateIncremental(currentInterim, false);
+					last_transcription = currentInterim.trim().replace(/\.?$/, '.') + ' ';
+				}
+			}
+			
 			if (event.type === "end"){
 				ends +=1;
 			}
 			if (ends > 3){
-				alert("WARNING: Cannot enable transcription service\n\nThe service will fail completely if more than one transcription session is currently active on your computer.\n\nPlease close other Caption.Ninja tabs or other transcription services and then wait a few minutes before retrying.");
+				alert("WARNING: Cannot enable transcription service...");
 			} else {
-				recognition.start();
+				setTimeout(() => recognition.start(), 100); // Small delay before restart
 			}
 		};
 		recognition.onresult = function(event) {
@@ -949,6 +1047,7 @@ function setup(){
 				}
 			}
 		};
+		if (isPaused){return;}
 		recognition.start();
 	}
 }

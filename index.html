@@ -17,6 +17,19 @@
 		  src: url('fonts/Cousine-Bold.ttf') format('truetype');
 		}
 	
+		:root {
+		  --primary-color: #2498Eb;
+		  --secondary-color: #2c3e50;
+		  --background-color: #0000;
+		  --text-color: #333;
+		  --border-radius: 4px;
+		  --cc-background: #000000;
+		  --cc-text-color: #ffffff;
+		  --cc-font-size: 24px;
+		  --cc-line-height: 1.2;
+		}
+
+
 		button {
 			max-width: 600px;
 		}
@@ -30,6 +43,9 @@
 			position:absolute;
 			bottom:0;
 			overflow:hidden;
+		}
+		.hidden {
+			display:none!important;
 		}
 
 		.output {
@@ -75,11 +91,77 @@
 			padding: 10px;
 			margin-top: 10px;
 		}
+		.toggle-button {
+		  background-color: var(--primary-color);
+		  color: white;
+		  border: none;
+		  padding: 10px 20px;
+		  border-radius: var(--border-radius);
+		  cursor: pointer;
+		  font-weight: bold;
+		  transition: background-color 0.3s ease;
+		  margin: 10px 0;
+		  position: absolute;
+		  top:0;
+		  right:0;
+		}
+
+		.toggle-button:hover {
+		  background-color: var(--secondary-color);
+		}
+
+		.toggle-button.paused {
+		  background-color: #dc3545;
+		}
+		
+		.control-buttons {
+		  position: fixed;
+		  top: 10px;
+		  left: 10px;
+		  right: 10px;
+		  display: flex;
+		  justify-content: flex-start;
+		  gap: 10px;
+		}
+
+		.control-button {
+		  background-color: var(--primary-color);
+		  color: white;
+		  border: none;
+		  padding: 10px 20px;
+		  border-radius: var(--border-radius);
+		  cursor: pointer;
+		  font-weight: bold;
+		  transition: background-color 0.3s ease;
+		}
+
+		.control-button:hover {
+		  background-color: var(--secondary-color);
+		}
+
+		.control-button.paused {
+		  background-color: #dc3545;
+		}
+		
+		.output {
+		  direction: auto;
+		  unicode-bidi: bidi-override;
+		}
+
+		.output span { 
+		  background-color: black; 
+		  padding: 8px 8px 0px 8px;
+		  margin: 0;
+		  display: inline-block;
+		  direction: inherit;
+		  text-align: start;
+		}
 	</style>
 </head>
 <body>
 	<div id="interm" class="output">
 	<font style='font-size:60%;line-height: 1.4em;'><span>Welcome to CAPTION.Ninja - A Free Captioning Tool</span></font>
+	
 	<div class="small-text-container">
 		<font style='font-size:30%;line-height: 1.4em;'>
 		<span>
@@ -100,7 +182,7 @@
 
 		<strong>🔬🛠️ Advanced Features:</strong>
 		<ul>
-			<li>Try our <a href='./translate'>LIVE TRANSLATION version here</a>❗</li>
+			<li>Try our <a href='./translate'>LIVE TRANSLATION version here</a>❗ Free to use, along with Text-to-Speech support 🗣️</li>
 			<li>Use a <a href='https://www.vb-audio.com/Cable/'>Virtual Audio Cable</a> to caption from other audio sources</li>
 			<li>Add &translate={bg,cs,nl,en,et,de,fr,is,it,nb,nn,fa,pl,pt,ru,es,uk} to the overlay page URL for translation</li>
 		</ul>
@@ -117,8 +199,15 @@
 	</div>
 	
 	<div id="output" class="output"></div>
-	
+	<button id="toggleTranscription" class="hidden control-button">Pause Transcription</button>
+
 	<script>
+	
+	function detectTextDirection(text) {
+	  const rtlChars = /[\u0591-\u07FF\u200F\u202B\u202E\uFB1D-\uFDFD\uFE70-\uFEFC]/;
+	  return rtlChars.test(text) ? 'rtl' : 'ltr';
+	}
+
 	function download(filename, text) {
 	  var element = document.createElement('a');
 	  element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
@@ -168,6 +257,22 @@
 		}
 		return item.value;
 	}
+	let isPaused = false;
+	const toggleButton = document.getElementById('toggleTranscription');
+
+	toggleButton.addEventListener('click', () => {
+	  isPaused = !isPaused;
+	  
+	  if (isPaused) {
+		recognition.stop();
+		toggleButton.textContent = 'Resume Transcription';
+		toggleButton.classList.add('paused');
+	  } else {
+		recognition.start();
+		toggleButton.textContent = 'Pause Transcription';
+		toggleButton.classList.remove('paused');
+	  }
+	});
 	function updateURL(param, force=false) {
 		var para = param.split('=');
 		if (!(urlParams.has(para[0].toLowerCase()))){
@@ -210,17 +315,31 @@
 		};
 	})(window);
 	var urlParams = new URLSearchParams(window.location.search);
-	var sanitize = function(string) {
+	
+	function isEdge() {
+	  return navigator.userAgent.indexOf("Edg/") !== -1;
+	}
+
+	function sanitize(string) {
 		var temp = document.createElement('div');
 		temp.textContent = string;
-		return temp.textContent
-			.substring(0, Math.min(temp.textContent.length, 500))
-			.trim();
-	};
+		let text = temp.textContent
+		.substring(0, Math.min(temp.textContent.length, 500))
+		.trim();
+
+		//if (isEdge()) {
+		const isRTL = /[\u0591-\u07FF\u200F\u202B\u202E\uFB1D-\uFDFD\uFE70-\uFEFC]/.test(text);
+		if (isRTL) {
+			text = text.replaceAll(/[.,!?،؟؛]/g," ");
+		}
+		//}
+
+		return text;
+	}
 	function generateStreamID(){
 		var text = "";
 		var possible = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-		for (var i = 0; i < 7; i++){
+		for (var i = 0; i < 9; i++){
 			text += possible.charAt(Math.floor(Math.random() * possible.length));
 		}
 		return text;
@@ -280,163 +399,252 @@
     }, () => {
     });
 	var apiKey = false;
+	
 	var socket;
+	let retryCount = 0;
+	const maxRetryDelay = 30000; // Maximum delay of 30 seconds
+	const baseDelay = 1000; // Start with 1 second delay after first immediate retry
+
+	function getRetryDelay() {
+		if (retryCount === 0) {
+			return 0; // First retry is immediate
+		}
+		// Exponential backoff: baseDelay * 2^(retryCount-1)
+		const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), maxRetryDelay);
+		return delay;
+	}
+
 	function connectWebSocket() {
-	    if (socket) {
+		if (socket) {
 			socket.close();
 			socket = null;
 		}
+
 		socket = new WebSocket("wss://api.caption.ninja:443");
+
 		socket.onclose = function() {
 			console.log("WebSocket connection closed. Attempting to reconnect...");
-			setTimeout(connectWebSocket, 500);
+			const delay = getRetryDelay();
+			console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
+			setTimeout(connectWebSocket, delay);
+			retryCount++;
 		};
+
 		socket.onopen = function() {
 			console.log("WebSocket connected. Joining room...");
+			// Reset retry count on successful connection
+			retryCount = 0;
 			socket.send(JSON.stringify({"join":roomID}));
 		};
+
 		socket.onerror = function(error) {
 			console.error("WebSocket error:", error);
 			if (socket) {
 				socket.close();
 				socket = null;
 			}
-			setTimeout(connectWebSocket, 5000);
+			const delay = getRetryDelay();
+			console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
+			setTimeout(connectWebSocket, delay);
+			retryCount++;
 		};
 	}
+
 	connectWebSocket();
+	
 	var ends = 0;
 	var final_transcript = '';
 	var interim_transcript = "";
 	var recognition = null;
 	var idle = null;
 	setup();
-	function setup(){
-		if ('webkitSpeechRecognition' in window){
-			if (recognition) {
-				recognition.onend = null;
-				recognition.abort();
-			}
-			recognition = new webkitSpeechRecognition();
-			if (myLang){
-				recognition.lang = myLang;
-			}
-			recognition.continuous = true;
-			recognition.interimResults = true;
-			recognition.onstart = function(){
-				console.log("started transcription");
-				setTimeout(function(){
-					ends = 0;
-				}, 2000);
-			};
-			recognition.onerror = function(event){
-				console.log(event);
-			};
-			recognition.onend = function(e){
-				console.log(e);
-				console.log("Stopped transcription");
-				if (e.type === "end"){
-					ends +=1;
-				}
-				if (ends > 3){
-					alert("WARNING: Cannot enable transcription service\n\nThe service will fail completely if more than one transcription session is currently active on your computer.\n\nPlease close other Caption.Ninja tabs or other transcription services and then wait a few minutes before retrying.\n\nIt might also fail if your browser does not offer a transcription service; use the official Chrome browser instead if unsure.");
-				}
-				setup();
-			};
-			recognition.onresult = function(event){
-				counter+=1;
-				var interim_transcript = '';
-				if(typeof(event.results) == 'undefined'){
-					return;
-				}
-				let new_final_transcript = '';
-				for(var i = event.resultIndex; i < event.results.length; ++i){
-					if(event.results[i].isFinal){
-						new_final_transcript += ' ' + sanitize(event.results[i][0].transcript);
-					} else {
-						interim_transcript += " " +sanitize(event.results[i][0].transcript);
-						interim_transcript = interim_transcript.trim();
-					}
-				}
-				final_transcript = new_final_transcript.trim();
-				if (final_transcript){
-					console.log("FINAL:", final_transcript);
-					document.getElementById("output").innerHTML+="<span id='final_"+counter+"'>"+final_transcript+"</span><br />";
-					document.getElementById("interm").innerHTML="";
-					try {
-						if (timestamp_start===null){
-							timestamp_start = Date.now();
-							timestamp_intern = Date.now();
-						}
-						timestamp_stop = Date.now();
-						timestamp_stop = Date.now() - timestamp_start;
-						var date = new Date(0);
-						date.setSeconds(timestamp_stop/1000);
-						timestamp_stop = date.toISOString().replace(".",",").replace("1970-01-01T","");
-						timestamp_stop = timestamp_stop.substring(0, timestamp_stop.length - 1);
-						timestamp_intern -= timestamp_start;
-						var date = new Date(0);
-						date.setSeconds(timestamp_intern/1000);
-						timestamp_intern = date.toISOString().replace(".",",").replace("1970-01-01T","");
-						timestamp_intern = timestamp_intern.substring(0, timestamp_intern.length - 1);
-					} catch(e){console.error(e);}
-					try {
-						logcounter+=1;
-						srtFile += logcounter + "\n";
-						srtFile += timestamp_intern + " --\> " + timestamp_stop + "\n";
-						timestamp_intern=null;
-						srtFile += ">> " + final_transcript + "\n\n";
-						setStorage("transcription_"+roomID+"_"+timestamp_start, srtFile, 1);
-						if (logcounter===1){
-							var button = document.createElement("button");
-							button.onclick = function(){
-								download("transcription_"+roomID+"_"+timestamp_start+".srt", srtFile);
-							};
-							button.innerHTML = "Download transcription";
-							button.style.position = "fixed";
-							button.style.top = "0";
-							button.style.left = "0";
-							document.body.appendChild(button);
-						}
-					} catch(e){console.error(e);}
-					try {
-						if (label){
-							socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter, "label":label, "ln": myLang}));
-						} else {
-							socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter, "ln": myLang}));
-						}
-						final_transcript="";
-						interim_transcript="";
-						timestamp_start = null;
-						timestamp_stop = null;
-						timestamp_intern = null;
-					} catch(e){
-						console.error(e);
-					}
-				} else {
-					if (timestamp_start===null){
-						timestamp_start = Date.now();
-					}
-					if (timestamp_intern===null){
-						timestamp_intern = Date.now();
-					}
-					console.log("INTERM:", interim_transcript);
-					document.getElementById("interm").innerHTML="<span>"+interim_transcript+"</span><br />";
-					try {
-						if (label){
-							socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "label":label, "ln": myLang}));
-						} else {
-							socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "ln": myLang}));
-						}
-					} catch(e){
-						console.error(e);
-					    interim_transcript="";
-					}
-				}
-			};
-			recognition.start();
+	var startd = false;
+	function setup() {
+	  if ('webkitSpeechRecognition' in window) {
+		if (recognition) {
+		  recognition.onend = null;
+		  recognition.abort();
 		}
+		recognition = new webkitSpeechRecognition();
+		if (myLang) {
+		  recognition.lang = myLang;
+		}
+		recognition.continuous = true;
+		recognition.interimResults = true;
+		
+		recognition.onstart = function() {
+		  console.log("started transcription");
+		  setTimeout(function() {
+			ends = 0;
+		  }, 2000);
+		};
+		
+		recognition.onerror = function(event) {
+		  console.log(event);
+		};
+		
+		recognition.onend = function(e) {
+		  if (isPaused) return;
+		  console.log(e);
+		  console.log("Stopped transcription");
+		  
+		  if (startd) {
+			let currentInterim = document.getElementById("interm").innerText.trim();
+			if (currentInterim) {
+			  counter += 1;
+			  const direction = detectTextDirection(currentInterim);
+			  document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${currentInterim}</span><br />`;
+			  document.getElementById("interm").innerHTML = "";
+			  
+			  try {
+				if (label) {
+				  socket.send(JSON.stringify({"msg":true, "final":currentInterim, "id":counter, "label":label, "ln": myLang}));
+				} else {
+				  socket.send(JSON.stringify({"msg":true, "final":currentInterim, "id":counter, "ln": myLang}));
+				}
+			  } catch(e) {
+				console.error(e);
+			  }
+			}
+		  }
+		  
+		  if (e.type === "end") {
+			ends += 1;
+		  }
+		  if (ends > 3) {
+			alert("WARNING: Cannot enable transcription service\n\nThe service will fail completely if more than one transcription session is currently active on your computer.\n\nPlease close other Caption.Ninja tabs or other transcription services and then wait a few minutes before retrying.\n\nIt might also fail if your browser does not offer a transcription service; use the official Chrome browser instead if unsure.");
+		  }
+		  
+		  setTimeout(setup, 100);
+		};
+
+		recognition.onresult = function(event) {
+		  if(typeof(event.results) == 'undefined') return;
+		  
+		  counter += 1;
+		  let interim_transcript = '';
+		  let new_final_transcript = '';
+		  
+		  for(let i = event.resultIndex; i < event.results.length; ++i) {
+			const transcript = sanitize(event.results[i][0].transcript);
+			const direction = detectTextDirection(transcript);
+			
+			if(event.results[i].isFinal) {
+			  new_final_transcript += ' ' + transcript;
+			  document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${transcript}</span><br />`;
+			  document.getElementById("interm").innerHTML = "";
+			} else {
+			  interim_transcript += " " + transcript;
+			  interim_transcript = interim_transcript.trim();
+			  document.getElementById("interm").innerHTML = `<span dir='${direction}'>${interim_transcript}</span><br />`;
+			}
+		  }
+		  
+		  final_transcript = new_final_transcript.trim();
+		  
+		  if (final_transcript) {
+			console.log("FINAL:", final_transcript);
+			startd = true;
+			try {
+			  if (timestamp_start === null) {
+				timestamp_start = Date.now();
+				timestamp_intern = Date.now();
+			  }
+			  timestamp_stop = Date.now();
+			  timestamp_stop = Date.now() - timestamp_start;
+			  var date = new Date(0);
+			  date.setSeconds(timestamp_stop/1000);
+			  timestamp_stop = date.toISOString().replace(".",",").replace("1970-01-01T","");
+			  timestamp_stop = timestamp_stop.substring(0, timestamp_stop.length - 1);
+			  timestamp_intern -= timestamp_start;
+			  var date = new Date(0);
+			  date.setSeconds(timestamp_intern/1000);
+			  timestamp_intern = date.toISOString().replace(".",",").replace("1970-01-01T","");
+			  timestamp_intern = timestamp_intern.substring(0, timestamp_intern.length - 1);
+			  
+			  logcounter += 1;
+			  srtFile += logcounter + "\n";
+			  srtFile += timestamp_intern + " --\> " + timestamp_stop + "\n";
+			  timestamp_intern = null;
+			  srtFile += ">> " + final_transcript + "\n\n";
+			  setStorage("transcription_"+roomID+"_"+timestamp_start, srtFile, 1);
+			  
+			  if (logcounter === 1) {
+				  var button = document.createElement("button");
+				  button.onclick = function() {
+					download("transcription_"+roomID+"_"+timestamp_start+".srt", srtFile);
+				  };
+				  button.innerHTML = "Download transcription";
+				  button.className = "control-button";
+
+				  var shareButton = document.createElement("button");
+				  shareButton.onclick = function() {
+					const overlayUrl = url+"/overlay?room="+roomID;
+					navigator.clipboard.writeText(overlayUrl).then(() => {
+					  shareButton.innerHTML = "Link Copied!";
+					  setTimeout(() => shareButton.innerHTML = "Copy Overlay Link", 2000);
+					});
+				  };
+				  shareButton.innerHTML = "Copy Overlay Link";
+				  shareButton.className = "control-button";
+
+				  var controlContainer = document.querySelector('.control-buttons');
+				  if (!controlContainer) {
+					controlContainer = document.createElement("div");
+					controlContainer.className = "control-buttons";
+					document.body.appendChild(controlContainer);
+				  }
+				  controlContainer.appendChild(button);
+				  controlContainer.appendChild(shareButton);
+				  toggleButton.classList.remove("hidden");
+				  document.querySelector('.control-buttons').appendChild(toggleButton);
+			  }
+			  
+			  if (label) {
+				socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter, "label":label, "ln": myLang}));
+			  } else {
+				socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter, "ln": myLang}));
+			  }
+			} catch(e) {
+			  console.error(e);
+			}
+		  } else if (interim_transcript) {
+			if (timestamp_start === null) {
+			  timestamp_start = Date.now();
+			}
+			if (timestamp_intern === null) {
+			  timestamp_intern = Date.now();
+			}
+			startd = true;
+			console.log("INTERM:", interim_transcript);
+			
+			try {
+			  if (label) {
+				socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "label":label, "ln": myLang}));
+			  } else {
+				socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "ln": myLang}));
+			  }
+			} catch(e) {
+			  console.error(e);
+			  interim_transcript = "";
+			}
+		  }
+		};
+		
+		if (!isPaused) {
+		  recognition.start();
+		}
+	  }
 	}
+			
+	if (urlParams.has("test")){
+		setInterval(function(){
+			counter += 1;
+			socket.send(JSON.stringify({"msg":true, "final":counter, "id":counter}));
+		},500);
+	}
+	
 	</script>
+	
 	</body>
 </html>

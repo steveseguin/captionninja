@@ -158,6 +158,62 @@
 			filter: invert(100%);
 			-webkit-filter: invert(100%);
 		}
+	   .toggle-button {
+		  background-color: var(--primary-color);
+		  color: white;
+		  border: none;
+		  padding: 10px 20px;
+		  border-radius: var(--border-radius);
+		  cursor: pointer;
+		  font-weight: bold;
+		  transition: background-color 0.3s ease;
+		  margin: 10px 0;
+		}
+
+		.toggle-button:hover {
+		  background-color: var(--secondary-color);
+		}
+
+		.toggle-button.paused {
+		  background-color: #dc3545;
+		}
+		
+		#tts-options {
+		  padding: 10px;
+		  border: 1px solid #ddd;
+		  border-radius: 4px;
+		  background: #f8f9fa;
+		}
+
+		#tts-options select,
+		#tts-options input {
+		  padding: 4px;
+		  border: 1px solid #ddd;
+		  border-radius: 4px;
+		}
+
+		#tts-options label {
+		  display: inline-flex;
+		  align-items: center;
+		  margin-right: 10px;
+		}
+
+		.tts-provider-options {
+		  margin-top: 10px;
+		  padding: 10px;
+		  border-top: 1px solid #ddd;
+		}
+
+		.input-group {
+		  margin-bottom: 10px;
+		}
+
+		.input-group input[type="text"],
+		.input-group input[type="password"] {
+		  width: 300px;
+		  padding: 4px 8px;
+		}
+			
 	</style>
 </head>
 <body>
@@ -181,11 +237,171 @@
 	  <select id="lang-to" name="to" class="lang-select"></select>
 	</label>
 	
-	 <label>
+	 <label title="Enabling added context with TTS will cause double speak">
 	 Translate with added context?
 	 <input type="checkbox" id="fullContext" />
 	 </label>
-	 <br /><br />
+	 
+	 <label>
+		Enable Text to Speech in overlay?
+		<input type="checkbox" id="enableTTS" />
+	  </label>
+	  
+	 <button id="toggleTranscription" class="toggle-button">Pause Transcription</button>
+	 <br />
+	<div id="tts-controls" style="margin-top: 10px;">
+	  <div id="tts-options" style="display: none; margin: 10px 0;">
+		<div class="tts-provider-select" style="margin-bottom: 10px;">
+		  <select id="tts-provider">
+			<option value="system">System TTS</option>
+			<option value="elevenlabs">ElevenLabs</option>
+			<option value="google">Google Cloud</option>
+			<option value="speechify">Speechify</option>
+		  </select>
+		</div>
+
+		<!-- System TTS Options -->
+		<div class="tts-provider-options" id="system-options">
+		  <select id="tts-voice" style="margin-right: 10px;">
+			<option value="">System Default Voice</option>
+		  </select>
+		  
+		  <label style="margin-right: 10px;">
+			Rate:
+			<input type="number" id="tts-rate" min="0.1" max="10" step="0.1" value="1.0" style="width: 60px;" />
+		  </label>
+		  
+		  <label style="margin-right: 10px;">
+			Pitch:
+			<input type="number" id="tts-pitch" min="0" max="2" step="0.1" value="1.0" style="width: 60px;" />
+		  </label>
+		  
+		  <label>
+			Volume:
+			<input type="number" id="tts-volume" min="0" max="1" step="0.1" value="1.0" style="width: 60px;" />
+		  </label>
+		</div>
+
+		<!-- ElevenLabs Options -->
+		<div class="tts-provider-options" id="elevenlabs-options" style="display: none;">
+		  <div class="input-group">
+			<label>
+			  API Key:
+			  <input type="password" id="elevenlabs-key" placeholder="Your ElevenLabs API Key" />
+			</label>
+		  </div>
+		  
+		  <div class="input-group">
+			<label>
+			  Voice ID:
+			  <input type="text" id="elevenlabs-voice" placeholder="e.g., VR6AewLTigWG4xSOukaG" />
+			</label>
+		  </div>
+		  
+		  <div class="input-group">
+			<label>
+			  Model:
+			  <select id="elevenlabs-model">
+				<option value="eleven_multilingual_v2">eleven_multilingual_v2</option>
+				<option value="eleven_turbo_v2">eleven_turbo_v2</option>
+				<option value="eleven_english_sts_v2">eleven_english_sts_v2</option>
+			  </select>
+			</label>
+		  </div>
+		  
+		  <div class="input-group">
+			<label>
+			  Speaking Rate:
+			  <input type="number" id="elevenlabs-rate" min="0.25" max="5.0" step="0.25" value="1.0" />
+			</label>
+		  </div>
+		  
+		  <label>
+			<input type="checkbox" id="elevenlabs-speaker-boost" />
+			Use Speaker Boost
+		  </label>
+		</div>
+
+		<!-- Google Cloud Options -->
+		<div class="tts-provider-options" id="google-options" style="display: none;">
+		  <div class="input-group">
+			<label>
+			  API Key:
+			  <input type="password" id="google-key" placeholder="Your Google Cloud API Key" />
+			</label>
+		  </div>
+		  
+		  <div class="input-group">
+			<label>
+			  Voice Name:
+			  <input type="text" id="google-voice" placeholder="e.g., en-GB-Standard-A" />
+			</label>
+		  </div>
+		  
+		  <div class="input-group">
+			<label>
+			  Rate:
+			  <input type="number" id="google-rate" min="0.25" max="4" step="0.1" value="1.0" />
+			</label>
+		  </div>
+		  
+		  <div class="input-group">
+			<label>
+			  Pitch:
+			  <input type="number" id="google-pitch" min="-20" max="20" step="1" value="0" />
+			</label>
+		  </div>
+		  
+		  <div class="input-group">
+			<label>
+			  Audio Profile:
+			  <select id="google-profile">
+				<option value="handset-class-device">Handset</option>
+				<option value="headphone-class-device">Headphone</option>
+				<option value="small-bluetooth-speaker-class-device">Small Speaker</option>
+				<option value="medium-bluetooth-speaker-class-device">Medium Speaker</option>
+				<option value="large-home-entertainment-class-device">Large Speaker</option>
+			  </select>
+			</label>
+		  </div>
+		</div>
+
+		<!-- Speechify Options -->
+		<div class="tts-provider-options" id="speechify-options" style="display: none;">
+		  <div class="input-group">
+			<label>
+			  API Key:
+			  <input type="password" id="speechify-key" placeholder="Your Speechify API Key" />
+			</label>
+		  </div>
+		  
+		  <div class="input-group">
+			<label>
+			  Voice ID:
+			  <input type="text" id="speechify-voice" placeholder="e.g., henry" />
+			</label>
+		  </div>
+		  
+		  <div class="input-group">
+			<label>
+			  Speed:
+			  <input type="number" id="speechify-speed" min="0.1" max="3.0" step="0.1" value="1.0" />
+			</label>
+		  </div>
+		  
+		  <div class="input-group">
+			<label>
+			  Model:
+			  <select id="speechify-model">
+				<option value="simba-english">English</option>
+				<option value="simba-multilingual">Multilingual</option>
+			  </select>
+			</label>
+		  </div>
+		</div>
+	  </div>
+	</div>
+	 <br />
 	<div class="footer" id="status"></div>
 	<textarea id="input" name="input"></textarea>
 	<br />
@@ -232,6 +448,23 @@ const langs = {
     "es": "Spanish",
     "uk": "Ukrainian"
 };
+let isPaused = false;
+const toggleButton = document.getElementById('toggleTranscription');
+
+toggleButton.addEventListener('click', () => {
+  isPaused = !isPaused;
+  
+  if (isPaused) {
+	recognition.stop();
+	toggleButton.textContent = 'Resume Transcription';
+	toggleButton.classList.add('paused');
+  } else {
+	recognition.start();
+	toggleButton.textContent = 'Pause Transcription';
+	toggleButton.classList.remove('paused');
+  }
+});
+
 var myLang = navigator.language || "en-US";
 if (urlParams.has("lang")){
 	myLang = urlParams.get("lang");
@@ -277,15 +510,15 @@ worker.onmessage = function (e) {
 		counter+=1;
 		if (e.data[3]||false){
 			if (label){
-				socket.send(JSON.stringify({"msg":true, "interm":e.data[1].join("\n\n"), "id":counter, "label":label, "c": document.getElementById("fullContext").checked, "ln": myLang}));
+				socket.send(JSON.stringify({"msg":true, "interm":e.data[1].join("\n\n"), "id":counter, "label":label, "c": document.getElementById("fullContext").checked, "ln": langTo.value}));
 			} else {
-				socket.send(JSON.stringify({"msg":true, "interm":e.data[1].join("\n\n"), "id":counter, "c": document.getElementById("fullContext").checked, "ln": myLang}));
+				socket.send(JSON.stringify({"msg":true, "interm":e.data[1].join("\n\n"), "id":counter, "c": document.getElementById("fullContext").checked, "ln": langTo.value}));
 			}
 		} else {
 			if (label){
-				socket.send(JSON.stringify({"msg":true, "final":e.data[1].join("\n\n"), "id":counter, "label":label, "c": document.getElementById("fullContext").checked, "ln": myLang}));
+				socket.send(JSON.stringify({"msg":true, "final":e.data[1].join("\n\n"), "id":counter, "label":label, "c": document.getElementById("fullContext").checked, "ln": langTo.value}));
 			} else {
-				socket.send(JSON.stringify({"msg":true, "final":e.data[1].join("\n\n"), "id":counter, "c": document.getElementById("fullContext").checked, "ln": myLang}));
+				socket.send(JSON.stringify({"msg":true, "final":e.data[1].join("\n\n"), "id":counter, "c": document.getElementById("fullContext").checked, "ln": langTo.value}));
 			}
 		}
     } else if (e.data[0] === "load_model_reply" && e.data[1]) {
@@ -418,23 +651,265 @@ document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID;
 navigator.clipboard.writeText(url+"/overlay?room="+roomID).then(() => {
 }, () => {
 });
+
+
 var socket;
-function connectWebSocket() {
-  socket = new WebSocket("wss://api.caption.ninja:443");
-  socket.onclose = function() {
-    console.log("WebSocket connection closed. Attempting to reconnect...");
-    setTimeout(connectWebSocket, 500);
-  };
-  socket.onopen = function() {
-    console.log("WebSocket connected. Joining room...");
-    socket.send(JSON.stringify({"join":roomID}));
-  };
-  socket.onerror = function(error) {
-    console.error("WebSocket error:", error);
-	setTimeout(connectWebSocket, 5000);
-  };
+let retryCount = 0;
+const maxRetryDelay = 30000; // Maximum delay of 30 seconds
+const baseDelay = 1000; // Start with 1 second delay after first immediate retry
+
+function getRetryDelay() {
+	if (retryCount === 0) {
+		return 0; // First retry is immediate
+	}
+	// Exponential backoff: baseDelay * 2^(retryCount-1)
+	const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), maxRetryDelay);
+	return delay;
 }
+
+function connectWebSocket() {
+	if (socket) {
+		socket.close();
+		socket = null;
+	}
+
+	socket = new WebSocket("wss://api.caption.ninja:443");
+
+	socket.onclose = function() {
+		console.log("WebSocket connection closed. Attempting to reconnect...");
+		const delay = getRetryDelay();
+		console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
+		setTimeout(connectWebSocket, delay);
+		retryCount++;
+	};
+
+	socket.onopen = function() {
+		console.log("WebSocket connected. Joining room...");
+		// Reset retry count on successful connection
+		retryCount = 0;
+		socket.send(JSON.stringify({"join":roomID}));
+	};
+
+	socket.onerror = function(error) {
+		console.error("WebSocket error:", error);
+		if (socket) {
+			socket.close();
+			socket = null;
+		}
+		const delay = getRetryDelay();
+		console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
+		setTimeout(connectWebSocket, delay);
+		retryCount++;
+	};
+}
+
+const ttsMenu = {
+  init() {
+    this.enableTTS = document.getElementById('enableTTS');
+    this.ttsOptions = document.getElementById('tts-options');
+    this.ttsProvider = document.getElementById('tts-provider');
+    this.providerOptions = {
+      system: document.getElementById('system-options'),
+      elevenlabs: document.getElementById('elevenlabs-options'),
+      google: document.getElementById('google-options'),
+      speechify: document.getElementById('speechify-options')
+    };
+    
+    // Initialize system voices if available
+	if ('speechSynthesis' in window) {
+	  const loadVoices = () => {
+		const voices = speechSynthesis.getVoices();
+		const ttsVoice = document.getElementById('tts-voice');
+		if (!ttsVoice) return;
+		
+		ttsVoice.innerHTML = '<option value="">System Default Voice</option>';
+		voices.forEach(voice => {
+		  const option = document.createElement('option');
+		  option.value = voice.name;
+		  option.textContent = `${voice.name} (${voice.lang})`;
+		  ttsVoice.appendChild(option);
+		});
+	  };
+	  
+	  if (speechSynthesis.onvoiceschanged !== undefined) {
+		speechSynthesis.onvoiceschanged = loadVoices;
+	  }
+	  
+	  // Initial load attempt
+	  const voices = speechSynthesis.getVoices();
+	  if (voices.length) {
+		loadVoices();
+	  }
+	}
+    
+    // Setup event listeners
+	this.enableTTS.addEventListener('change', () => {
+	  this.ttsOptions.style.display = this.enableTTS.checked ? 'block' : 'none';
+	  this.updateShareLink();
+	  checkForConflictingSettings();
+	});
+    
+    this.ttsProvider.addEventListener('change', () => {
+      Object.values(this.providerOptions).forEach(el => el.style.display = 'none');
+      this.providerOptions[this.ttsProvider.value].style.display = 'block';
+      this.updateShareLink();
+    });
+    
+    // Add change listeners to all inputs
+    document.querySelectorAll('#tts-options input, #tts-options select').forEach(el => {
+      el.addEventListener('change', () => this.updateShareLink());
+    });
+    
+    // Initialize from URL params
+    this.initFromURL();
+  },
+
+  initFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (!urlParams.has('tts')) return;
+    
+    this.enableTTS.checked = true;
+    this.ttsOptions.style.display = 'block';
+    
+    // Determine provider from URL params
+    if (urlParams.has('elevenlabskey')) {
+      this.ttsProvider.value = 'elevenlabs';
+      document.getElementById('elevenlabs-key').value = urlParams.get('elevenlabskey');
+      if (urlParams.has('voice11')) document.getElementById('elevenlabs-voice').value = urlParams.get('voice11');
+      if (urlParams.has('elevenlabsmodel')) document.getElementById('elevenlabs-model').value = urlParams.get('elevenlabsmodel');
+      if (urlParams.has('elevenrate')) document.getElementById('elevenlabs-rate').value = urlParams.get('elevenrate');
+      document.getElementById('elevenlabs-speaker-boost').checked = urlParams.has('elevenspeakerboost');
+    } else if (urlParams.has('ttskey')) {
+      this.ttsProvider.value = 'google';
+      document.getElementById('google-key').value = urlParams.get('ttskey');
+      if (urlParams.has('voicegoogle')) document.getElementById('google-voice').value = urlParams.get('voicegoogle');
+      if (urlParams.has('googlerate')) document.getElementById('google-rate').value = urlParams.get('googlerate');
+      if (urlParams.has('googlepitch')) document.getElementById('google-pitch').value = urlParams.get('googlepitch');
+      if (urlParams.has('googleaudioprofile')) document.getElementById('google-profile').value = urlParams.get('googleaudioprofile');
+    } else if (urlParams.has('speechifykey')) {
+      this.ttsProvider.value = 'speechify';
+      document.getElementById('speechify-key').value = urlParams.get('speechifykey');
+      if (urlParams.has('voicespeechify')) document.getElementById('speechify-voice').value = urlParams.get('voicespeechify');
+      if (urlParams.has('speechifyspeed')) document.getElementById('speechify-speed').value = urlParams.get('speechifyspeed');
+      if (urlParams.has('speechifymodel')) document.getElementById('speechify-model').value = urlParams.get('speechifymodel');
+    } else {
+      // System TTS params
+      if (urlParams.has('voice')) document.getElementById('tts-voice').value = urlParams.get('voice');
+      if (urlParams.has('rate')) document.getElementById('tts-rate').value = urlParams.get('rate');
+      if (urlParams.has('pitch')) document.getElementById('tts-pitch').value = urlParams.get('pitch');
+      if (urlParams.has('volume')) document.getElementById('tts-volume').value = urlParams.get('volume');
+    }
+    
+    // Show correct provider options
+    Object.values(this.providerOptions).forEach(el => el.style.display = 'none');
+    this.providerOptions[this.ttsProvider.value].style.display = 'block';
+  },
+
+  updateShareLink() {
+	  const shareLink = document.getElementById('shareLink');
+	  const currentUrl = new URL(shareLink.href);
+	  const params = new URLSearchParams(currentUrl.search);
+	  
+	  // Clear existing TTS params
+	  ['tts', 'voice', 'rate', 'pitch', 'volume', 
+	   'elevenlabskey', 'voice11', 'elevenlabsmodel', 'elevenrate', 'elevenspeakerboost',
+	   'ttskey', 'voicegoogle', 'googlerate', 'googlepitch', 'googleaudioprofile',
+	   'speechifykey', 'voicespeechify', 'speechifyspeed', 'speechifymodel'].forEach(param => {
+		params.delete(param);
+	  });
+	  
+	  if (this.enableTTS.checked) {
+		params.set('tts', '');
+		
+		const provider = this.ttsProvider.value;
+		switch(provider) {
+        case 'elevenlabs':
+          const elevenKey = document.getElementById('elevenlabs-key').value;
+          if (elevenKey) {
+            params.set('elevenlabskey', elevenKey);
+            const elevenVoice = document.getElementById('elevenlabs-voice').value;
+            if (elevenVoice) params.set('voice11', elevenVoice);
+            params.set('elevenlabsmodel', document.getElementById('elevenlabs-model').value);
+            params.set('elevenrate', document.getElementById('elevenlabs-rate').value);
+            if (document.getElementById('elevenlabs-speaker-boost').checked) {
+              params.set('elevenspeakerboost', '');
+            }
+          }
+          break;
+          
+        case 'google':
+          const googleKey = document.getElementById('google-key').value;
+          if (googleKey) {
+            params.set('ttskey', googleKey);
+            const googleVoice = document.getElementById('google-voice').value;
+            if (googleVoice) params.set('voicegoogle', googleVoice);
+            params.set('googlerate', document.getElementById('google-rate').value);
+            params.set('googlepitch', document.getElementById('google-pitch').value);
+            params.set('googleaudioprofile', document.getElementById('google-profile').value);
+          }
+          break;
+          
+        case 'speechify':
+          const speechifyKey = document.getElementById('speechify-key').value;
+          if (speechifyKey) {
+            params.set('speechifykey', speechifyKey);
+            const speechifyVoice = document.getElementById('speechify-voice').value;
+            if (speechifyVoice) params.set('voicespeechify', speechifyVoice);
+            params.set('speechifyspeed', document.getElementById('speechify-speed').value);
+            params.set('speechifymodel', document.getElementById('speechify-model').value);
+          }
+          break;
+          
+        default: // system
+          const voice = document.getElementById('tts-voice').value;
+          if (voice) params.set('voice', voice);
+          if (document.getElementById('tts-rate').value !== '1.0') {
+            params.set('rate', document.getElementById('tts-rate').value);
+          }
+          if (document.getElementById('tts-pitch').value !== '1.0') {
+            params.set('pitch', document.getElementById('tts-pitch').value);
+          }
+          if (document.getElementById('tts-volume').value !== '1.0') {
+            params.set('volume', document.getElementById('tts-volume').value);
+          }
+          break;
+      }
+    }
+    
+      currentUrl.search = params.toString();
+	  shareLink.href = currentUrl.toString();
+	  shareLink.textContent = currentUrl.toString();
+	  
+	  // Add notification about needing to recopy link
+	  shareLink.style.backgroundColor = "#fff3cd";  
+	  shareLink.style.padding = "3px";
+	  shareLink.title = "TTS settings updated - copy new link to update overlay";
+	  
+	  // Clear highlight after 2 seconds
+	  setTimeout(() => {
+		shareLink.style.backgroundColor = "";
+		shareLink.style.padding = "";
+	  }, 2000);
+	  
+	  // Update clipboard
+	  navigator.clipboard.writeText(currentUrl.toString()).catch(err => console.error('Failed to copy URL:', err));
+	  
+	  // Show temporary notification
+	  const status = document.getElementById('status');
+	  if (status) {
+		const originalText = status.textContent;
+		status.textContent = "TTS settings updated - copy new overlay link to apply changes";
+		setTimeout(() => {
+		  status.textContent = originalText;
+		}, 3000);
+	  }
+	}
+};
+
+
 connectWebSocket();
+
+
 var transcript = '';
 var last_transcription  = "";
 var second_transcription = "";
@@ -475,14 +950,28 @@ function setup(){
 			console.error(event);
 		};
 		recognition.onend = function(e){
+			if (isPaused){return;}
 			console.log("Stopped transcription");
+			
+			// Save any pending transcript before restarting
+			if (transcript) {
+				if (document.getElementById("fullContext").checked){
+					translateCall([second_transcription, last_transcription, transcript].filter(Boolean).join(' '), false);
+				} else {
+					translateCall(transcript, false);
+				}
+				second_transcription = last_transcription;
+				last_transcription = transcript + ". ";
+				transcript = "";
+			}
+			
 			if (event.type === "end"){
 				ends += 1;
 			}
 			if (ends > 3){
 				alert("WARNING: Cannot enable transcription service...");
 			} else {
-				recognition.start();
+				setTimeout(() => recognition.start(), 100); // Small delay before restart
 			}
 		};
 		recognition.onresult = function(event){
@@ -523,9 +1012,22 @@ function setup(){
 				}
 			}
 		};
+		if (isPaused){return;}
 		recognition.start();
 	}
 }
+
+function checkForConflictingSettings() {
+  const enableTTS = document.getElementById('enableTTS');
+  const fullContext = document.getElementById('fullContext');
+  
+  if (enableTTS.checked && fullContext.checked) {
+    alert('Warning: Using TTS with added context will cause double speak.');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => ttsMenu.init());
+document.getElementById('fullContext').addEventListener('change', checkForConflictingSettings);
 </script>
 	</body>
 </html>

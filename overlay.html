@@ -87,6 +87,43 @@
 	let currentTo = null;
 
 	const status = function(message){document.getElementById("status").innerText = message;}
+	
+	const getLocaleFromLang = (lang) => {
+	  if (!lang) return null;
+	  if (lang.includes("-")) return lang;
+	  
+	  // Common language to locale mappings
+	  const localeMap = {
+		en: "en-US",
+		es: "es-ES",
+		fr: "fr-FR",
+		de: "de-DE",
+		it: "it-IT",
+		pt: "pt-PT",
+		ru: "ru-RU",
+		zh: "zh-CN",
+		ja: "ja-JP",
+		ko: "ko-KR"
+	  };
+
+	  return localeMap[lang.toLowerCase()] || `${lang}-${lang.toUpperCase()}`;
+	};
+
+	// Default system language
+	let currentLanguage = "en-US";
+
+	// Translation settings
+	const translationParams = ["translate", "lang", "ln"];
+	const hasTranslation = translationParams.some(param => urlParams.has(param));
+	const translationLang = hasTranslation ? 
+	  (translationParams.map(param => urlParams.get(param)).find(val => val) || "en") : false;
+	const langTo = translationLang ? translationLang.split("-")[0] : false;
+
+	// TTS settings initialization - only set if explicitly specified
+	const ttsParams = ["speech", "speak", "tts"];
+	const hasTTS = ttsParams.some(param => urlParams.has(param));
+	const ttsLang = hasTTS ?
+	  (ttsParams.map(param => urlParams.get(param)).find(val => val)) : null;
 
 	const langs = { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
 		"bg": "Bulgarian",
@@ -137,14 +174,369 @@
 		}
 	}
 	
-	
-	var langTo = false;
-	if (urlParams.has("translate") || urlParams.has("lang") || urlParams.has("ln") ){
-		var myLang = urlParams.get("translate") || urlParams.get("lang") || urlParams.get("ln") ||  "en";
-		langTo = myLang.split("-")[0];
-		console.log("Language: "+langTo);
+	class TextToSpeech {
+	  constructor(urlParams = new URLSearchParams(window.location.search)) {
+		this.speech = false;
+		this.premiumQueueTTS = [];
+		this.premiumQueueActive = false;
+		
+		this.initializeSettings(urlParams);
+		this.initializeVoices();
+		this.initializeAudio();
+	  }
+
+	  initializeSettings(urlParams) {
+		this.settings = {
+		  // Only set speechLang if explicitly provided in URL
+		  speechLang: ttsLang ? getLocaleFromLang(ttsLang) : langTo ? getLocaleFromLang(langTo) : null,
+		  volume: parseFloat(urlParams.get("volume")) || 1,
+		  pitch: parseFloat(urlParams.get("pitch")) || 0,
+		  rate: parseFloat(urlParams.get("rate")) || 1,
+		  voiceLatency: parseInt(urlParams.get("latency")) || 4,
+		  voiceGender: urlParams.get("gender") || false,
+		  voiceName: urlParams.get("voice") || false,
+		  
+		  google: {
+			apiKey: urlParams.get("ttskey") || urlParams.get("googlettskey") || false,
+			rate: urlParams.has("googlerate") ? parseFloat(urlParams.get("googlerate")) : 1,
+			pitch: urlParams.has("googlepitch") ? parseFloat(urlParams.get("googlepitch")) : 0,
+			audioProfile: urlParams.get("googleaudioprofile") || false,
+			voiceName: urlParams.get("voicegoogle") || false
+		  },
+		  
+		  elevenLabs: {
+			apiKey: urlParams.get("elevenlabskey") || false,
+			latency: urlParams.has("elevenlatency") ? parseInt(urlParams.get("elevenlatency")) : 4,
+			stability: urlParams.has("elevenstability") ? parseFloat(urlParams.get("elevenstability")) : 0.5,
+			similarity: urlParams.has("elevensimilarity") ? parseFloat(urlParams.get("elevensimilarity")) : 0.75,
+			style: urlParams.has("elevenstyle") ? parseFloat(urlParams.get("elevenstyle")) : 0.5,
+			speakingRate: urlParams.has("elevenrate") ? parseFloat(urlParams.get("elevenrate")) : 1.0,
+			speakerBoost: urlParams.has("elevenspeakerboost"),
+			voiceName: urlParams.get("voice11") || urlParams.get("elevenlabsvoice") || false,
+			model: urlParams.get("elevenlabsmodel") || "eleven_multilingual_v2"
+		  },
+		  
+		  speechify: {
+			apiKey: urlParams.get("speechifykey") || false,
+			speed: urlParams.has("speechifyspeed") ? parseFloat(urlParams.get("speechifyspeed")) : 1.0,
+			model: urlParams.get("speechifymodel") || 'simba-english',
+			voiceName: urlParams.get("voicespeechify") || false
+		  }
+		};
+
+		if (urlParams.has("speech") || urlParams.has("speak") || urlParams.has("tts")) {
+		  this.speech = true;
+		}
+	  }
+
+	  initializeVoices() {
+		this.voices = null;
+		this.voice = false;
+		
+		try {
+		  this.voices = window.speechSynthesis.getVoices();
+		  if (!this.voices.length && this.isSafari()) {
+			console.warn("Safari doesn't fully support automatic TTS");
+		  }
+		} catch (e) {
+		  console.error("TTS not supported");
+		}
+	  }
+
+	  initializeAudio() {
+		if (this.settings.google.apiKey || this.settings.elevenLabs.apiKey || this.settings.speechify.apiKey) {
+		  this.audio = document.createElement("audio");
+		  this.audio.onended = () => this.finishedAudio();
+		}
+	  }
+
+	  createUI() {
+		const template = document.createElement('template');
+		template.innerHTML = `
+		  <div class="tts-controls">
+			<button id="ttsToggle" class="tts-toggle">Toggle TTS</button>
+			<input type="range" id="volumeSlider" min="0" max="100" value="${this.settings.volume * 100}" />
+		  </div>
+		`;
+		
+		const style = document.createElement('style');
+		style.textContent = `
+		  .tts-controls { display: flex; gap: 1em; align-items: center; }
+		  .tts-toggle { padding: 0.5em 1em; }
+		`;
+		
+		document.head.appendChild(style);
+		
+		const ui = template.content.cloneNode(true);
+		ui.querySelector('#ttsToggle').addEventListener('click', () => this.toggleTTS());
+		ui.querySelector('#volumeSlider').addEventListener('input', (e) => {
+		  this.settings.volume = e.target.value / 100;
+		});
+		
+		return ui;
+	  }
+
+	  speak(text, allow = false) {
+		if ((!this.speech && !allow) || !text) return;
+
+		// Use explicitly set language or fall back to current language
+		const languageToUse = this.settings.speechLang || currentLanguage;
+
+		if (this.settings.google.apiKey) {
+		  if (!this.premiumQueueActive) {
+			this.googleTTS(text, languageToUse);
+		  } else {
+			this.premiumQueueTTS.push({text, language: languageToUse});
+		  }
+		  return;
+		}
+		
+		// Similar updates for other TTS services
+		if (this.settings.elevenLabs.apiKey) {
+		  if (!this.premiumQueueActive) {
+			this.elevenLabsTTS(text, languageToUse);
+		  } else {
+			this.premiumQueueTTS.push({text, language: languageToUse});
+		  }
+		  return;
+		}
+		
+		if (this.settings.speechify.apiKey) {
+		  if (!this.premiumQueueActive) {
+			this.speechifyTTS(text, languageToUse);
+		  } else {
+			this.premiumQueueTTS.push({text, language: languageToUse});
+		  }
+		  return;
+		}
+
+		this.useNativeTTS(text, languageToUse);
+	  }
+
+	  useNativeTTS(text, language) {
+		if (!this.voices && this.voices === null) return;
+		
+		const speechInput = new SpeechSynthesisUtterance();
+		
+		// Set language before voice selection
+		speechInput.lang = language;
+		
+		if (!this.voice) {
+		  this.selectVoice(language);
+		}
+		
+		if (this.voice) {
+		  speechInput.voice = this.voice;
+		}
+
+		speechInput.volume = this.settings.volume;
+		speechInput.rate = this.settings.rate;
+		speechInput.pitch = this.settings.pitch;
+		speechInput.text = text;
+
+		if (window.speechSynthesis) {
+		  window.speechSynthesis.speak(speechInput);
+		  this.updateUIState(true);
+		}
+	  }
+
+	  selectVoice(language) {
+		if (!this.voices || !this.voices.length) {
+		  if (window.speechSynthesis) {
+			this.voices = window.speechSynthesis.getVoices();
+		  }
+		}
+
+		if (this.voices) {
+		  // Try to find voice matching name and language
+		  if (this.settings.voiceName) {
+			this.voice = this.voices.find(v => 
+			  v.name.toLowerCase().includes(this.settings.voiceName.toLowerCase()) &&
+			  v.lang.toLowerCase().startsWith(language.split('-')[0].toLowerCase())
+			);
+		  }
+		  
+		  // If no voice found, try just matching language
+		  if (!this.voice) {
+			this.voice = this.voices.find(v => 
+			  v.lang.toLowerCase() === language.toLowerCase() ||
+			  v.lang.split('-')[0].toLowerCase() === language.split('-')[0].toLowerCase()
+			);
+		  }
+		  
+		  // Fall back to first available voice if needed
+		  if (!this.voice && this.voices.length) {
+			this.voice = this.voices[0];
+		  }
+		}
+	  }
+
+	  googleTTS(text) {
+		this.premiumQueueActive = true;
+		const url = `https://texttospeech.googleapis.com/v1beta1/text:synthesize?key=${this.settings.google.apiKey}`;
+		
+		const data = {
+		  input: { text },
+		  voice: {
+			languageCode: this.settings.speechLang.toLowerCase() || 'en-US',
+			name: this.settings.google.voiceName || "en-GB-Standard-A",
+			ssmlGender: this.settings.voiceGender ? this.settings.voiceGender.toUpperCase() : "FEMALE"
+		  },
+		  audioConfig: {
+			audioEncoding: "MP3",
+			speakingRate: this.settings.google.rate,
+			pitch: this.settings.google.pitch,
+			effectsProfileId: [this.settings.google.audioProfile || 'handset-class-device']
+		  }
+		};
+
+		this.fetchAudio(url, {
+		  headers: { "content-type": "application/json; charset=UTF-8" },
+		  body: JSON.stringify(data),
+		  method: "POST"
+		}, response => `data:audio/mp3;base64,${response.audioContent}`);
+	  }
+
+	  elevenLabsTTS(text) {
+		this.premiumQueueActive = true;
+		const voiceid = this.settings.elevenLabs.voiceName || "VR6AewLTigWG4xSOukaG";
+		const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceid}/stream?optimize_streaming_latency=${this.settings.elevenLabs.latency}`;
+		
+		const data = {
+		  text,
+		  model_id: this.settings.elevenLabs.model,
+		  voice_settings: {
+			stability: this.settings.elevenLabs.stability,
+			similarity_boost: this.settings.elevenLabs.similarity,
+			style: this.settings.elevenLabs.style,
+			use_speaker_boost: this.settings.elevenLabs.speakerBoost,
+			speaking_rate: this.settings.elevenLabs.speakingRate
+		  }
+		};
+
+		this.fetchAudio(url, {
+		  headers: {
+			"content-type": "application/json",
+			"xi-api-key": this.settings.elevenLabs.apiKey,
+			accept: "*/*"
+		  },
+		  body: JSON.stringify(data),
+		  method: "POST"
+		}, async response => {
+		  const blob = await response.blob();
+		  return URL.createObjectURL(new Blob([blob]));
+		});
+	  }
+
+	  speechifyTTS(text) {
+		this.premiumQueueActive = true;
+		const url = "https://api.sws.speechify.com/v1/audio/speech";
+		
+		const data = {
+		  input: `<speak>${text}</speak>`,
+		  voice_id: this.settings.speechify.voiceName || "henry",
+		  model: this.settings.speechify.model,
+		  audio_format: "mp3",
+		  speed: this.settings.speechify.speed
+		};
+
+		this.fetchAudio(url, {
+		  headers: {
+			"Authorization": `Bearer ${this.settings.speechify.apiKey}`,
+			"Content-Type": "application/json"
+		  },
+		  body: JSON.stringify(data),
+		  method: "POST"
+		}, response => `data:audio/mp3;base64,${response.audio_data}`);
+	  }
+
+	  async fetchAudio(url, options, processResponse) {
+		try {
+		  const response = await fetch(url, options);
+		  const data = await response.json();
+		  
+		  if (!this.audio) {
+			this.audio = document.createElement("audio");
+			this.audio.onended = () => this.finishedAudio();
+		  }
+		  
+		  this.audio.src = await processResponse(data);
+		  if (this.settings.volume) {
+			this.audio.volume = this.settings.volume;
+		  }
+		  
+		  try {
+			await this.audio.play();
+		  } catch (e) {
+			this.finishedAudio();
+			console.error("User interaction required for audio playback");
+		  }
+		} catch (error) {
+		  this.finishedAudio();
+		  console.error("Audio fetch error:", error);
+		}
+	  }
+
+	  finishedAudio() {
+		this.premiumQueueActive = false;
+		if (this.premiumQueueTTS.length) {
+		  this.speak(this.premiumQueueTTS.shift());
+		}
+		this.updateUIState(false);
+	  }
+
+	  clearTTS() {
+		if (window.speechSynthesis && (window.speechSynthesis.pending || window.speechSynthesis.speaking)) {
+		  window.speechSynthesis.cancel();
+		} else if (this.premiumQueueActive) {
+		  this.premiumQueueTTS = [];
+		  try {
+			if (this.audio) {
+			  this.audio.pause();
+			}
+		  } catch (e) {
+			console.error(e);
+		  }
+		}
+	  }
+
+	  toggleTTS() {
+		if (window.speechSynthesis && (window.speechSynthesis.pending || window.speechSynthesis.speaking)) {
+		  this.speech = false;
+		  window.speechSynthesis.cancel();
+		} else if (this.premiumQueueActive) {
+		  this.speech = false;
+		  this.premiumQueueTTS = [];
+		  try {
+			if (this.audio) {
+			  this.audio.pause();
+			}
+		  } catch (e) {
+			console.error(e);
+		  }
+		  this.premiumQueueActive = false;
+		} else {
+		  this.speech = !this.speech;
+		}
+		
+		this.updateUIState(this.speech);
+	  }
+
+	  updateUIState(isPlaying) {
+		const toggle = document.getElementById('ttsToggle');
+		if (toggle) {
+		  toggle.textContent = isPlaying ? 'Stop TTS' : 'Start TTS';
+		  toggle.classList.toggle('active', isPlaying);
+		}
+	  }
+
+	  isSafari() {
+		return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+	  }
 	}
 
+	const tts = new TextToSpeech();
+	// document.body.appendChild(tts.createUI());
 	
 	if (langTo){
 		var langFrom = "en";
@@ -239,51 +631,79 @@
 		allowHTML = true;
 	}
 	
-	//var counter=0;
 	var idle = null;
 
 	var socket;
+	let retryCount = 0;
+	const maxRetryDelay = 30000; // Maximum delay of 30 seconds
+	const baseDelay = 1000; // Start with 1 second delay after first immediate retry
 
-	function connectWebSocket() {
-	  socket = new WebSocket("wss://api.caption.ninja:443");
-
-	  socket.onclose = function() {
-		console.log("WebSocket connection closed. Attempting to reconnect...");
-		setTimeout(connectWebSocket, 500); // Try to reconnect after 5 seconds
-	  };
-
-	  socket.onopen = function() {
-		console.log("WebSocket connected. Joining room...");
-		socket.send(JSON.stringify({"join":roomID}));
-	  };
-
-	  // Add error handling
-	  socket.onerror = function(error) {
-		console.error("WebSocket error:", error);
-		setTimeout(connectWebSocket, 5000); // Try to reconnect after 5 seconds
-	  };
+	function getRetryDelay() {
+		if (retryCount === 0) {
+			return 0; // First retry is immediate
+		}
+		// Exponential backoff: baseDelay * 2^(retryCount-1)
+		const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), maxRetryDelay);
+		return delay;
 	}
 
-	// Initial connection
+	function connectWebSocket() {
+		if (socket) {
+			socket.close();
+			socket = null;
+		}
+
+		socket = new WebSocket("wss://api.caption.ninja:443");
+
+		socket.onclose = function() {
+			console.log("WebSocket connection closed. Attempting to reconnect...");
+			const delay = getRetryDelay();
+			console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
+			setTimeout(connectWebSocket, delay);
+			retryCount++;
+		};
+
+		socket.onopen = function() {
+			console.log("WebSocket connected. Joining room...");
+			// Reset retry count on successful connection
+			retryCount = 0;
+			socket.send(JSON.stringify({"join":roomID}));
+		};
+
+		socket.onerror = function(error) {
+			console.error("WebSocket error:", error);
+			if (socket) {
+				socket.close();
+				socket = null;
+			}
+			const delay = getRetryDelay();
+			console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
+			setTimeout(connectWebSocket, delay);
+			retryCount++;
+		};
+	}
+
 	connectWebSocket();
 	
 	socket.addEventListener('message', function (event) {
-		
-		if (event.data){
-			var data = JSON.parse(event.data);
-			if (langTo && data.ln){
-				//if (data.final)
-					if (langFrom !== data.ln.split("-")[0]){
-						langFrom = data.ln.split("-")[0];
-						console.log("Loading model");
-						loadModel();
-					}
-					translateCall(data.final || data.interm, data, data.interm||false);
-				//}
-			} else {
-				processReply(data);
-			}
+	  if (event.data) {
+		const data = JSON.parse(event.data);
+		if (data.ln) {
+		  // Update current language from socket unless translating
+		  if (!langTo) {
+			currentLanguage = data.ln;
+		  }
 		}
+		if (langTo && data.ln) {
+		  if (langFrom !== data.ln.split("-")[0]) {
+			langFrom = data.ln.split("-")[0];
+			loadModel();
+		  }
+		  translateCall(data.final || data.interm, data, data.interm||false);
+		} else {
+		  processReply(data);
+		}
+	  }
 	});
 	
 	var lastLabel = "";
@@ -318,10 +738,13 @@
 		} else {
 			label = "";
 		}
-		console.log(data);
+		// console.log(data);
 		if ("interm" in data){
 			document.getElementById("interm").innerHTML = label+"<span>"+sanitize(data.interm)+"</span><br/>";
 		} else if ("final" in data){
+		
+			tts.speak(data.final);
+		
 			if (clearOnNew || data.c){
 				document.getElementById("output").innerHTML = label+"<span>"+sanitize(data.final)+"</span><br/>";
 			} else {
