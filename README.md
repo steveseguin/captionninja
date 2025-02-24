@@ -116,7 +116,7 @@ You can deploy your own basic websocket server with this code: https://github.co
 
 The actual voice to text transcriptions are done usually on Google cloud servers, so it's not possible in most cases to fully-self host the service, although some devices, like Pixel smartphones, may do on-device voice to text rather than using the Google cloud.
 
-The Mozilla-powered translation component can be deployed from https://github.com/mozilla/translate -- you'll need to deploy that yourself also, and edit the worker file, to use your own deployment of that service though. That's out of scope of this repo though. Primarily just the CAPTION.Ninja client side code is provided here.
+The Mozilla-powered translation component can be deployed from https://github.com/mozilla/translate -- you'll need to deploy that yourself also if you want the free translation component, but that's out of scope of this repo. Primarily just the CAPTION.Ninja client side code is provided here. Not deploying that aspect won't impact the transcription service or the paid/premium translation/transcription options.
 
 ### Disclaimers
 I am not responsible if this app fails to work, service violations, or whatever else. It is provided as-is without warranty or support. I do not take responsibility for any liability.
@@ -131,8 +131,7 @@ That said, things change, and problems occur, so you accept any risks to using t
 
 Fonts are provided with their own license; apache 2.0 I believe, but confirm yourself.
 
-The free translation component is powered by Mozilla Translate; this includes the worker and wasm files located in this folder. You'll want to deploy it yourself probably if self-hosting.
-https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+The free translation component is powered by Mozilla Translate; https://github.com/mozilla/translate - MPL 2.0 - Mozilla
 
 As per CAPTION.NInja, to keep in spirit of what Mozilla has created, the code here contributed as part of this CAPTION.Ninja project is also made available as MPL 2.0. 
 
