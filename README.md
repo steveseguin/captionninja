@@ -110,3 +110,12 @@ The actual voice to text transcriptions are done usually on Google cloud servers
 
 ### Disclaimers
 I am not responsible if this app fails to work or whatever else. It is provided as-is without warranty or support. I do not take responsibility for any liability.
+
+### License
+
+The free translation component is powered by Mozilla Translate:
+https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+
+As such, to keep in spirit of that project, code contributed by in this repo is also made available as MPL 2.0.
+
+
