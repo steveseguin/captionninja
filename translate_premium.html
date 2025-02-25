@@ -794,21 +794,37 @@ function updateTrans(translatedText, isIncremental) {
 	}
 }
 langFrom.addEventListener("change", e => {
-	myLangCode = e.target.value;
-	console.log("Source language changed to:", myLangCode);
-	
-	// Always update storage and URL, regardless of previous language
-	setStorage("myLang", myLangCode, 999999);
-	updateURL("lang="+myLangCode, true);
-	
-	// Always restart recognition with new language
-	if (recognition) {
-		recognition.onend = null;
-		recognition.stop();
-		recognition = null;
-	}
-	myLang = myLangCode; // Update the myLang variable directly
-	setup();
+    const setToCode = (currentTo !== langFrom.value)
+      ? currentTo
+      : findFirstSupportedTo();
+    
+    myLang = langFrom.value;
+    myLangCode = myLang.split("-")[0].toLowerCase();
+    
+    if (myLangCode in supportedFromCodes) {
+        console.log("Setting input language to", myLang);
+        console.log("Language code:", myLangCode);
+        
+        // Force update URL parameter
+        updateURL("lang=" + myLang, true);
+        
+        // Properly stop and restart recognition
+        if (recognition) {
+            console.log("Stopping old recognition instance");
+            recognition.onend = null; // Remove event listener
+            recognition.stop();
+            setTimeout(() => {
+                console.log("Creating new recognition instance with language:", myLang);
+                recognition = null; // Ensure garbage collection
+                setup(); // This will create a new recognition object
+            }, 200);
+        }
+    } else {
+        console.warn("Language not supported:", myLangCode);
+    }
+    
+    setLangs(langTo, supportedToCodes, setToCode, langFrom.value);
+    loadModel();
 });
 langTo.addEventListener("change", e => {
 	targetCode = e.target.value;
