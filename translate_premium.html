@@ -795,21 +795,46 @@ function updateTrans(translatedText, isIncremental) {
 }
 langFrom.addEventListener("change", e => {
 	myLangCode = e.target.value;
-	console.log(myLangCode)
-	if (myLang.split("-")[0].toLowerCase() !== myLangCode){
-		setStorage("myLang", myLangCode, 999999);
-		updateURL("lang="+myLangCode, true);
+	console.log("Source language changed to:", myLangCode);
+	
+	// Always update storage and URL, regardless of previous language
+	setStorage("myLang", myLangCode, 999999);
+	updateURL("lang="+myLangCode, true);
+	
+	// Always restart recognition with new language
+	if (recognition) {
 		recognition.onend = null;
 		recognition.stop();
 		recognition = null;
-		setup();
 	}
+	myLang = myLangCode; // Update the myLang variable directly
+	setup();
 });
 langTo.addEventListener("change", e => {
 	targetCode = e.target.value;
+	console.log("Target language changed to:", targetCode);
 	updateURL("translate="+targetCode, true);
-	console.log(targetCode);
 	setStorage("targetCode", targetCode, 999999);
+	
+	// If there's text in the input field, translate it immediately with the new target language
+	const currentText = document.getElementById("input").value.trim();
+	if (currentText && document.getElementById("enabledTranscription").checked) {
+		if (document.getElementById("fullContext").checked) {
+			let fullText = [];
+			if (second_transcription?.trim()) {
+				fullText.push(second_transcription.trim().replace(/\.?$/, '.'));
+			}
+			if (last_transcription?.trim()) {
+				fullText.push(last_transcription.trim().replace(/\.?$/, '.'));
+			}
+			if (currentText?.trim()) {
+				fullText.push(currentText.trim().replace(/\.?$/, '.'));
+			}
+			translateIncremental(fullText.join(' '));
+		} else {
+			translateIncremental(currentText);
+		}
+	}
 });
 function updateURL(param, force=false) {
 	var para = param.split('=');
@@ -937,17 +962,11 @@ function setup(){
 	if ('webkitSpeechRecognition' in window){
 		console.log("Setting up webkitSpeechRecognition");
 		recognition = new webkitSpeechRecognition();
-		if (myLang && myLangCode){
-			if (myLang.split("-")[0] == myLangCode){
-				recognition.lang = myLang;
-			} else {
-				recognition.lang = myLangCode;
-			}
-		} else if (myLangCode){
-			recognition.lang = myLangCode;
-		} else if (myLang){
-			recognition.lang = myLang;
-		}
+		
+		// Always use the current myLangCode
+		recognition.lang = myLangCode || myLang || navigator.language || "en-US";
+		console.log("Recognition language set to:", recognition.lang);
+		
 		recognition.continuous = true;
 		recognition.interimResults = document.getElementById("incrementalUpdates").checked;
 		recognition.onstart = function(){

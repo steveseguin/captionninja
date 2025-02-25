@@ -225,7 +225,7 @@
 	<br /><br />
 	Please note that this app uses your default microphone as the audio input source. You sometimes can change the default audio source via the browser's setting, but you can also change it at your system level by changing the default recording device. You can also change audio sources by using a Virtual Audio Cable, <a href='https://www.vb-audio.com/Cable/'> such as this one.</a> Using it, it becomes possible to select other sources, including microphones, speakers, and other applications.
 	<br /><br />
-	The translation component is based on code from Mozilla <a href="https://github.com/mozilla/translate">https://github.com/mozilla/translate</a>. If your language is missing though, or you want better results, I have a version <a href='https://caption.ninja/translate_premium' target='_blank'>powered by Google Cloud Translation here</a>. Check out more options and details on <a href='https://github.com/steveseguin/captionninja'>GitHub</a>.
+	The translation component is based on code from Mozilla <a href="https://github.com/mozilla/translate">https://github.com/mozilla/translate</a>. If your language is missing though, or you want better results, I have a version <a href='https://caption.ninja/translate_premium''>powered by Google Cloud Translation here</a>. Check out more options and details on <a href='https://github.com/steveseguin/captionninja'>GitHub</a>.
 	<br /><br />
 	<label>
 	  From
@@ -556,17 +556,25 @@ langFrom.addEventListener("change", e => {
     const setToCode = (currentTo !== langFrom.value)
       ? currentTo
       : findFirstSupportedTo();
-	myLangCode = langFrom.value.split("-")[0];
-	if (myLangCode in supportedFromCodes) {
-		console.log("guessing input language is", myLangCode);
-		setFromCode = myLangCode;
-	}
-	recognition.stop();
+    myLangCode = langFrom.value.split("-")[0];
+    if (myLangCode in supportedFromCodes) {
+        console.log("setting input language to", myLangCode);
+        myLang = myLangCode;
+        // Update URL parameter
+        updateURL("lang=" + myLangCode, true);
+        // Update recognition language
+        if (recognition) {
+            recognition.lang = myLangCode;
+        }
+    }
+    recognition.stop();
     setLangs(langTo, supportedToCodes, setToCode, langFrom.value);
     loadModel();
 });
 langTo.addEventListener("change", e => {
     currentTo = langTo.value;
+    // Update URL parameter
+    updateURL("translate=" + currentTo, true);
     loadModel();
 });
 const setLangs = (selector, langsToSet, value, exlcude) => {
@@ -623,7 +631,6 @@ function updateURL(param, force=false) {
 			} else {
 				href.searchParams.set(para[0].toLowerCase(), para[1]);
 			}
-			log(href.toString());
 			window.history.pushState({path:href.toString()},'',href.toString());
 		}
 	}
@@ -925,19 +932,19 @@ var sanitize = function(string) {
 		.trim();
 };
 function setup(){
-	if ('webkitSpeechRecognition' in window){
-		recognition = new webkitSpeechRecognition();
-		if (myLang && myLangCode){
-			if (myLang.split("-")[0] == myLangCode){
-				recognition.lang = myLang;
-			} else {
-				recognition.lang = myLangCode;
-			}
-		} else if (myLangCode){
-			recognition.lang = myLangCode;
-		} else if (myLang){
-			recognition.lang = myLang;
-		}
+    if ('webkitSpeechRecognition' in window){
+        recognition = new webkitSpeechRecognition();
+        if (myLang && myLangCode){
+            if (myLang.split("-")[0] == myLangCode){
+                recognition.lang = myLang;
+            } else {
+                recognition.lang = myLangCode;
+            }
+        } else if (myLangCode){
+            recognition.lang = myLangCode;
+        } else if (myLang){
+            recognition.lang = myLang;
+        }
 		recognition.continuous = true;
 		recognition.interimResults = true;
 		recognition.onstart = function(){
