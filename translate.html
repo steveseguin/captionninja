@@ -556,17 +556,22 @@ langFrom.addEventListener("change", e => {
     const setToCode = (currentTo !== langFrom.value)
       ? currentTo
       : findFirstSupportedTo();
-    myLangCode = langFrom.value.split("-")[0];
+    
+    myLang = langFrom.value;
+    myLangCode = myLang.split("-")[0];
+    
     if (myLangCode in supportedFromCodes) {
-        console.log("setting input language to", myLangCode);
-        myLang = myLangCode;
-        // Update URL parameter
-        updateURL("lang=" + myLangCode, true);
-        // Update recognition language
+        console.log("setting input language to", myLang);
+        
+        // Update URL parameter with full language code
+        updateURL("lang=" + myLang, true);
+        
+        // Update recognition language with full language code
         if (recognition) {
-            recognition.lang = myLangCode;
+            recognition.lang = myLang;
         }
     }
+    
     recognition.stop();
     setLangs(langTo, supportedToCodes, setToCode, langFrom.value);
     loadModel();
@@ -611,29 +616,34 @@ function init() {
     loadModel();
 }
 function updateURL(param, force=false) {
-	var para = param.split('=');
-	if (!(urlParams.has(para[0].toLowerCase()))){
-		if (history.pushState){
-			var arr = window.location.href.split('?');
-			var newurl;
-			if (arr.length > 1 && arr[1] !== '') {
-				newurl = window.location.href + '&' +param;
-			} else {
-				newurl = window.location.href + '?' +param;
-			}
-			window.history.pushState({path:newurl},'',newurl);
-		}
-	} else if (force){
-		if (history.pushState){
-			var href = new URL(window.location.href);
-			if (para.length==1){
-				href.searchParams.set(para[0].toLowerCase(), "");
-			} else {
-				href.searchParams.set(para[0].toLowerCase(), para[1]);
-			}
-			window.history.pushState({path:href.toString()},'',href.toString());
-		}
-	}
+    var para = param.split('=');
+    
+    if (!(urlParams.has(para[0].toLowerCase()))) {
+        if (history.pushState) {
+            var arr = window.location.href.split('?');
+            var newurl;
+            if (arr.length > 1 && arr[1] !== '') {
+                newurl = window.location.href + '&' + param;
+            } else {
+                newurl = window.location.href + '?' + param;
+            }
+            window.history.pushState({path:newurl},'',newurl);
+            // Update urlParams with the new parameter
+            urlParams = new URLSearchParams(window.location.search);
+        }
+    } else if (force) {
+        if (history.pushState) {
+            var href = new URL(window.location.href);
+            if (para.length==1) {
+                href.searchParams.set(para[0].toLowerCase(), "");
+            } else {
+                href.searchParams.set(para[0].toLowerCase(), para[1]);
+            }
+            window.history.pushState({path:href.toString()},'',href.toString());
+            // Update urlParams with the modified parameters
+            urlParams = new URLSearchParams(window.location.search);
+        }
+    }
 }
 function generateStreamID(){
 	var text = "";
