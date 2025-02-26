@@ -424,250 +424,396 @@
 		};
 	};
 })(window);
+
 var urlParams = new URLSearchParams(window.location.search);
+let currentTranslationId = 0;
 let worker;
 let modelRegistry;
 let version;
-const status = function(message){document.getElementById("status").innerText = message;}
+const status = function(message) {
+	document.getElementById("status").innerText = message;
+}
 const langs = {
-    "bg": "Bulgarian",
-    "cs": "Czech",
-    "nl": "Dutch",
-    "en": "English",
-    "et": "Estonian",
-    "de": "German",
-    "fr": "French",
-    "is": "Icelandic",
-    "it": "Italian",
-    "nb": "Norwegian Bokmål",
-    "nn": "Norwegian Nynorsk",
-    "fa": "Persian",
-    "pl": "Polish",
-    "pt": "Portuguese",
-    "ru": "Russian",
-    "es": "Spanish",
-    "uk": "Ukrainian"
+	"bg": "Bulgarian",
+	"cs": "Czech",
+	"nl": "Dutch",
+	"en": "English",
+	"et": "Estonian",
+	"de": "German",
+	"fr": "French",
+	"is": "Icelandic",
+	"it": "Italian",
+	"nb": "Norwegian Bokmål",
+	"nn": "Norwegian Nynorsk",
+	"fa": "Persian",
+	"pl": "Polish",
+	"pt": "Portuguese",
+	"ru": "Russian",
+	"es": "Spanish",
+	"uk": "Ukrainian"
 };
 let isPaused = false;
 const toggleButton = document.getElementById('toggleTranscription');
 
 toggleButton.addEventListener('click', () => {
-  isPaused = !isPaused;
-  
-  if (isPaused) {
-	recognition.stop();
-	toggleButton.textContent = 'Resume Transcription';
-	toggleButton.classList.add('paused');
-  } else {
-	recognition.start();
-	toggleButton.textContent = 'Pause Transcription';
-	toggleButton.classList.remove('paused');
-  }
+	isPaused = !isPaused;
+
+	if (isPaused) {
+		recognition.stop();
+		toggleButton.textContent = 'Resume Transcription';
+		toggleButton.classList.add('paused');
+	} else {
+		recognition.start();
+		toggleButton.textContent = 'Pause Transcription';
+		toggleButton.classList.remove('paused');
+	}
 });
 
 var myLang = navigator.language || "en-US";
-if (urlParams.has("lang")){
+if (urlParams.has("lang")) {
 	myLang = urlParams.get("lang");
 } else {
-	updateURL("lang="+myLang);
+	updateURL("lang=" + myLang);
 }
+
 var myLangCode = myLang.split("-")[0].toLowerCase();
 var targetCode = "de";
-if (myLangCode == "de"){
+if (myLangCode == "de") {
 	targetCode = "en";
 }
-if (urlParams.has("translate") || urlParams.has("target")){
+if (urlParams.has("translate") || urlParams.has("target")) {
 	targetCode = urlParams.get("translate") || urlParams.get("target") || targetCode;
 	targetCode = targetCode.split("-")[0].toLowerCase();
 } else {
-	updateURL("translate="+targetCode);
+	updateURL("translate=" + targetCode);
 }
-console.log("Language: "+myLang);
+
+console.log("Language: " + myLang);
 const langFrom = document.getElementById("lang-from");
 const langTo = document.getElementById("lang-to");
+
 let supportedFromCodes = {};
 let supportedToCodes = {};
 let currentTo = null;
+let translationQueue = [];
+let isTranslating = false;
+let lastFinalTranslationId = 0;
+let pendingTranslations = new Map();
+
+
 if (window.Worker) {
-    worker = new Worker("worker.js?v=2");
-    worker.postMessage(["import"]);
+	worker = new Worker("worker.js?v=2");
+	worker.postMessage(["import"]);
 }
-function translateCall(text, interm=false){
-    if (!text.trim().length) return;
-    const paragraphs = text.split("\n");
-    const lngFrom = langFrom.value;
-    const lngTo = langTo.value;
-    worker.postMessage(["translate", lngFrom, lngTo, paragraphs, null, interm]);
-};
+
+function translateCall(text, interm = false) {
+	if (!text.trim().length) return;
+
+	const translationId = counter;
+	const paragraphs = text.split("\n");
+	const lngFrom = langFrom.value;
+	const lngTo = langTo.value;
+
+	// Add to queue with priority (final translations get higher priority)
+	translationQueue.push({
+		id: translationId,
+		from: lngFrom,
+		to: lngTo,
+		text: paragraphs,
+		interm: interm,
+		timestamp: Date.now()
+	});
+
+	// Store in pending translations map
+	pendingTranslations.set(translationId, {
+		text: text,
+		interm: interm
+	});
+
+	// Process queue if not already processing
+	if (!isTranslating) {
+		processTranslationQueue();
+	}
+}
+
 var label = false;
-if (urlParams.has("label")){
+if (urlParams.has("label")) {
 	label = urlParams.get("label");
 }
 var counter = 0;
-worker.onmessage = function (e) {
-    if (e.data[0] === "translate_reply" && e.data[1]) {
-        document.getElementById("output").innerText = e.data[1].join("<br /><br />");
-		counter+=1;
-		if (e.data[3]||false){
-			if (label){
-				socket.send(JSON.stringify({"msg":true, "interm":e.data[1].join("\n\n"), "id":counter, "label":label, "c": document.getElementById("fullContext").checked, "ln": langTo.value}));
+
+worker.onmessage = function(e) {
+	if (e.data[0] === "translate_reply" && e.data[1]) {
+		document.getElementById("output").innerText = e.data[1].join("<br /><br />");
+
+		// Get the pending translation info
+		const pendingTranslation = pendingTranslations.get(currentTranslationId);
+		if (pendingTranslation) {
+			if (pendingTranslation.interm || e.data[3]) {
+				if (label) {
+					socket.send(JSON.stringify({
+						"msg": true,
+						"interm": e.data[1].join("\n\n"),
+						"id": currentTranslationId,
+						"label": label,
+						"c": document.getElementById("fullContext").checked,
+						"ln": langTo.value
+					}));
+				} else {
+					socket.send(JSON.stringify({
+						"msg": true,
+						"interm": e.data[1].join("\n\n"),
+						"id": currentTranslationId,
+						"c": document.getElementById("fullContext").checked,
+						"ln": langTo.value
+					}));
+				}
 			} else {
-				socket.send(JSON.stringify({"msg":true, "interm":e.data[1].join("\n\n"), "id":counter, "c": document.getElementById("fullContext").checked, "ln": langTo.value}));
-			}
-		} else {
-			if (label){
-				socket.send(JSON.stringify({"msg":true, "final":e.data[1].join("\n\n"), "id":counter, "label":label, "c": document.getElementById("fullContext").checked, "ln": langTo.value}));
-			} else {
-				socket.send(JSON.stringify({"msg":true, "final":e.data[1].join("\n\n"), "id":counter, "c": document.getElementById("fullContext").checked, "ln": langTo.value}));
+				if (label) {
+					socket.send(JSON.stringify({
+						"msg": true,
+						"final": e.data[1].join("\n\n"),
+						"id": currentTranslationId,
+						"label": label,
+						"c": document.getElementById("fullContext").checked,
+						"ln": langTo.value
+					}));
+				} else {
+					socket.send(JSON.stringify({
+						"msg": true,
+						"final": e.data[1].join("\n\n"),
+						"id": currentTranslationId,
+						"c": document.getElementById("fullContext").checked,
+						"ln": langTo.value
+					}));
+				}
+
+				// Clean up old pending translations
+				pendingTranslations.forEach((value, key) => {
+					if (key <= currentTranslationId) {
+						pendingTranslations.delete(key);
+					}
+				});
 			}
 		}
-    } else if (e.data[0] === "load_model_reply" && e.data[1]) {
-        status(e.data[1]);
-    } else if (e.data[0] === "import_reply" && e.data[1]) {
-        modelRegistry = e.data[1];
-        version = e.data[2];
-        init();
-    }
+
+		// Continue processing queue
+		setTimeout(processTranslationQueue, 0);
+	} else if (e.data[0] === "load_model_reply" && e.data[1]) {
+		status(e.data[1]);
+		isTranslating = false;
+	} else if (e.data[0] === "import_reply" && e.data[1]) {
+		modelRegistry = e.data[1];
+		version = e.data[2];
+		init();
+		isTranslating = false;
+	}
 };
+
+function processTranslationQueue() {
+	if (translationQueue.length === 0) {
+		isTranslating = false;
+		return;
+	}
+
+	isTranslating = true;
+
+	// Sort queue: final translations first, then most recent interim translations
+	translationQueue.sort((a, b) => {
+		// Final translations get priority over interim
+		if (!a.interm && b.interm) return -1;
+		if (a.interm && !b.interm) return 1;
+
+		// For interim translations, prioritize newest
+		if (a.interm && b.interm) {
+			return b.timestamp - a.timestamp;
+		}
+
+		// For final translations, prioritize oldest (in order)
+		return a.timestamp - b.timestamp;
+	});
+
+	// Remove outdated interim translations, keeping only the most recent one
+	let mostRecentInterim = null;
+	const newQueue = [];
+
+	for (const item of translationQueue) {
+		if (item.interm) {
+			if (!mostRecentInterim || item.timestamp > mostRecentInterim.timestamp) {
+				mostRecentInterim = item;
+			}
+		} else {
+			newQueue.push(item);
+		}
+	}
+
+	if (mostRecentInterim) {
+		newQueue.push(mostRecentInterim);
+	}
+
+	translationQueue = newQueue;
+
+	// Take the first item from the queue
+	const nextTranslation = translationQueue.shift();
+
+	// Process this translation
+	worker.postMessage([
+		"translate",
+		nextTranslation.from,
+		nextTranslation.to,
+		nextTranslation.text,
+		null,
+		nextTranslation.interm
+	]);
+
+	// Store the ID to handle it in the worker response
+	currentTranslationId = nextTranslation.id;
+}
+
 const isSupported = (lngFrom, lngTo) => {
-    return true;
+	return true;
 }
 const loadModel = () => {
-    const lngFrom = langFrom.value;
-    const lngTo = langTo.value;
-    if (lngFrom !== lngTo) {
-        if (!isSupported(lngFrom, lngTo)) {
-            status("Language pair is not supported");
-            document.getElementById("output").innerText = "";
-            return;
-        }
-        status(`Installing model...`);
-        console.log(`Loading model '${lngFrom}${lngTo}'`);
-        worker.postMessage(["load_model", lngFrom, lngTo]);
-    } else {
-        const input = document.getElementById("input").value;
-        document.getElementById("output").innerText = "";
-    }
+	const lngFrom = langFrom.value;
+	const lngTo = langTo.value;
+	if (lngFrom !== lngTo) {
+		if (!isSupported(lngFrom, lngTo)) {
+			status("Language pair is not supported");
+			document.getElementById("output").innerText = "";
+			return;
+		}
+		status(`Installing model...`);
+		console.log(`Loading model '${lngFrom}${lngTo}'`);
+		worker.postMessage(["load_model", lngFrom, lngTo]);
+	} else {
+		const input = document.getElementById("input").value;
+		document.getElementById("output").innerText = "";
+	}
 };
 const findFirstSupportedTo = () => {
-    return Object.entries(supportedToCodes).find(([code, ]) => code !== langFrom.value)[0]
+	return Object.entries(supportedToCodes).find(([code, ]) => code !== langFrom.value)[0]
 }
 langFrom.addEventListener("change", e => {
-    const setToCode = (currentTo !== langFrom.value)
-      ? currentTo
-      : findFirstSupportedTo();
-    
-    myLang = langFrom.value;
-    myLangCode = myLang.split("-")[0];
-    
-    if (myLangCode in supportedFromCodes) {
-        console.log("setting input language to", myLang);
-        
-        // Update URL parameter with full language code
-        updateURL("lang=" + myLang, true);
-        
-        // Update recognition language with full language code
-        if (recognition) {
-            recognition.lang = myLang;
-        }
-    }
-    
-    recognition.stop();
-    setLangs(langTo, supportedToCodes, setToCode, langFrom.value);
-    loadModel();
+	const setToCode = (currentTo !== langFrom.value) ?
+		currentTo :
+		findFirstSupportedTo();
+
+	myLang = langFrom.value;
+	myLangCode = myLang.split("-")[0];
+
+	if (myLangCode in supportedFromCodes) {
+		console.log("setting input language to", myLang);
+
+		// Update URL parameter with full language code
+		updateURL("lang=" + myLang, true);
+
+		// Update recognition language with full language code
+		if (recognition) {
+			recognition.lang = myLang;
+		}
+	}
+
+	recognition.stop();
+	setLangs(langTo, supportedToCodes, setToCode, langFrom.value);
+	loadModel();
 });
 langTo.addEventListener("change", e => {
-    currentTo = langTo.value;
-    // Update URL parameter
-    updateURL("translate=" + currentTo, true);
-    loadModel();
+	currentTo = langTo.value;
+	// Update URL parameter
+	updateURL("translate=" + currentTo, true);
+	loadModel();
 });
 const setLangs = (selector, langsToSet, value, exlcude) => {
-    selector.innerHTML = "";
-    for (const [code, type] of Object.entries(langsToSet)) {
-        if (code === exlcude) continue;
-        let name = langs[code];
-        if (type === "dev") name += " (Beta)";
-        selector.innerHTML += "<option value='"+code+"'>"+name+"</option>";
-    }
-    selector.value = value;
+	selector.innerHTML = "";
+	for (const [code, type] of Object.entries(langsToSet)) {
+		if (code === exlcude) continue;
+		let name = langs[code];
+		if (type === "dev") name += " (Beta)";
+		selector.innerHTML += "<option value='" + code + "'>" + name + "</option>";
+	}
+	selector.value = value;
 }
+
 function init() {
-    supportedFromCodes["en"] = "prod";
-    supportedToCodes["en"] = "prod";
-    for (const [langPair, value] of Object.entries(modelRegistry)) {
-        const firstLang = langPair.substring(0, 2);
-        const secondLang = langPair.substring(2, 4);
-        if (firstLang !== "en") supportedFromCodes[firstLang] = value.model.modelType;
-        if (secondLang !== "en") supportedToCodes[secondLang] = value.model.modelType;
-    }
-    let setFromCode = "en";
-    if (myLang) {
-        myLangCode = myLang.split("-")[0];
-        if (myLangCode in supportedFromCodes) {
-            console.log("guessing input language is", myLangCode);
-            setFromCode = myLangCode;
-        }
-    }
-    setLangs(langFrom, supportedFromCodes, setFromCode, null);
-    const setToCode = targetCode;
-    setLangs(langTo, supportedToCodes, setToCode, setFromCode);
-    currentTo = setToCode;
-    loadModel();
+	supportedFromCodes["en"] = "prod";
+	supportedToCodes["en"] = "prod";
+	for (const [langPair, value] of Object.entries(modelRegistry)) {
+		const firstLang = langPair.substring(0, 2);
+		const secondLang = langPair.substring(2, 4);
+		if (firstLang !== "en") supportedFromCodes[firstLang] = value.model.modelType;
+		if (secondLang !== "en") supportedToCodes[secondLang] = value.model.modelType;
+	}
+	let setFromCode = "en";
+	if (myLang) {
+		myLangCode = myLang.split("-")[0];
+		if (myLangCode in supportedFromCodes) {
+			console.log("guessing input language is", myLangCode);
+			setFromCode = myLangCode;
+		}
+	}
+	setLangs(langFrom, supportedFromCodes, setFromCode, null);
+	const setToCode = targetCode;
+	setLangs(langTo, supportedToCodes, setToCode, setFromCode);
+	currentTo = setToCode;
+	loadModel();
 }
-function updateURL(param, force=false) {
-    var para = param.split('=');
-    
-    if (!(urlParams.has(para[0].toLowerCase()))) {
-        if (history.pushState) {
-            var arr = window.location.href.split('?');
-            var newurl;
-            if (arr.length > 1 && arr[1] !== '') {
-                newurl = window.location.href + '&' + param;
-            } else {
-                newurl = window.location.href + '?' + param;
-            }
-            window.history.pushState({path:newurl},'',newurl);
-            // Update urlParams with the new parameter
-            urlParams = new URLSearchParams(window.location.search);
-        }
-    } else if (force) {
-        if (history.pushState) {
-            var href = new URL(window.location.href);
-            if (para.length==1) {
-                href.searchParams.set(para[0].toLowerCase(), "");
-            } else {
-                href.searchParams.set(para[0].toLowerCase(), para[1]);
-            }
-            window.history.pushState({path:href.toString()},'',href.toString());
-            // Update urlParams with the modified parameters
-            urlParams = new URLSearchParams(window.location.search);
-        }
-    }
+
+function updateURL(param, force = false) {
+	var para = param.split('=');
+
+	if (!(urlParams.has(para[0].toLowerCase()))) {
+		if (history.pushState) {
+			var arr = window.location.href.split('?');
+			var newurl;
+			if (arr.length > 1 && arr[1] !== '') {
+				newurl = window.location.href + '&' + param;
+			} else {
+				newurl = window.location.href + '?' + param;
+			}
+			window.history.pushState({
+				path: newurl
+			}, '', newurl);
+			// Update urlParams with the new parameter
+			urlParams = new URLSearchParams(window.location.search);
+		}
+	} else if (force) {
+		if (history.pushState) {
+			var href = new URL(window.location.href);
+			if (para.length == 1) {
+				href.searchParams.set(para[0].toLowerCase(), "");
+			} else {
+				href.searchParams.set(para[0].toLowerCase(), para[1]);
+			}
+			window.history.pushState({
+				path: href.toString()
+			}, '', href.toString());
+			// Update urlParams with the modified parameters
+			urlParams = new URLSearchParams(window.location.search);
+		}
+	}
 }
-function generateStreamID(){
+
+function generateStreamID() {
 	var text = "";
 	var possible = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-	for (var i = 0; i < 7; i++){
+	for (var i = 0; i < 7; i++) {
 		text += possible.charAt(Math.floor(Math.random() * possible.length));
 	}
 	return text;
 };
 var roomID = "test";
-if (urlParams.has("room")){
+if (urlParams.has("room")) {
 	roomID = urlParams.get("room");
-} else if (urlParams.has("ROOM")){
+} else if (urlParams.has("ROOM")) {
 	roomID = urlParams.get("ROOM");
 } else {
 	roomID = generateStreamID();
-	updateURL("room="+roomID);
+	updateURL("room=" + roomID);
 }
-var url = document.URL.substr(0,document.URL.lastIndexOf('/'));
-document.getElementById("shareLink").href= url+"/overlay?room="+roomID;
-document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID;
-navigator.clipboard.writeText(url+"/overlay?room="+roomID).then(() => {
-}, () => {
-});
+var url = document.URL.substr(0, document.URL.lastIndexOf('/'));
+document.getElementById("shareLink").href = url + "/overlay?room=" + roomID;
+document.getElementById("shareLink").innerHTML = url + "/overlay?room=" + roomID;
+navigator.clipboard.writeText(url + "/overlay?room=" + roomID).then(() => {}, () => {});
 
 
 var socket;
@@ -704,7 +850,9 @@ function connectWebSocket() {
 		console.log("WebSocket connected. Joining room...");
 		// Reset retry count on successful connection
 		retryCount = 0;
-		socket.send(JSON.stringify({"join":roomID}));
+		socket.send(JSON.stringify({
+			"join": roomID
+		}));
 	};
 
 	socket.onerror = function(error) {
@@ -721,205 +869,206 @@ function connectWebSocket() {
 }
 
 const ttsMenu = {
-  init() {
-    this.enableTTS = document.getElementById('enableTTS');
-    this.ttsOptions = document.getElementById('tts-options');
-    this.ttsProvider = document.getElementById('tts-provider');
-    this.providerOptions = {
-      system: document.getElementById('system-options'),
-      elevenlabs: document.getElementById('elevenlabs-options'),
-      google: document.getElementById('google-options'),
-      speechify: document.getElementById('speechify-options')
-    };
-    
-    // Initialize system voices if available
-	if ('speechSynthesis' in window) {
-	  const loadVoices = () => {
-		const voices = speechSynthesis.getVoices();
-		const ttsVoice = document.getElementById('tts-voice');
-		if (!ttsVoice) return;
-		
-		ttsVoice.innerHTML = '<option value="">System Default Voice</option>';
-		voices.forEach(voice => {
-		  const option = document.createElement('option');
-		  option.value = voice.name;
-		  option.textContent = `${voice.name} (${voice.lang})`;
-		  ttsVoice.appendChild(option);
+	init() {
+		this.enableTTS = document.getElementById('enableTTS');
+		this.ttsOptions = document.getElementById('tts-options');
+		this.ttsProvider = document.getElementById('tts-provider');
+		this.providerOptions = {
+			system: document.getElementById('system-options'),
+			elevenlabs: document.getElementById('elevenlabs-options'),
+			google: document.getElementById('google-options'),
+			speechify: document.getElementById('speechify-options')
+		};
+
+		// Initialize system voices if available
+		if ('speechSynthesis' in window) {
+			const loadVoices = () => {
+				const voices = speechSynthesis.getVoices();
+				const ttsVoice = document.getElementById('tts-voice');
+				if (!ttsVoice) return;
+
+				ttsVoice.innerHTML = '<option value="">System Default Voice</option>';
+				voices.forEach(voice => {
+					const option = document.createElement('option');
+					option.value = voice.name;
+					option.textContent = `${voice.name} (${voice.lang})`;
+					ttsVoice.appendChild(option);
+				});
+			};
+
+			if (speechSynthesis.onvoiceschanged !== undefined) {
+				speechSynthesis.onvoiceschanged = loadVoices;
+			}
+
+			// Initial load attempt
+			const voices = speechSynthesis.getVoices();
+			if (voices.length) {
+				loadVoices();
+			}
+		}
+
+		// Setup event listeners
+		this.enableTTS.addEventListener('change', () => {
+			this.ttsOptions.style.display = this.enableTTS.checked ? 'block' : 'none';
+			this.updateShareLink();
+			checkForConflictingSettings();
 		});
-	  };
-	  
-	  if (speechSynthesis.onvoiceschanged !== undefined) {
-		speechSynthesis.onvoiceschanged = loadVoices;
-	  }
-	  
-	  // Initial load attempt
-	  const voices = speechSynthesis.getVoices();
-	  if (voices.length) {
-		loadVoices();
-	  }
-	}
-    
-    // Setup event listeners
-	this.enableTTS.addEventListener('change', () => {
-	  this.ttsOptions.style.display = this.enableTTS.checked ? 'block' : 'none';
-	  this.updateShareLink();
-	  checkForConflictingSettings();
-	});
-    
-    this.ttsProvider.addEventListener('change', () => {
-      Object.values(this.providerOptions).forEach(el => el.style.display = 'none');
-      this.providerOptions[this.ttsProvider.value].style.display = 'block';
-      this.updateShareLink();
-    });
-    
-    // Add change listeners to all inputs
-    document.querySelectorAll('#tts-options input, #tts-options select').forEach(el => {
-      el.addEventListener('change', () => this.updateShareLink());
-    });
-    
-    // Initialize from URL params
-    this.initFromURL();
-  },
 
-  initFromURL() {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (!urlParams.has('tts')) return;
-    
-    this.enableTTS.checked = true;
-    this.ttsOptions.style.display = 'block';
-    
-    // Determine provider from URL params
-    if (urlParams.has('elevenlabskey')) {
-      this.ttsProvider.value = 'elevenlabs';
-      document.getElementById('elevenlabs-key').value = urlParams.get('elevenlabskey');
-      if (urlParams.has('voice11')) document.getElementById('elevenlabs-voice').value = urlParams.get('voice11');
-      if (urlParams.has('elevenlabsmodel')) document.getElementById('elevenlabs-model').value = urlParams.get('elevenlabsmodel');
-      if (urlParams.has('elevenrate')) document.getElementById('elevenlabs-rate').value = urlParams.get('elevenrate');
-      document.getElementById('elevenlabs-speaker-boost').checked = urlParams.has('elevenspeakerboost');
-    } else if (urlParams.has('ttskey')) {
-      this.ttsProvider.value = 'google';
-      document.getElementById('google-key').value = urlParams.get('ttskey');
-      if (urlParams.has('voicegoogle')) document.getElementById('google-voice').value = urlParams.get('voicegoogle');
-      if (urlParams.has('googlerate')) document.getElementById('google-rate').value = urlParams.get('googlerate');
-      if (urlParams.has('googlepitch')) document.getElementById('google-pitch').value = urlParams.get('googlepitch');
-      if (urlParams.has('googleaudioprofile')) document.getElementById('google-profile').value = urlParams.get('googleaudioprofile');
-    } else if (urlParams.has('speechifykey')) {
-      this.ttsProvider.value = 'speechify';
-      document.getElementById('speechify-key').value = urlParams.get('speechifykey');
-      if (urlParams.has('voicespeechify')) document.getElementById('speechify-voice').value = urlParams.get('voicespeechify');
-      if (urlParams.has('speechifyspeed')) document.getElementById('speechify-speed').value = urlParams.get('speechifyspeed');
-      if (urlParams.has('speechifymodel')) document.getElementById('speechify-model').value = urlParams.get('speechifymodel');
-    } else {
-      // System TTS params
-      if (urlParams.has('voice')) document.getElementById('tts-voice').value = urlParams.get('voice');
-      if (urlParams.has('rate')) document.getElementById('tts-rate').value = urlParams.get('rate');
-      if (urlParams.has('pitch')) document.getElementById('tts-pitch').value = urlParams.get('pitch');
-      if (urlParams.has('volume')) document.getElementById('tts-volume').value = urlParams.get('volume');
-    }
-    
-    // Show correct provider options
-    Object.values(this.providerOptions).forEach(el => el.style.display = 'none');
-    this.providerOptions[this.ttsProvider.value].style.display = 'block';
-  },
+		this.ttsProvider.addEventListener('change', () => {
+			Object.values(this.providerOptions).forEach(el => el.style.display = 'none');
+			this.providerOptions[this.ttsProvider.value].style.display = 'block';
+			this.updateShareLink();
+		});
 
-  updateShareLink() {
-	  const shareLink = document.getElementById('shareLink');
-	  const currentUrl = new URL(shareLink.href);
-	  const params = new URLSearchParams(currentUrl.search);
-	  
-	  // Clear existing TTS params
-	  ['tts', 'voice', 'rate', 'pitch', 'volume', 
-	   'elevenlabskey', 'voice11', 'elevenlabsmodel', 'elevenrate', 'elevenspeakerboost',
-	   'ttskey', 'voicegoogle', 'googlerate', 'googlepitch', 'googleaudioprofile',
-	   'speechifykey', 'voicespeechify', 'speechifyspeed', 'speechifymodel'].forEach(param => {
-		params.delete(param);
-	  });
-	  
-	  if (this.enableTTS.checked) {
-		params.set('tts', '');
-		
-		const provider = this.ttsProvider.value;
-		switch(provider) {
-        case 'elevenlabs':
-          const elevenKey = document.getElementById('elevenlabs-key').value;
-          if (elevenKey) {
-            params.set('elevenlabskey', elevenKey);
-            const elevenVoice = document.getElementById('elevenlabs-voice').value;
-            if (elevenVoice) params.set('voice11', elevenVoice);
-            params.set('elevenlabsmodel', document.getElementById('elevenlabs-model').value);
-            params.set('elevenrate', document.getElementById('elevenlabs-rate').value);
-            if (document.getElementById('elevenlabs-speaker-boost').checked) {
-              params.set('elevenspeakerboost', '');
-            }
-          }
-          break;
-          
-        case 'google':
-          const googleKey = document.getElementById('google-key').value;
-          if (googleKey) {
-            params.set('ttskey', googleKey);
-            const googleVoice = document.getElementById('google-voice').value;
-            if (googleVoice) params.set('voicegoogle', googleVoice);
-            params.set('googlerate', document.getElementById('google-rate').value);
-            params.set('googlepitch', document.getElementById('google-pitch').value);
-            params.set('googleaudioprofile', document.getElementById('google-profile').value);
-          }
-          break;
-          
-        case 'speechify':
-          const speechifyKey = document.getElementById('speechify-key').value;
-          if (speechifyKey) {
-            params.set('speechifykey', speechifyKey);
-            const speechifyVoice = document.getElementById('speechify-voice').value;
-            if (speechifyVoice) params.set('voicespeechify', speechifyVoice);
-            params.set('speechifyspeed', document.getElementById('speechify-speed').value);
-            params.set('speechifymodel', document.getElementById('speechify-model').value);
-          }
-          break;
-          
-        default: // system
-          const voice = document.getElementById('tts-voice').value;
-          if (voice) params.set('voice', voice);
-          if (document.getElementById('tts-rate').value !== '1.0') {
-            params.set('rate', document.getElementById('tts-rate').value);
-          }
-          if (document.getElementById('tts-pitch').value !== '1.0') {
-            params.set('pitch', document.getElementById('tts-pitch').value);
-          }
-          if (document.getElementById('tts-volume').value !== '1.0') {
-            params.set('volume', document.getElementById('tts-volume').value);
-          }
-          break;
-      }
-    }
-    
-      currentUrl.search = params.toString();
-	  shareLink.href = currentUrl.toString();
-	  shareLink.textContent = currentUrl.toString();
-	  
-	  // Add notification about needing to recopy link
-	  shareLink.style.backgroundColor = "#fff3cd";  
-	  shareLink.style.padding = "3px";
-	  shareLink.title = "TTS settings updated - copy new link to update overlay";
-	  
-	  // Clear highlight after 2 seconds
-	  setTimeout(() => {
-		shareLink.style.backgroundColor = "";
-		shareLink.style.padding = "";
-	  }, 2000);
-	  
-	  // Update clipboard
-	  navigator.clipboard.writeText(currentUrl.toString()).catch(err => console.error('Failed to copy URL:', err));
-	  
-	  // Show temporary notification
-	  const status = document.getElementById('status');
-	  if (status) {
-		const originalText = status.textContent;
-		status.textContent = "TTS settings updated - copy new overlay link to apply changes";
+		// Add change listeners to all inputs
+		document.querySelectorAll('#tts-options input, #tts-options select').forEach(el => {
+			el.addEventListener('change', () => this.updateShareLink());
+		});
+
+		// Initialize from URL params
+		this.initFromURL();
+	},
+
+	initFromURL() {
+		const urlParams = new URLSearchParams(window.location.search);
+		if (!urlParams.has('tts')) return;
+
+		this.enableTTS.checked = true;
+		this.ttsOptions.style.display = 'block';
+
+		// Determine provider from URL params
+		if (urlParams.has('elevenlabskey')) {
+			this.ttsProvider.value = 'elevenlabs';
+			document.getElementById('elevenlabs-key').value = urlParams.get('elevenlabskey');
+			if (urlParams.has('voice11')) document.getElementById('elevenlabs-voice').value = urlParams.get('voice11');
+			if (urlParams.has('elevenlabsmodel')) document.getElementById('elevenlabs-model').value = urlParams.get('elevenlabsmodel');
+			if (urlParams.has('elevenrate')) document.getElementById('elevenlabs-rate').value = urlParams.get('elevenrate');
+			document.getElementById('elevenlabs-speaker-boost').checked = urlParams.has('elevenspeakerboost');
+		} else if (urlParams.has('ttskey')) {
+			this.ttsProvider.value = 'google';
+			document.getElementById('google-key').value = urlParams.get('ttskey');
+			if (urlParams.has('voicegoogle')) document.getElementById('google-voice').value = urlParams.get('voicegoogle');
+			if (urlParams.has('googlerate')) document.getElementById('google-rate').value = urlParams.get('googlerate');
+			if (urlParams.has('googlepitch')) document.getElementById('google-pitch').value = urlParams.get('googlepitch');
+			if (urlParams.has('googleaudioprofile')) document.getElementById('google-profile').value = urlParams.get('googleaudioprofile');
+		} else if (urlParams.has('speechifykey')) {
+			this.ttsProvider.value = 'speechify';
+			document.getElementById('speechify-key').value = urlParams.get('speechifykey');
+			if (urlParams.has('voicespeechify')) document.getElementById('speechify-voice').value = urlParams.get('voicespeechify');
+			if (urlParams.has('speechifyspeed')) document.getElementById('speechify-speed').value = urlParams.get('speechifyspeed');
+			if (urlParams.has('speechifymodel')) document.getElementById('speechify-model').value = urlParams.get('speechifymodel');
+		} else {
+			// System TTS params
+			if (urlParams.has('voice')) document.getElementById('tts-voice').value = urlParams.get('voice');
+			if (urlParams.has('rate')) document.getElementById('tts-rate').value = urlParams.get('rate');
+			if (urlParams.has('pitch')) document.getElementById('tts-pitch').value = urlParams.get('pitch');
+			if (urlParams.has('volume')) document.getElementById('tts-volume').value = urlParams.get('volume');
+		}
+
+		// Show correct provider options
+		Object.values(this.providerOptions).forEach(el => el.style.display = 'none');
+		this.providerOptions[this.ttsProvider.value].style.display = 'block';
+	},
+
+	updateShareLink() {
+		const shareLink = document.getElementById('shareLink');
+		const currentUrl = new URL(shareLink.href);
+		const params = new URLSearchParams(currentUrl.search);
+
+		// Clear existing TTS params
+		['tts', 'voice', 'rate', 'pitch', 'volume',
+			'elevenlabskey', 'voice11', 'elevenlabsmodel', 'elevenrate', 'elevenspeakerboost',
+			'ttskey', 'voicegoogle', 'googlerate', 'googlepitch', 'googleaudioprofile',
+			'speechifykey', 'voicespeechify', 'speechifyspeed', 'speechifymodel'
+		].forEach(param => {
+			params.delete(param);
+		});
+
+		if (this.enableTTS.checked) {
+			params.set('tts', '');
+
+			const provider = this.ttsProvider.value;
+			switch (provider) {
+				case 'elevenlabs':
+					const elevenKey = document.getElementById('elevenlabs-key').value;
+					if (elevenKey) {
+						params.set('elevenlabskey', elevenKey);
+						const elevenVoice = document.getElementById('elevenlabs-voice').value;
+						if (elevenVoice) params.set('voice11', elevenVoice);
+						params.set('elevenlabsmodel', document.getElementById('elevenlabs-model').value);
+						params.set('elevenrate', document.getElementById('elevenlabs-rate').value);
+						if (document.getElementById('elevenlabs-speaker-boost').checked) {
+							params.set('elevenspeakerboost', '');
+						}
+					}
+					break;
+
+				case 'google':
+					const googleKey = document.getElementById('google-key').value;
+					if (googleKey) {
+						params.set('ttskey', googleKey);
+						const googleVoice = document.getElementById('google-voice').value;
+						if (googleVoice) params.set('voicegoogle', googleVoice);
+						params.set('googlerate', document.getElementById('google-rate').value);
+						params.set('googlepitch', document.getElementById('google-pitch').value);
+						params.set('googleaudioprofile', document.getElementById('google-profile').value);
+					}
+					break;
+
+				case 'speechify':
+					const speechifyKey = document.getElementById('speechify-key').value;
+					if (speechifyKey) {
+						params.set('speechifykey', speechifyKey);
+						const speechifyVoice = document.getElementById('speechify-voice').value;
+						if (speechifyVoice) params.set('voicespeechify', speechifyVoice);
+						params.set('speechifyspeed', document.getElementById('speechify-speed').value);
+						params.set('speechifymodel', document.getElementById('speechify-model').value);
+					}
+					break;
+
+				default: // system
+					const voice = document.getElementById('tts-voice').value;
+					if (voice) params.set('voice', voice);
+					if (document.getElementById('tts-rate').value !== '1.0') {
+						params.set('rate', document.getElementById('tts-rate').value);
+					}
+					if (document.getElementById('tts-pitch').value !== '1.0') {
+						params.set('pitch', document.getElementById('tts-pitch').value);
+					}
+					if (document.getElementById('tts-volume').value !== '1.0') {
+						params.set('volume', document.getElementById('tts-volume').value);
+					}
+					break;
+			}
+		}
+
+		currentUrl.search = params.toString();
+		shareLink.href = currentUrl.toString();
+		shareLink.textContent = currentUrl.toString();
+
+		// Add notification about needing to recopy link
+		shareLink.style.backgroundColor = "#fff3cd";
+		shareLink.style.padding = "3px";
+		shareLink.title = "TTS settings updated - copy new link to update overlay";
+
+		// Clear highlight after 2 seconds
 		setTimeout(() => {
-		  status.textContent = originalText;
-		}, 3000);
-	  }
+			shareLink.style.backgroundColor = "";
+			shareLink.style.padding = "";
+		}, 2000);
+
+		// Update clipboard
+		navigator.clipboard.writeText(currentUrl.toString()).catch(err => console.error('Failed to copy URL:', err));
+
+		// Show temporary notification
+		const status = document.getElementById('status');
+		if (status) {
+			const originalText = status.textContent;
+			status.textContent = "TTS settings updated - copy new overlay link to apply changes";
+			setTimeout(() => {
+				status.textContent = originalText;
+			}, 3000);
+		}
 	}
 };
 
@@ -928,7 +1077,7 @@ connectWebSocket();
 
 
 var transcript = '';
-var last_transcription  = "";
+var last_transcription = "";
 var second_transcription = "";
 var idle = null;
 var recognition = null;
@@ -941,38 +1090,41 @@ var sanitize = function(string) {
 		.substring(0, Math.min(temp.textContent.length, 500))
 		.trim();
 };
-function setup(){
-    if ('webkitSpeechRecognition' in window){
-        recognition = new webkitSpeechRecognition();
-        if (myLang && myLangCode){
-            if (myLang.split("-")[0] == myLangCode){
-                recognition.lang = myLang;
-            } else {
-                recognition.lang = myLangCode;
-            }
-        } else if (myLangCode){
-            recognition.lang = myLangCode;
-        } else if (myLang){
-            recognition.lang = myLang;
-        }
+
+function setup() {
+	if ('webkitSpeechRecognition' in window) {
+		recognition = new webkitSpeechRecognition();
+		if (myLang && myLangCode) {
+			if (myLang.split("-")[0] == myLangCode) {
+				recognition.lang = myLang;
+			} else {
+				recognition.lang = myLangCode;
+			}
+		} else if (myLangCode) {
+			recognition.lang = myLangCode;
+		} else if (myLang) {
+			recognition.lang = myLang;
+		}
 		recognition.continuous = true;
 		recognition.interimResults = true;
-		recognition.onstart = function(){
+		recognition.onstart = function() {
 			console.log("started transcription");
-			setTimeout(function(){
+			setTimeout(function() {
 				ends = 0;
 			}, 2000);
 		};
-		recognition.onerror = function(event){
+		recognition.onerror = function(event) {
 			console.error(event);
 		};
-		recognition.onend = function(e){
-			if (isPaused){return;}
+		recognition.onend = function(e) {
+			if (isPaused) {
+				return;
+			}
 			console.log("Stopped transcription");
-			
+
 			// Save any pending transcript before restarting
 			if (transcript) {
-				if (document.getElementById("fullContext").checked){
+				if (document.getElementById("fullContext").checked) {
 					translateCall([second_transcription, last_transcription, transcript].filter(Boolean).join(' '), false);
 				} else {
 					translateCall(transcript, false);
@@ -981,66 +1133,82 @@ function setup(){
 				last_transcription = transcript + ". ";
 				transcript = "";
 			}
-			
-			if (event.type === "end"){
+
+			if (event.type === "end") {
 				ends += 1;
 			}
-			if (ends > 3){
+			if (ends > 3) {
 				alert("WARNING: Cannot enable transcription service...");
 			} else {
 				setTimeout(() => recognition.start(), 100); // Small delay before restart
 			}
 		};
-		recognition.onresult = function(event){
-			counter+=1;
+
+		recognition.onresult = function(event) {
+			counter += 1;
 			var interim_transcript = '';
-			if(typeof(event.results) == 'undefined'){
+			if (typeof(event.results) == 'undefined') {
 				console.log(event);
 				return;
 			}
+
 			var isFinal = false;
 			let new_transcript = '';
-			for(var i = event.resultIndex; i < event.results.length; ++i){
-				if (event.results[i].isFinal){
+
+			for (var i = event.resultIndex; i < event.results.length; ++i) {
+				if (event.results[i].isFinal) {
 					isFinal = true;
 				}
-				if (event.results[i][0].transcript){
+				if (event.results[i][0].transcript) {
 					new_transcript += ' ' + sanitize(event.results[i][0].transcript);
 				}
 			}
+
 			new_transcript = new_transcript.trim();
-			if (new_transcript){
+
+			if (new_transcript) {
 				transcript = new_transcript;
-				if (isFinal){
+				if (isFinal) {
 					console.log("final transcript:", transcript);
 				}
+
 				document.getElementById("input").value = transcript;
-				if (document.getElementById("fullContext").checked){
+
+				// Don't send new interim results if queue is backed up (more than 3 items)
+				if (!isFinal && translationQueue.length > 3) {
+					console.log("Skipping interim translation due to backlog");
+					return;
+				}
+
+				if (document.getElementById("fullContext").checked) {
 					translateCall([second_transcription, last_transcription, transcript]
 						.filter(Boolean)
 						.join(' '), !isFinal);
 				} else {
 					translateCall(transcript, !isFinal);
 				}
-				if (isFinal){
+
+				if (isFinal) {
 					second_transcription = last_transcription;
 					last_transcription = transcript + ". ";
 					transcript = "";
 				}
 			}
 		};
-		if (isPaused){return;}
+		if (isPaused) {
+			return;
+		}
 		recognition.start();
 	}
 }
 
 function checkForConflictingSettings() {
-  const enableTTS = document.getElementById('enableTTS');
-  const fullContext = document.getElementById('fullContext');
-  
-  if (enableTTS.checked && fullContext.checked) {
-    alert('Warning: Using TTS with added context will cause double speak.');
-  }
+	const enableTTS = document.getElementById('enableTTS');
+	const fullContext = document.getElementById('fullContext');
+
+	if (enableTTS.checked && fullContext.checked) {
+		alert('Warning: Using TTS with added context will cause double speak.');
+	}
 }
 
 document.addEventListener('DOMContentLoaded', () => ttsMenu.init());
