@@ -1155,6 +1155,7 @@ function setup() {
 			var isFinal = false;
 			let new_transcript = '';
 
+			// Start from the latest result index to avoid repeating earlier parts
 			for (var i = event.resultIndex; i < event.results.length; ++i) {
 				if (event.results[i].isFinal) {
 					isFinal = true;
@@ -1167,7 +1168,15 @@ function setup() {
 			new_transcript = new_transcript.trim();
 
 			if (new_transcript) {
-				transcript = new_transcript;
+				// Append the new transcript to the existing one instead of replacing it
+				// Only replace if this is the first result of a new recognition session
+				if (transcript === '' || event.resultIndex === 0) {
+					transcript = new_transcript;
+				} else {
+					// For continuous speech, append new parts
+					transcript = transcript + ' ' + new_transcript;
+				}
+
 				if (isFinal) {
 					console.log("final transcript:", transcript);
 				}
@@ -1194,7 +1203,7 @@ function setup() {
 					transcript = "";
 				}
 			}
-		};
+		};;
 		if (isPaused) {
 			return;
 		}

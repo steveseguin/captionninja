@@ -1035,21 +1035,34 @@ function setup(){
 		};
 		recognition.onresult = function(event) {
 			let interim_transcript = '';
+			let new_final_transcript = ''; // Create a new variable for this batch of results
+			
 			if (typeof(event.results) == 'undefined') {
 				console.log('Undefined results in event:', event);
 				return;
 			}
+			
 			for(var i = event.resultIndex; i < event.results.length; ++i){
 				if(event.results[i].isFinal){
-					final_transcript += sanitize(event.results[i][0].transcript);
+					new_final_transcript += ' ' + sanitize(event.results[i][0].transcript);
 				} else {
-					interim_transcript += " " +sanitize(event.results[i][0].transcript);
-					interim_transcript = interim_transcript.trim();
+					interim_transcript += " " + sanitize(event.results[i][0].transcript);
 				}
 			}
+			
+			// Trim both transcripts
+			new_final_transcript = new_final_transcript.trim();
+			interim_transcript = interim_transcript.trim();
+			
+			// If we have new final text, add it to the final_transcript
+			if (new_final_transcript) {
+				final_transcript = new_final_transcript; // Replace instead of append
+			}
+			
 			if (final_transcript || (interim_transcript && document.getElementById("incrementalUpdates").checked)) {
 				let currentText = final_transcript || interim_transcript;
 				console.log("Processing text:", currentText, "Final:", !!final_transcript);
+				
 				if (document.getElementById("fullContext").checked) {
 					let fullText = [];
 					if (second_transcription?.trim()) {
@@ -1069,11 +1082,12 @@ function setup(){
 					document.getElementById("input").value = currentText;
 					translateIncremental(currentText);
 				}
+				
 				if (final_transcript) {
 					if (currentText.trim()) {
 						second_transcription = last_transcription;
 						last_transcription = currentText.trim().replace(/\.?$/, '.') + ' ';
-						final_transcript = '';
+						final_transcript = ''; // Reset final_transcript after processing
 						console.log("Updated context state:", {
 							second: second_transcription,
 							last: last_transcription
