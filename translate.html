@@ -1144,66 +1144,80 @@ function setup() {
 			}
 		};
 
+		// Replace the entire recognition.onresult handler with this
 		recognition.onresult = function(event) {
-			counter += 1;
-			var interim_transcript = '';
-			if (typeof(event.results) == 'undefined') {
-				console.log(event);
-				return;
+		  counter += 1;
+		  
+		  if (typeof(event.results) == 'undefined') {
+			console.log(event);
+			return;
+		  }
+
+		  // Track what's being processed in this batch
+		  let isFinal = false;
+		  let current_batch = '';
+		  
+		  // Process only the new results since last event
+		  for (var i = event.resultIndex; i < event.results.length; ++i) {
+			if (event.results[i].isFinal) {
+			  isFinal = true;
 			}
-
-			var isFinal = false;
-			let new_transcript = '';
-
-			// Start from the latest result index to avoid repeating earlier parts
-			for (var i = event.resultIndex; i < event.results.length; ++i) {
-				if (event.results[i].isFinal) {
-					isFinal = true;
-				}
-				if (event.results[i][0].transcript) {
-					new_transcript += ' ' + sanitize(event.results[i][0].transcript);
-				}
+			if (event.results[i][0].transcript) {
+			  current_batch += ' ' + sanitize(event.results[i][0].transcript);
 			}
-
-			new_transcript = new_transcript.trim();
-
-			if (new_transcript) {
-				// Append the new transcript to the existing one instead of replacing it
-				// Only replace if this is the first result of a new recognition session
-				if (transcript === '' || event.resultIndex === 0) {
-					transcript = new_transcript;
-				} else {
-					// For continuous speech, append new parts
-					transcript = transcript + ' ' + new_transcript;
-				}
-
-				if (isFinal) {
-					console.log("final transcript:", transcript);
-				}
-
-				document.getElementById("input").value = transcript;
-
-				// Don't send new interim results if queue is backed up (more than 3 items)
-				if (!isFinal && translationQueue.length > 3) {
-					console.log("Skipping interim translation due to backlog");
-					return;
-				}
-
-				if (document.getElementById("fullContext").checked) {
-					translateCall([second_transcription, last_transcription, transcript]
-						.filter(Boolean)
-						.join(' '), !isFinal);
-				} else {
-					translateCall(transcript, !isFinal);
-				}
-
-				if (isFinal) {
-					second_transcription = last_transcription;
-					last_transcription = transcript + ". ";
-					transcript = "";
-				}
+		  }
+		  
+		  current_batch = current_batch.trim();
+		  
+		  if (!current_batch) {
+			return;
+		  }
+		  
+		  // Update the UI to show what's being recognized
+		  if (isFinal) {
+			// When we get a final result, add it to transcript
+			transcript += (transcript ? ' ' : '') + current_batch;
+			document.getElementById("input").value = transcript;
+			console.log("final transcript:", transcript);
+			
+			// Send final result for translation
+			if (document.getElementById("fullContext").checked) {
+			  translateCall([second_transcription, last_transcription, transcript]
+				.filter(Boolean)
+				.join(' '), false);
+			} else {
+			  translateCall(transcript, false);
 			}
-		};;
+			
+			// Update memory of previous segments
+			second_transcription = last_transcription;
+			last_transcription = transcript + ". ";
+			transcript = "";
+		  } else {
+			// For interim results, combine previous final text with current interim text
+			let display_text = transcript + (transcript ? ' ' : '') + current_batch;
+			document.getElementById("input").value = display_text;
+			
+			// Don't send new interim results if queue is backed up
+			if (translationQueue.length > 3) {
+			  console.log("Skipping interim translation due to backlog");
+			  return;
+			}
+			
+			// For translation: only send what's new if not using context
+			let text_to_translate;
+			if (document.getElementById("fullContext").checked) {
+			  text_to_translate = [second_transcription, last_transcription, display_text]
+				.filter(Boolean)
+				.join(' ');
+			} else {
+			  // Only send the latest segment to avoid duplicates in translation
+			  text_to_translate = display_text;
+			}
+			
+			translateCall(text_to_translate, true);
+		  }
+		};
 		if (isPaused) {
 			return;
 		}
