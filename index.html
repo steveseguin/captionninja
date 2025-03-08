@@ -156,9 +156,37 @@
 		  direction: inherit;
 		  text-align: start;
 		}
+		
+		.error-banner {
+		  position: fixed;
+		  top: 0;
+		  left: 0;
+		  right: 0;
+		  background-color: #dc3545;
+		  color: white;
+		  padding: 10px;
+		  text-align: center;
+		  z-index: 10000;
+		  font-size: 16px;
+		  display: none;
+		}
+
+		.error-banner button {
+		  background-color: white;
+		  color: #dc3545;
+		  border: none;
+		  padding: 5px 10px;
+		  margin-left: 10px;
+		  border-radius: 4px;
+		  cursor: pointer;
+		}
 	</style>
 </head>
 <body>
+	<div id="errorBanner" class="error-banner">
+	  <span id="errorMessage"></span>
+	  <button id="dismissError">Dismiss</button>
+	</div>
 	<div id="interm" class="output">
 	<font style='font-size:60%;line-height: 1.4em;'><span>Welcome to CAPTION.Ninja - A Free Captioning Tool</span></font>
 	
@@ -452,6 +480,35 @@
 
 	connectWebSocket();
 	
+	
+	function handleNetworkError() {
+	  const isOnline = navigator.onLine;
+	  const browserName = isEdge() ? 'Microsoft Edge' : 
+						 navigator.userAgent.includes('Chrome') ? 'Google Chrome' : 'your browser';
+	  const alternateBrowser = isEdge() ? 'Google Chrome' : 'Microsoft Edge';
+	  
+	  let message = '';
+	  
+	  if (!isOnline) {
+		message = 'Internet connection not available. Please check your network connection.';
+	  } else {
+		message = `Speech recognition service is currently unavailable in ${browserName}. Try using ${alternateBrowser} instead.`;
+	  }
+	  
+	  showErrorBanner(message);
+	}
+
+	function showErrorBanner(message) {
+	  const banner = document.getElementById('errorBanner');
+	  const messageEl = document.getElementById('errorMessage');
+	  messageEl.textContent = message;
+	  banner.style.display = 'block';
+	  
+	  document.getElementById('dismissError').onclick = function() {
+		banner.style.display = 'none';
+	  };
+	}
+		
 	var ends = 0;
 	var final_transcript = '';
 	var interim_transcript = "";
@@ -481,7 +538,11 @@
 		
 		recognition.onerror = function(event) {
 		  console.log(event);
+		  if (event.error === 'network') {
+			handleNetworkError();
+		  }
 		};
+
 		
 		recognition.onend = function(e) {
 		  if (isPaused) return;
@@ -643,6 +704,14 @@
 			socket.send(JSON.stringify({"msg":true, "final":counter, "id":counter}));
 		},500);
 	}
+	
+	window.addEventListener('online', function() {
+	  document.getElementById('errorBanner').style.display = 'none';
+	  // Only restart recognition if it's not paused
+	  if (!isPaused) {
+		setup();
+	  }
+	});
 	
 	</script>
 	
