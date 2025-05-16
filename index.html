@@ -1,6 +1,7 @@
 <html>
 <head>
-	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+
 	<meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
 	<meta content="utf-8" http-equiv="encoding" />
 	<meta name="copyright" content="&copy; 2020 Steve Seguin" />
@@ -43,6 +44,7 @@
 			position:absolute;
 			bottom:0;
 			overflow:hidden;
+			max-width: calc(100vw - 20px);
 		}
 		.hidden {
 			display:none!important;
@@ -65,6 +67,7 @@
 			background-color: black; 
 			padding: 8px 8px 0px 8px;
 			margin:0;
+			max-width: 100%;
 		}
 		
 		a {
@@ -180,51 +183,53 @@
 		  border-radius: 4px;
 		  cursor: pointer;
 		}
+		
+		@media (max-width: 768px) {
+		  .small-text-container {
+			padding: 5px;
+			margin-top: 5px;
+		  }
+		  
+		  .output {
+			font-size: 2.2em;
+			line-height: 1em;
+			text-shadow: 0.03em 0.03em 0px rgba(0,0,0,1);
+		  }
+		  
+		  .output span {
+			padding: 5px 5px 0px 5px;
+		  }
+		  
+		  body {
+			padding: 0 5px;
+			max-width: calc(100vw - 10px);
+		  }
+		  
+		  
+		  .control-button {
+			padding: 8px 12px;
+			font-size: 14px;
+		  }
+		  
+		  ol, ul {
+			padding-left: 20px;
+		  }
+		  
+		  .small-text-container font {
+			font-size: 40% !important;
+		  }
+		}
 
-@media screen and (max-width: 768px) {
-  body {
-    padding: 0 5px;
-    font-size: 14px;
-  }
-  
-  .output {
-    font-size: 2.5em;
-    line-height: 1.2em;
-  }
-  
-  .small-text-container {
-    max-width: 100%;
-    overflow-x: hidden;
-    word-wrap: break-word;
-  }
-  
-  .small-text-container font {
-    font-size: 40% !important;
-    line-height: 1.3em !important;
-  }
-  
-  .small-text-container ol, 
-  .small-text-container ul {
-    padding-left: 20px;
-  }
-  
-  .control-buttons {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
-  .control-button {
-    margin-bottom: 5px;
-    width: calc(100% - 20px);
-    max-width: 100%;
-  }
-}
-
-/* Fix viewport for mobile */
-@viewport {
-  width: device-width;
-  zoom: 1.0;
-}
+		/* For very small screens */
+		@media (max-width: 480px) {
+		  .output {
+			font-size: 1.6em;
+		  }
+		  
+		  .small-text-container font {
+			font-size: 50% !important;
+		  }
+		}
 	</style>
 </head>
 <body>
@@ -624,55 +629,46 @@
 		  setTimeout(setup, 100);
 		};
 
-		// Replace the entire recognition.onresult function
 		recognition.onresult = function(event) {
 		  if(typeof(event.results) == 'undefined') return;
 		  
-		  // Clear interim display first to prevent duplication
-		  document.getElementById("interm").innerHTML = "";
-		  
 		  let interim_transcript = '';
 		  let new_final_transcript = '';
-		  let lastProcessedIndex = event.resultIndex;
 		  
 		  for(let i = event.resultIndex; i < event.results.length; ++i) {
-		    if (event.results[i]) {
-		      const transcript = sanitize(event.results[i][0].transcript);
+		    const transcript = sanitize(event.results[i][0].transcript);
+		    const direction = detectTextDirection(transcript);
+		    
+		    if(event.results[i].isFinal) {
+		      new_final_transcript += ' ' + transcript;
+		      document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${transcript}</span><br />`;
+		      document.getElementById("interm").innerHTML = "";
 		      
-		      if(event.results[i].isFinal) {
-		        const direction = detectTextDirection(transcript);
-		        document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${transcript}</span><br />`;
-		        
-		        try {
-		          if (label) {
-		            socket.send(JSON.stringify({"msg":true, "final":transcript, "id":counter, "label":label, "ln": myLang}));
-		          } else {
-		            socket.send(JSON.stringify({"msg":true, "final":transcript, "id":counter, "ln": myLang}));
-		          }
-		        } catch(e) {
-		          console.error(e);
+		      try {
+		        if (label) {
+		          socket.send(JSON.stringify({"msg":true, "final":transcript, "id":counter, "label":label, "ln": myLang}));
+		        } else {
+		          socket.send(JSON.stringify({"msg":true, "final":transcript, "id":counter, "ln": myLang}));
 		        }
-		        
-		        new_final_transcript += ' ' + transcript;
-		        counter += 1;
-		        lastProcessedIndex = i + 1; // Mark this result as processed
-		      } else {
-		        interim_transcript += " " + transcript;
+		      } catch(e) {
+		        console.error(e);
 		      }
+		      
+		      counter += 1;
+		    } else {
+		      interim_transcript += " " + transcript;
 		    }
 		  }
 		  
-		  // Only process interim if we have something and there are no final results
-		  if (interim_transcript.trim() && lastProcessedIndex === event.resultIndex) {
-		    interim_transcript = interim_transcript.trim();
+		  if (interim_transcript.trim()) {
 		    const direction = detectTextDirection(interim_transcript);
-		    document.getElementById("interm").innerHTML = `<span dir='${direction}'>${interim_transcript}</span><br />`;
+		    document.getElementById("interm").innerHTML = `<span dir='${direction}'>${interim_transcript.trim()}</span><br />`;
 		    
 		    try {
 		      if (label) {
-		        socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "label":label, "ln": myLang}));
+		        socket.send(JSON.stringify({"msg":true, "interm":interim_transcript.trim(), "id":counter, "label":label, "ln": myLang}));
 		      } else {
-		        socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "ln": myLang}));
+		        socket.send(JSON.stringify({"msg":true, "interm":interim_transcript.trim(), "id":counter, "ln": myLang}));
 		      }
 		    } catch(e) {
 		      console.error(e);
@@ -681,46 +677,39 @@
 		  
 		  final_transcript = new_final_transcript.trim();
 		  
-		  // Rest of the function remains the same with timestamp handling
-		  if (final_transcript || interim_transcript.trim()) {
-		    if (timestamp_start === null) {
-		      timestamp_start = Date.now();
-		      timestamp_intern = Date.now();
-		    }
-		    
-		    startd = true;
+		  if (final_transcript && timestamp_start === null) {
+		    timestamp_start = Date.now();
+		    timestamp_intern = Date.now();
+		  } else if (interim_transcript.trim() && timestamp_start === null) {
+		    timestamp_start = Date.now();
+		    timestamp_intern = Date.now();
 		  }
 		  
 		  if (final_transcript) {
 		    console.log("FINAL:", final_transcript);
-		    
+		    startd = true;
 		    try {
-		      // Existing timestamp and SRT file logic remains unchanged
 		      timestamp_stop = Date.now();
 		      timestamp_stop = Date.now() - timestamp_start;
 		      var date = new Date(0);
 		      date.setSeconds(timestamp_stop/1000);
 		      timestamp_stop = date.toISOString().replace(".",",").replace("1970-01-01T","");
 		      timestamp_stop = timestamp_stop.substring(0, timestamp_stop.length - 1);
+		      timestamp_intern -= timestamp_start;
+		      var date = new Date(0);
+		      date.setSeconds(timestamp_intern/1000);
+		      timestamp_intern = date.toISOString().replace(".",",").replace("1970-01-01T","");
+		      timestamp_intern = timestamp_intern.substring(0, timestamp_intern.length - 1);
 		      
-		      if (timestamp_intern !== null) {
-		        timestamp_intern -= timestamp_start;
-		        var date = new Date(0);
-		        date.setSeconds(timestamp_intern/1000);
-		        timestamp_intern = date.toISOString().replace(".",",").replace("1970-01-01T","");
-		        timestamp_intern = timestamp_intern.substring(0, timestamp_intern.length - 1);
+		      logcounter += 1;
+		      srtFile += logcounter + "\n";
+		      srtFile += timestamp_intern + " --\> " + timestamp_stop + "\n";
+		      timestamp_intern = null;
+		      srtFile += ">> " + final_transcript + "\n\n";
+		      setStorage("transcription_"+roomID+"_"+timestamp_start, srtFile, 1);
 		      
-		        logcounter += 1;
-		        srtFile += logcounter + "\n";
-		        srtFile += timestamp_intern + " --\> " + timestamp_stop + "\n";
-		        srtFile += ">> " + final_transcript + "\n\n";
-		        setStorage("transcription_"+roomID+"_"+timestamp_start, srtFile, 1);
-		        timestamp_intern = null;
-		      }
-		      
-		      // UI creation for first transcript remains the same
 		      if (logcounter === 1) {
-		        // Button creation code remains unchanged...
+		        // UI setup code remains unchanged
 		        var button = document.createElement("button");
 		        button.onclick = function() {
 		          download("transcription_"+roomID+"_"+timestamp_start+".srt", srtFile);
