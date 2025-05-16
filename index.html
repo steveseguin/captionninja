@@ -582,113 +582,116 @@
 		recognition.onresult = function(event) {
 		  if(typeof(event.results) == 'undefined') return;
 		  
-		  counter += 1;
 		  let interim_transcript = '';
 		  let new_final_transcript = '';
 		  
 		  for(let i = event.resultIndex; i < event.results.length; ++i) {
-			const transcript = sanitize(event.results[i][0].transcript);
-			const direction = detectTextDirection(transcript);
-			
-			if(event.results[i].isFinal) {
-			  new_final_transcript += ' ' + transcript;
-			  document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${transcript}</span><br />`;
-			  document.getElementById("interm").innerHTML = "";
-			} else {
-			  interim_transcript += " " + transcript;
-			  interim_transcript = interim_transcript.trim();
-			  document.getElementById("interm").innerHTML = `<span dir='${direction}'>${interim_transcript}</span><br />`;
-			}
+		    const transcript = sanitize(event.results[i][0].transcript);
+		    const direction = detectTextDirection(transcript);
+		    
+		    if(event.results[i].isFinal) {
+		      new_final_transcript += ' ' + transcript;
+		      document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${transcript}</span><br />`;
+		      document.getElementById("interm").innerHTML = "";
+		      
+		      try {
+		        if (label) {
+		          socket.send(JSON.stringify({"msg":true, "final":transcript, "id":counter, "label":label, "ln": myLang}));
+		        } else {
+		          socket.send(JSON.stringify({"msg":true, "final":transcript, "id":counter, "ln": myLang}));
+		        }
+		      } catch(e) {
+		        console.error(e);
+		      }
+		      
+		      counter += 1;
+		    } else {
+		      interim_transcript += " " + transcript;
+		    }
+		  }
+		  
+		  if (interim_transcript.trim()) {
+		    const direction = detectTextDirection(interim_transcript);
+		    document.getElementById("interm").innerHTML = `<span dir='${direction}'>${interim_transcript.trim()}</span><br />`;
+		    
+		    try {
+		      if (label) {
+		        socket.send(JSON.stringify({"msg":true, "interm":interim_transcript.trim(), "id":counter, "label":label, "ln": myLang}));
+		      } else {
+		        socket.send(JSON.stringify({"msg":true, "interm":interim_transcript.trim(), "id":counter, "ln": myLang}));
+		      }
+		    } catch(e) {
+		      console.error(e);
+		    }
 		  }
 		  
 		  final_transcript = new_final_transcript.trim();
 		  
+		  if (final_transcript && timestamp_start === null) {
+		    timestamp_start = Date.now();
+		    timestamp_intern = Date.now();
+		  } else if (interim_transcript.trim() && timestamp_start === null) {
+		    timestamp_start = Date.now();
+		    timestamp_intern = Date.now();
+		  }
+		  
 		  if (final_transcript) {
-			console.log("FINAL:", final_transcript);
-			startd = true;
-			try {
-			  if (timestamp_start === null) {
-				timestamp_start = Date.now();
-				timestamp_intern = Date.now();
-			  }
-			  timestamp_stop = Date.now();
-			  timestamp_stop = Date.now() - timestamp_start;
-			  var date = new Date(0);
-			  date.setSeconds(timestamp_stop/1000);
-			  timestamp_stop = date.toISOString().replace(".",",").replace("1970-01-01T","");
-			  timestamp_stop = timestamp_stop.substring(0, timestamp_stop.length - 1);
-			  timestamp_intern -= timestamp_start;
-			  var date = new Date(0);
-			  date.setSeconds(timestamp_intern/1000);
-			  timestamp_intern = date.toISOString().replace(".",",").replace("1970-01-01T","");
-			  timestamp_intern = timestamp_intern.substring(0, timestamp_intern.length - 1);
-			  
-			  logcounter += 1;
-			  srtFile += logcounter + "\n";
-			  srtFile += timestamp_intern + " --\> " + timestamp_stop + "\n";
-			  timestamp_intern = null;
-			  srtFile += ">> " + final_transcript + "\n\n";
-			  setStorage("transcription_"+roomID+"_"+timestamp_start, srtFile, 1);
-			  
-			  if (logcounter === 1) {
-				  var button = document.createElement("button");
-				  button.onclick = function() {
-					download("transcription_"+roomID+"_"+timestamp_start+".srt", srtFile);
-				  };
-				  button.innerHTML = "Download transcription";
-				  button.className = "control-button";
-
-				  var shareButton = document.createElement("button");
-				  shareButton.onclick = function() {
-					const overlayUrl = url+"/overlay?room="+roomID;
-					navigator.clipboard.writeText(overlayUrl).then(() => {
-					  shareButton.innerHTML = "Link Copied!";
-					  setTimeout(() => shareButton.innerHTML = "Copy Overlay Link", 2000);
-					});
-				  };
-				  shareButton.innerHTML = "Copy Overlay Link";
-				  shareButton.className = "control-button";
-
-				  var controlContainer = document.querySelector('.control-buttons');
-				  if (!controlContainer) {
-					controlContainer = document.createElement("div");
-					controlContainer.className = "control-buttons";
-					document.body.appendChild(controlContainer);
-				  }
-				  controlContainer.appendChild(button);
-				  controlContainer.appendChild(shareButton);
-				  toggleButton.classList.remove("hidden");
-				  document.querySelector('.control-buttons').appendChild(toggleButton);
-			  }
-			  
-			  if (label) {
-				socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter, "label":label, "ln": myLang}));
-			  } else {
-				socket.send(JSON.stringify({"msg":true, "final":final_transcript, "id":counter, "ln": myLang}));
-			  }
-			} catch(e) {
-			  console.error(e);
-			}
-		  } else if (interim_transcript) {
-			if (timestamp_start === null) {
-			  timestamp_start = Date.now();
-			}
-			if (timestamp_intern === null) {
-			  timestamp_intern = Date.now();
-			}
-			startd = true;
-			console.log("INTERM:", interim_transcript);
-			
-			try {
-			  if (label) {
-				socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "label":label, "ln": myLang}));
-			  } else {
-				socket.send(JSON.stringify({"msg":true, "interm":interim_transcript, "id":counter, "ln": myLang}));
-			  }
-			} catch(e) {
-			  console.error(e);
-			  interim_transcript = "";
-			}
+		    console.log("FINAL:", final_transcript);
+		    startd = true;
+		    try {
+		      timestamp_stop = Date.now();
+		      timestamp_stop = Date.now() - timestamp_start;
+		      var date = new Date(0);
+		      date.setSeconds(timestamp_stop/1000);
+		      timestamp_stop = date.toISOString().replace(".",",").replace("1970-01-01T","");
+		      timestamp_stop = timestamp_stop.substring(0, timestamp_stop.length - 1);
+		      timestamp_intern -= timestamp_start;
+		      var date = new Date(0);
+		      date.setSeconds(timestamp_intern/1000);
+		      timestamp_intern = date.toISOString().replace(".",",").replace("1970-01-01T","");
+		      timestamp_intern = timestamp_intern.substring(0, timestamp_intern.length - 1);
+		      
+		      logcounter += 1;
+		      srtFile += logcounter + "\n";
+		      srtFile += timestamp_intern + " --\> " + timestamp_stop + "\n";
+		      timestamp_intern = null;
+		      srtFile += ">> " + final_transcript + "\n\n";
+		      setStorage("transcription_"+roomID+"_"+timestamp_start, srtFile, 1);
+		      
+		      if (logcounter === 1) {
+		        // UI setup code remains unchanged
+		        var button = document.createElement("button");
+		        button.onclick = function() {
+		          download("transcription_"+roomID+"_"+timestamp_start+".srt", srtFile);
+		        };
+		        button.innerHTML = "Download transcription";
+		        button.className = "control-button";
+		
+		        var shareButton = document.createElement("button");
+		        shareButton.onclick = function() {
+		          const overlayUrl = url+"/overlay?room="+roomID;
+		          navigator.clipboard.writeText(overlayUrl).then(() => {
+		            shareButton.innerHTML = "Link Copied!";
+		            setTimeout(() => shareButton.innerHTML = "Copy Overlay Link", 2000);
+		          });
+		        };
+		        shareButton.innerHTML = "Copy Overlay Link";
+		        shareButton.className = "control-button";
+		
+		        var controlContainer = document.querySelector('.control-buttons');
+		        if (!controlContainer) {
+		          controlContainer = document.createElement("div");
+		          controlContainer.className = "control-buttons";
+		          document.body.appendChild(controlContainer);
+		        }
+		        controlContainer.appendChild(button);
+		        controlContainer.appendChild(shareButton);
+		        toggleButton.classList.remove("hidden");
+		        document.querySelector('.control-buttons').appendChild(toggleButton);
+		      }
+		    } catch(e) {
+		      console.error(e);
+		    }
 		  }
 		};
 		
