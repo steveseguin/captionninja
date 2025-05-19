@@ -204,7 +204,7 @@
         
         <div class="api-key-container">
             <label for="apiKey">Google Translation API Key:</label>
-            <input type="text" id="apiKey" placeholder="Enter your API key here">
+            <input type="password" id="apiKey" placeholder="Enter your API key here">
             <button id="saveApiKey" class="button">Save Key</button>
             <span id="apiKeyStatus" class="api-key-status status-inactive">No API Key</span>
         </div>
@@ -251,10 +251,7 @@
         <div id="output" class="output">Translated text will appear here...</div>
     </div>
 
-    <script>
-        // Main app functionality
-        const app = {
-            // App state
+    <script>const app = {
             state: {
                 apiKey: '',
                 roomId: '',
@@ -271,8 +268,6 @@
                 lastRequestTime: 0,
                 languageMap: {}
             },
-            
-            // DOM Elements
             elements: {
                 apiKeyInput: document.getElementById('apiKey'),
                 apiKeyStatus: document.getElementById('apiKeyStatus'),
@@ -290,15 +285,9 @@
                 copyLinkBtn: document.getElementById('copyLink'),
                 errorContainer: document.getElementById('errorContainer')
             },
-            
-            // Speech recognition object
             recognition: null,
-            
-            // WebSocket connection
             socket: null,
             retryCount: 0,
-            
-            // Initialize the application
             init: function() {
                 this.loadApiKey();
                 this.generateRoomId();
@@ -308,8 +297,6 @@
                 this.connectWebSocket();
                 this.updateShareLink();
             },
-            
-            // Load API Key from storage if available
             loadApiKey: function() {
                 const savedKey = this.getStorage('apiKey');
                 if (savedKey) {
@@ -320,8 +307,6 @@
                     this.updateApiKeyStatus(false);
                 }
             },
-            
-            // Update API Key status display
             updateApiKeyStatus: function(isActive) {
                 if (isActive) {
                     this.elements.apiKeyStatus.textContent = 'API Key Active';
@@ -331,11 +316,8 @@
                     this.elements.apiKeyStatus.className = 'api-key-status status-inactive';
                 }
             },
-            
-            // Generate a unique room ID for websocket communication
             generateRoomId: function() {
                 const urlParams = new URLSearchParams(window.location.search);
-                
                 if (urlParams.has('room')) {
                     this.state.roomId = urlParams.get('room');
                 } else {
@@ -343,8 +325,6 @@
                     this.updateURL('room=' + this.state.roomId);
                 }
             },
-            
-            // Create a random ID for the room
             generateRandomId: function() {
                 const possible = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
                 let text = "";
@@ -353,12 +333,8 @@
                 }
                 return text;
             },
-            
-            // Load previously saved language preferences
             loadLanguagePreferences: function() {
                 const urlParams = new URLSearchParams(window.location.search);
-                
-                // Source language
                 if (urlParams.has('lang')) {
                     this.state.myLang = urlParams.get('lang');
                 } else if (this.getStorage('myLang')) {
@@ -366,40 +342,38 @@
                 } else {
                     this.updateURL('lang=' + this.state.myLang);
                 }
-                
                 this.state.myLangCode = this.state.myLang.split('-')[0].toLowerCase();
-                
-                // Target language
                 if (urlParams.has('translate') || urlParams.has('target')) {
                     this.state.targetLang = urlParams.get('translate') || urlParams.get('target');
                 } else if (this.getStorage('targetLang')) {
                     this.state.targetLang = this.getStorage('targetLang');
                 } else {
-                    // Default target language
                     this.state.targetLang = this.state.myLangCode === 'en' ? 'de' : 'en';
                     this.updateURL('translate=' + this.state.targetLang);
                 }
-                
                 this.setStorage('targetLang', this.state.targetLang, 999999);
                 this.setStorage('myLang', this.state.myLang, 999999);
             },
-            
-            // Set up all event listeners
             setupEventListeners: function() {
-                // API Key button
                 this.elements.saveApiKeyBtn.addEventListener('click', () => {
-                    const newKey = this.elements.apiKeyInput.value.trim();
-                    if (newKey) {
-                        this.state.apiKey = newKey;
-                        this.setStorage('apiKey', newKey, 999999);
-                        this.updateApiKeyStatus(true);
-                        this.fetchLanguages(); // Refresh languages with new key
-                    } else {
-                        this.showError('Please enter a valid API key');
-                    }
-                });
-                
-                // Copy link button
+					const newKey = this.elements.apiKeyInput.value.trim();
+					if (newKey) {
+						if (newKey !== this.state.apiKey) {
+							this.state.apiKey = newKey;
+							this.setStorage('apiKey', newKey, 999999);
+							this.updateApiKeyStatus(true);
+							this.fetchLanguages();
+						} else {
+							const originalText = this.elements.saveApiKeyBtn.textContent;
+							this.elements.saveApiKeyBtn.textContent = 'Key Already Active';
+							setTimeout(() => {
+								this.elements.saveApiKeyBtn.textContent = originalText;
+							}, 2000);
+						}
+					} else {
+						this.showError('Please enter a valid API key');
+					}
+				});
                 this.elements.copyLinkBtn.addEventListener('click', () => {
                     navigator.clipboard.writeText(this.elements.shareLink.href)
                         .then(() => {
@@ -412,52 +386,35 @@
                             this.showError('Failed to copy: ' + err);
                         });
                 });
-                
-                // Language selectors
                 this.elements.langFromSelect.addEventListener('change', (e) => {
                     const newLang = e.target.value;
                     this.state.myLang = newLang;
                     this.state.myLangCode = newLang.split('-')[0].toLowerCase();
-                    
-                    // Ensure source and target are different
                     if (this.state.myLangCode === this.state.targetLang) {
                         this.state.targetLang = (this.state.myLangCode === 'en') ? 'de' : 'en';
                         this.updateLanguageSelectors();
                     }
-                    
                     this.updateURL('lang=' + this.state.myLang, true);
                     this.setStorage('myLang', this.state.myLang, 999999);
-                    
-                    // Restart recognition with new language
                     this.restartRecognition();
                 });
-                
                 this.elements.langToSelect.addEventListener('change', (e) => {
                     const newTarget = e.target.value;
-                    
-                    // Ensure source and target are different
                     if (newTarget === this.state.myLangCode) {
                         this.showError('Source and target languages cannot be the same');
-                        // Reset to previous or alternative
                         this.updateLanguageSelectors();
                         return;
                     }
-                    
                     this.state.targetLang = newTarget;
                     this.updateURL('translate=' + this.state.targetLang, true);
                     this.setStorage('targetLang', this.state.targetLang, 999999);
-                    
-                    // Translate current input with new target language
                     const currentText = this.elements.inputTextarea.value.trim();
                     if (currentText && this.elements.enabledTranscriptionCheckbox.checked) {
                         this.translateText(currentText);
                     }
                 });
-                
-                // Toggle transcription button
                 this.elements.toggleTranscriptionBtn.addEventListener('click', () => {
                     this.state.isPaused = !this.state.isPaused;
-                    
                     if (this.state.isPaused) {
                         if (this.recognition) {
                             this.recognition.stop();
@@ -470,22 +427,16 @@
                         this.elements.toggleTranscriptionBtn.classList.remove('paused');
                     }
                 });
-                
-                // Checkbox handlers
                 this.elements.incrementalUpdatesCheckbox.addEventListener('change', () => {
                     this.restartRecognition();
                 });
             },
-            
-            // Connect to WebSocket server
             connectWebSocket: function() {
                 if (this.socket) {
                     this.socket.close();
                     this.socket = null;
                 }
-
                 this.socket = new WebSocket("wss://api.caption.ninja:443");
-
                 this.socket.onclose = () => {
                     console.log("WebSocket connection closed. Attempting to reconnect...");
                     const delay = this.getRetryDelay();
@@ -493,13 +444,11 @@
                     setTimeout(() => this.connectWebSocket(), delay);
                     this.retryCount++;
                 };
-
                 this.socket.onopen = () => {
                     console.log("WebSocket connected. Joining room...");
                     this.retryCount = 0;
                     this.socket.send(JSON.stringify({"join": this.state.roomId}));
                 };
-
                 this.socket.onerror = (error) => {
                     console.error("WebSocket error:", error);
                     if (this.socket) {
@@ -508,27 +457,31 @@
                     }
                 };
             },
-            
-            // Calculate delay for reconnection attempts
+			handleRecognitionConflict: function() {
+				this.state.isPaused = true;
+				this.elements.toggleTranscriptionBtn.textContent = 'Resume Transcription';
+				this.elements.toggleTranscriptionBtn.classList.add('paused');
+				if (this.recognition) {
+					this.recognition.onend = null;
+					this.recognition.stop();
+					this.recognition = null;
+				}
+				this.showError('Speech recognition is already in use in another tab or application. Click "Resume Transcription" when ready to try again.');
+				this.elements.statusDiv.textContent = "Paused: Recognition conflict detected";
+			},
             getRetryDelay: function() {
                 if (this.retryCount === 0) {
-                    return 0; // First retry is immediate
+                    return 0;
                 }
-                // Exponential backoff: 1000ms * 2^(retryCount-1), capped at 30 seconds
                 return Math.min(1000 * Math.pow(2, this.retryCount - 1), 30000);
             },
-            
-            // Fetch available languages from Google API
             fetchLanguages: function() {
                 let url;
-                
                 if (this.state.apiKey) {
                     url = `https://www.googleapis.com/language/translate/v2/languages?key=${this.state.apiKey}`;
                 } else {
-                    // Fallback to a public proxy if no API key is available
                     url = `https://captionninjapremium.vdo.workers.dev/?ts=${Date.now()}`;
                 }
-                
                 fetch(url, {
                     method: 'GET',
                     headers: {
@@ -546,148 +499,127 @@
                     if (data.error) {
                         throw new Error(data.error.message || 'Error fetching languages');
                     }
-                    
                     this.processLanguages(data.data.languages);
                 })
                 .catch(error => {
                     this.showError('Failed to fetch languages: ' + error.message);
                     console.error('Language fetch error:', error);
-                    
-                    // Load some default languages if API fails
                     this.loadDefaultLanguages();
                 });
             },
-            
-            // Process fetched languages and populate selectors
             processLanguages: function(languages) {
                 this.state.languageData = languages;
-                
-                // Create language map
                 languages.forEach(lang => {
                     const langName = this.getLanguageName(lang.language);
                     this.state.languageMap[lang.language] = langName;
                 });
-                
-                // Populate language selectors
                 this.populateLanguageSelectors();
-                
-                // Initialize speech recognition
                 this.setupSpeechRecognition();
             },
-            
-            // Get readable language name from code
             getLanguageName: function(code) {
-                // Language name mapping
                 const languageNames = {
-                    "aa": "Afar", "ab": "Abkhazian", "ae": "Avestan", "af": "Afrikaans",
-                    "ak": "Akan", "am": "Amharic", "an": "Aragonese", "ar": "Arabic",
-                    "as": "Assamese", "av": "Avaric", "ay": "Aymara", "az": "Azerbaijani",
-                    "ba": "Bashkir", "be": "Belarusian", "bg": "Bulgarian", "bh": "Bihari",
-                    "bi": "Bislama", "bm": "Bambara", "bn": "Bengali", "bo": "Tibetan",
-                    "br": "Breton", "bs": "Bosnian", "ca": "Catalan", "ce": "Chechen",
-                    "ch": "Chamorro", "co": "Corsican", "cr": "Cree", "cs": "Czech",
-                    "cu": "Church Slavic", "cv": "Chuvash", "cy": "Welsh", "da": "Danish",
-                    "de": "German", "dv": "Divehi", "dz": "Dzongkha", "ee": "Ewe",
-                    "el": "Greek", "en": "English", "eo": "Esperanto", "es": "Spanish",
-                    "et": "Estonian", "eu": "Basque", "fa": "Persian", "ff": "Fulah",
-                    "fi": "Finnish", "fj": "Fijian", "fo": "Faroese", "fr": "French",
-                    "fy": "Western Frisian", "ga": "Irish", "gd": "Scottish Gaelic",
-                    "gl": "Galician", "gn": "Guarani", "gu": "Gujarati", "gv": "Manx",
-                    "ha": "Hausa", "he": "Hebrew", "hi": "Hindi", "ho": "Hiri Motu",
-                    "hr": "Croatian", "ht": "Haitian", "hu": "Hungarian", "hy": "Armenian",
-                    "hz": "Herero", "ia": "Interlingua", "id": "Indonesian", "ie": "Interlingue",
-                    "ig": "Igbo", "ii": "Sichuan Yi", "ik": "Inupiaq", "io": "Ido",
-                    "is": "Icelandic", "it": "Italian", "iu": "Inuktitut", "ja": "Japanese",
-                    "jv": "Javanese", "ka": "Georgian", "kg": "Kongo", "ki": "Kikuyu",
-                    "kj": "Kuanyama", "kk": "Kazakh", "kl": "Kalaallisut", "km": "Khmer",
-                    "kn": "Kannada", "ko": "Korean", "kr": "Kanuri", "ks": "Kashmiri",
-                    "ku": "Kurdish", "kv": "Komi", "kw": "Cornish", "ky": "Kyrgyz",
-                    "la": "Latin", "lb": "Luxembourgish", "lg": "Ganda", "li": "Limburgan",
-                    "ln": "Lingala", "lo": "Lao", "lt": "Lithuanian", "lu": "Luba-Katanga",
-                    "lv": "Latvian", "mg": "Malagasy", "mh": "Marshallese", "mi": "Maori",
-                    "mk": "Macedonian", "ml": "Malayalam", "mn": "Mongolian", "mr": "Marathi",
-                    "ms": "Malay", "mt": "Maltese", "my": "Burmese", "na": "Nauru",
-                    "nb": "Norwegian Bokmål", "nd": "North Ndebele", "ne": "Nepali",
-                    "ng": "Ndonga", "nl": "Dutch", "nn": "Norwegian Nynorsk", "no": "Norwegian",
-                    "nr": "South Ndebele", "nv": "Navajo", "ny": "Chichewa", "oc": "Occitan",
-                    "oj": "Ojibwa", "om": "Oromo", "or": "Oriya", "os": "Ossetian",
-                    "pa": "Punjabi", "pi": "Pali", "pl": "Polish", "ps": "Pashto",
-                    "pt": "Portuguese", "qu": "Quechua", "rm": "Romansh", "rn": "Rundi",
-                    "ro": "Romanian", "ru": "Russian", "rw": "Kinyarwanda", "sa": "Sanskrit",
-                    "sc": "Sardinian", "sd": "Sindhi", "se": "Northern Sami", "sg": "Sango",
-                    "si": "Sinhala", "sk": "Slovak", "sl": "Slovenian", "sm": "Samoan",
-                    "sn": "Shona", "so": "Somali", "sq": "Albanian", "sr": "Serbian",
-                    "ss": "Swati", "st": "Southern Sotho", "su": "Sundanese", "sv": "Swedish",
-                    "sw": "Swahili", "ta": "Tamil", "te": "Telugu", "tg": "Tajik",
-                    "th": "Thai", "ti": "Tigrinya", "tk": "Turkmen", "tl": "Tagalog",
-                    "tn": "Tswana", "to": "Tonga", "tr": "Turkish", "ts": "Tsonga",
-                    "tt": "Tatar", "tw": "Twi", "ty": "Tahitian", "ug": "Uighur",
-                    "uk": "Ukrainian", "ur": "Urdu", "uz": "Uzbek", "ve": "Venda",
-                    "vi": "Vietnamese", "vo": "Volapük", "wa": "Walloon", "wo": "Wolof",
-                    "xh": "Xhosa", "yi": "Yiddish", "yo": "Yoruba", "za": "Zhuang",
-                    "zh": "Chinese", "zu": "Zulu"
-                };
-                
+					"aa": "Afar", "ab": "Abkhazian", "ae": "Avestan", "af": "Afrikaans",
+					"ak": "Akan", "am": "Amharic", "an": "Aragonese", "ar": "Arabic",
+					"as": "Assamese", "av": "Avaric", "ay": "Aymara", "az": "Azerbaijani",
+					"ba": "Bashkir", "be": "Belarusian", "bg": "Bulgarian", "bh": "Bihari",
+					"bi": "Bislama", "bm": "Bambara", "bn": "Bengali", "bo": "Tibetan",
+					"br": "Breton", "bs": "Bosnian", "ca": "Catalan", "ce": "Chechen",
+					"ch": "Chamorro", "co": "Corsican", "cr": "Cree", "cs": "Czech",
+					"cu": "Church Slavic", "cv": "Chuvash", "cy": "Welsh", "da": "Danish",
+					"de": "German", "dv": "Divehi", "dz": "Dzongkha", "ee": "Ewe",
+					"el": "Greek", "en": "English", "eo": "Esperanto", "es": "Spanish",
+					"et": "Estonian", "eu": "Basque", "fa": "Persian", "ff": "Fulah",
+					"fi": "Finnish", "fj": "Fijian", "fo": "Faroese", "fr": "French",
+					"fy": "Western Frisian", "ga": "Irish", "gd": "Scottish Gaelic", "gl": "Galician",
+					"gn": "Guarani", "gu": "Gujarati", "gv": "Manx", "ha": "Hausa",
+					"he": "Hebrew", "hi": "Hindi", "ho": "Hiri Motu", "hr": "Croatian",
+					"ht": "Haitian", "hu": "Hungarian", "hy": "Armenian", "hz": "Herero",
+					"ia": "Interlingua", "id": "Indonesian", "ie": "Interlingue", "ig": "Igbo",
+					"ii": "Sichuan Yi", "ik": "Inupiaq", "io": "Ido", "is": "Icelandic",
+					"it": "Italian", "iu": "Inuktitut", "ja": "Japanese", "jv": "Javanese",
+					"ka": "Georgian", "kg": "Kongo", "ki": "Kikuyu", "kj": "Kuanyama",
+					"kk": "Kazakh", "kl": "Kalaallisut", "km": "Khmer", "kn": "Kannada",
+					"ko": "Korean", "kr": "Kanuri", "ks": "Kashmiri", "ku": "Kurdish",
+					"kv": "Komi", "kw": "Cornish", "ky": "Kyrgyz", "la": "Latin",
+					"lb": "Luxembourgish", "lg": "Ganda", "li": "Limburgan", "ln": "Lingala",
+					"lo": "Lao", "lt": "Lithuanian", "lu": "Luba-Katanga", "lv": "Latvian",
+					"mg": "Malagasy", "mh": "Marshallese", "mi": "Maori", "mk": "Macedonian",
+					"ml": "Malayalam", "mn": "Mongolian", "mr": "Marathi", "ms": "Malay",
+					"mt": "Maltese", "my": "Burmese", "na": "Nauru", "nb": "Norwegian Bokmål",
+					"nd": "North Ndebele", "ne": "Nepali", "ng": "Ndonga", "nl": "Dutch",
+					"nn": "Norwegian Nynorsk", "no": "Norwegian", "nr": "South Ndebele", "nv": "Navajo",
+					"ny": "Chichewa", "oc": "Occitan", "oj": "Ojibwa", "om": "Oromo",
+					"or": "Oriya", "os": "Ossetian", "pa": "Punjabi", "pi": "Pali",
+					"pl": "Polish", "ps": "Pashto", "pt": "Portuguese", "qu": "Quechua",
+					"rm": "Romansh", "rn": "Rundi", "ro": "Romanian", "ru": "Russian",
+					"rw": "Kinyarwanda", "sa": "Sanskrit", "sc": "Sardinian", "sd": "Sindhi",
+					"se": "Northern Sami", "sg": "Sango", "si": "Sinhala", "sk": "Slovak",
+					"sl": "Slovenian", "sm": "Samoan", "sn": "Shona", "so": "Somali",
+					"sq": "Albanian", "sr": "Serbian", "ss": "Swati", "st": "Southern Sotho",
+					"su": "Sundanese", "sv": "Swedish", "sw": "Swahili", "ta": "Tamil",
+					"te": "Telugu", "tg": "Tajik", "th": "Thai", "ti": "Tigrinya",
+					"tk": "Turkmen", "tl": "Tagalog", "tn": "Tswana", "to": "Tonga",
+					"tr": "Turkish", "ts": "Tsonga", "tt": "Tatar", "tw": "Twi",
+					"ty": "Tahitian", "ug": "Uighur", "uk": "Ukrainian", "ur": "Urdu",
+					"uz": "Uzbek", "ve": "Venda", "vi": "Vietnamese", "vo": "Volapük",
+					"wa": "Walloon", "wo": "Wolof", "xh": "Xhosa", "yi": "Yiddish",
+					"yo": "Yoruba", "za": "Zhuang", "zh": "Chinese", "zu": "Zulu",
+					"ace": "Achinese", "ach": "Acoli", "alz": "Alur", "awa": "Awadhi",
+					"ban": "Balinese", "bbc": "Batak Toba", "bem": "Bemba", "bew": "Betawi",
+					"bho": "Bhojpuri", "bik": "Bikol", "bts": "Batak Simalungun", "btx": "Batak Karo",
+					"bua": "Buriat", "ceb": "Cebuano", "cgg": "Chiga", "chm": "Mari",
+					"ckb": "Central Kurdish", "cnh": "Hakha Chin", "crh": "Crimean Tatar", "crs": "Seselwa Creole French",
+					"din": "Dinka", "doi": "Dogri", "dov": "Dombe", "gaa": "Ga",
+					"gom": "Goan Konkani", "haw": "Hawaiian", "hil": "Hiligaynon", "hmn": "Hmong",
+					"hrx": "Hunsrik", "ilo": "Iloko", "iw": "Hebrew", "jw": "Javanese",
+					"kri": "Krio", "ktu": "Kituba", "lij": "Ligurian", "lmo": "Lombard",
+					"ltg": "Latgalian", "luo": "Luo", "lus": "Lushai", "mai": "Maithili",
+					"mak": "Makasar", "min": "Minangkabau", "mni-Mtei": "Manipuri (Meetei Mayek script)", "ms-Arab": "Malay (Arabic script)",
+					"new": "Newari", "nso": "Northern Sotho", "nus": "Nuer", "pa-Arab": "Punjabi (Arabic script)",
+					"pag": "Pangasinan", "pam": "Pampanga", "pap": "Papiamento", "rom": "Romany",
+					"scn": "Sicilian", "shn": "Shan", "szl": "Silesian", "tet": "Tetum",
+					"yua": "Yucatec Maya", "yue": "Cantonese", "zh-CN": "Chinese (Simplified)", "zh-TW": "Chinese (Traditional)"
+				};
                 return languageNames[code] || code;
             },
-            
-            // Load default languages if API fails
             loadDefaultLanguages: function() {
                 const defaultLanguages = [
-                    { language: "en" }, { language: "de" }, { language: "fr" }, 
+                    { language: "en" }, { language: "de" }, { language: "fr" },
                     { language: "es" }, { language: "it" }, { language: "nl" },
-                    { language: "pt" }, { language: "ru" }, { language: "zh" }, 
+                    { language: "pt" }, { language: "ru" }, { language: "zh" },
                     { language: "ja" }, { language: "ko" }, { language: "ar" }
                 ];
                 this.processLanguages(defaultLanguages);
             },
-            
-            // Populate the language dropdown selectors
             populateLanguageSelectors: function() {
-                // Clear existing options
                 this.elements.langFromSelect.innerHTML = '';
                 this.elements.langToSelect.innerHTML = '';
-                
-                // Add options to source language selector
                 this.state.languageData.forEach(lang => {
                     const option = document.createElement('option');
                     const langName = this.getLanguageName(lang.language);
                     option.value = lang.language;
                     option.textContent = langName;
-                    
                     if (lang.language === this.state.myLangCode) {
                         option.selected = true;
                     }
-                    
                     this.elements.langFromSelect.appendChild(option);
                 });
-                
-                // Add options to target language selector
                 this.state.languageData.forEach(lang => {
                     const option = document.createElement('option');
                     const langName = this.getLanguageName(lang.language);
                     option.value = lang.language;
                     option.textContent = langName;
-                    
                     if (lang.language === this.state.targetLang) {
                         option.selected = true;
                     }
-                    
                     this.elements.langToSelect.appendChild(option);
                 });
-                
-                // Make sure source and target aren't the same
                 this.updateLanguageSelectors();
             },
-            
-            // Ensure source and target languages are different
             updateLanguageSelectors: function() {
-                // If source and target are the same, change target
                 if (this.state.myLangCode === this.state.targetLang) {
                     this.state.targetLang = (this.state.myLangCode === 'en') ? 'de' : 'en';
                 }
-                
-                // Update selectors to reflect current state
                 const fromOptions = this.elements.langFromSelect.options;
                 for (let i = 0; i < fromOptions.length; i++) {
                     if (fromOptions[i].value === this.state.myLangCode) {
@@ -695,7 +627,6 @@
                         break;
                     }
                 }
-                
                 const toOptions = this.elements.langToSelect.options;
                 for (let i = 0; i < toOptions.length; i++) {
                     if (toOptions[i].value === this.state.targetLang) {
@@ -704,72 +635,58 @@
                     }
                 }
             },
-            
-            // Update the overlay share link
             updateShareLink: function() {
                 const baseUrl = window.location.href.split('?')[0];
-                const overlayUrl = baseUrl.replace(/\/[^\/]*$/, '/overlay') + 
+                const overlayUrl = baseUrl.replace(/\/[^\/]*$/, '/overlay') +
                                   `?room=${this.state.roomId}`;
-                
                 this.elements.shareLink.href = overlayUrl;
                 this.elements.shareLink.textContent = overlayUrl;
             },
-            
-            // Set up speech recognition
             setupSpeechRecognition: function() {
-                if (!('webkitSpeechRecognition' in window)) {
-                    this.showError('Speech recognition is not supported in your browser. Try Chrome or Edge.');
-                    return;
-                }
-                
-                // Create new recognition instance
-                this.recognition = new webkitSpeechRecognition();
-                
-                // Configure recognition
-                this.recognition.lang = this.state.myLang;
-                this.recognition.continuous = true;
-                this.recognition.interimResults = this.elements.incrementalUpdatesCheckbox.checked;
-                
-                // Set up event handlers
+				if (!('webkitSpeechRecognition' in window)) {
+					this.showError('Speech recognition is not supported in your browser. Try Chrome or Edge.');
+					return;
+				}
+				this.recognition = new webkitSpeechRecognition();
+				this.recognition.lang = this.state.myLang;
+				this.recognition.continuous = true;
+				this.recognition.interimResults = this.elements.incrementalUpdatesCheckbox.checked;
                 this.recognition.onstart = () => {
                     console.log("Speech recognition started");
                     this.elements.statusDiv.textContent = "Listening...";
                     this.state.isTranscribing = true;
                 };
-                
                 this.recognition.onerror = (event) => {
-                    console.error("Recognition error:", event);
-                    
-                    if (event.error === 'no-speech') {
-                        this.elements.statusDiv.textContent = "No speech detected. Still listening...";
-                    } else if (event.error === 'audio-capture') {
-                        this.showError("No microphone detected");
-} else if (event.error === 'not-allowed') {
-                        this.showError("Microphone access denied. Please allow microphone access in your browser settings.");
-                    } else if (event.error === 'aborted') {
-                        console.log("Recognition aborted");
-                    } else {
-                        this.showError(`Speech recognition error: ${event.error}`);
-                    }
-                };
-                
+					console.error("Recognition error:", event);
+					if (event.error === 'no-speech') {
+						this.elements.statusDiv.textContent = "No speech detected. Still listening...";
+					} else if (event.error === 'audio-capture') {
+						this.showError("No microphone detected");
+					} else if (event.error === 'not-allowed') {
+						this.showError("Microphone access denied. Please allow microphone access in your browser settings.");
+					} else if (event.error === 'aborted') {
+						console.log("Recognition aborted");
+						if (!this.state.isPaused) {
+							this.handleRecognitionConflict();
+						}
+					} else if (event.error === 'network') {
+						this.showError("Network error occurred. Will attempt to reconnect...");
+						this.restartRecognition();
+					} else {
+						this.showError(`Speech recognition error: ${event.error}`);
+					}
+				};
                 this.recognition.onend = () => {
                     console.log("Speech recognition ended");
-                    
-                    // Process any remaining text if needed
                     this.processRemainingText();
-                    
                     if (!this.state.isPaused && this.state.isTranscribing) {
                         console.log("Restarting recognition...");
                         this.elements.statusDiv.textContent = "Reconnecting...";
-                        
-                        // Restart with a slight delay
                         setTimeout(() => {
                             try {
                                 this.recognition.start();
                             } catch (err) {
                                 console.error("Error restarting recognition:", err);
-                                // If restart fails, create a new instance
                                 this.setupSpeechRecognition();
                             }
                         }, 300);
@@ -777,37 +694,31 @@
                         this.elements.statusDiv.textContent = "Paused";
                     }
                 };
-                
                 this.recognition.onresult = (event) => {
                     if (typeof(event.results) === 'undefined') {
                         console.log('Undefined results in event:', event);
                         return;
                     }
-                    
-                    // Process the speech recognition results
                     this.processSpeechResults(event);
                 };
-                
-                // Start recognition if not paused
                 if (!this.state.isPaused) {
-                    try {
-                        this.recognition.start();
-                    } catch (error) {
-                        console.error("Error starting recognition:", error);
-                        this.showError("Failed to start speech recognition");
-                    }
-                }
-            },
-            
-            // Process speech recognition results
+					try {
+						this.recognition.start();
+					} catch (error) {
+						console.error("Error starting recognition:", error);
+						if (error.name === 'InvalidStateError') {
+							this.handleRecognitionConflict();
+						} else {
+							this.showError("Failed to start speech recognition");
+						}
+					}
+				}
+			},
             processSpeechResults: function(event) {
                 let currentBatchFinal = '';
                 let currentBatchInterim = '';
-                
-                // Process all results in the current batch
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     const transcript = this.sanitizeText(event.results[i][0].transcript);
-                    
                     if (event.results[i].isFinal) {
                         currentBatchFinal += (currentBatchFinal ? ' ' : '') + transcript;
                         console.log(`Processing text: ${transcript} Final: true`);
@@ -816,76 +727,50 @@
                         console.log(`Processing text: ${transcript} Final: false`);
                     }
                 }
-                
-                // Update transcript based on results
                 if (currentBatchFinal) {
-                    // Add final segments to the final transcript
                     this.state.finalTranscript += (this.state.finalTranscript ? ' ' : '') + currentBatchFinal;
-                    
-                    // Update input display
                     this.elements.inputTextarea.value = this.state.finalTranscript;
-                    
-                    // Translate the final text
                     this.translateText(this.state.finalTranscript);
-                    
-                    // Update context for future translations
                     this.state.secondTranscription = this.state.lastTranscription;
                     this.state.lastTranscription = this.state.finalTranscript.trim().replace(/\.?$/, '.') + ' ';
                     this.state.finalTranscript = '';
-                    
                     console.log("Updated context state:", {
                         second: this.state.secondTranscription,
                         last: this.state.lastTranscription
                     });
-                } 
+                }
                 else if (currentBatchInterim && this.elements.incrementalUpdatesCheckbox.checked) {
-                    // Display combined text for UI
-                    const displayText = this.state.finalTranscript + 
-                                       (this.state.finalTranscript ? ' ' : '') + 
+                    const displayText = this.state.finalTranscript +
+                                       (this.state.finalTranscript ? ' ' : '') +
                                        currentBatchInterim;
-                    
                     this.elements.inputTextarea.value = displayText;
-                    
-                    // Only translate interim results if enabled and not overloaded
-                    if (this.state.activeRequest === null && 
+                    if (this.state.activeRequest === null &&
                         (Date.now() - this.state.lastRequestTime > 250)) {
                         this.translateText(displayText, true);
                     }
                 }
             },
-            
-            // Process any remaining text when recognition ends
             processRemainingText: function() {
                 const currentText = this.elements.inputTextarea.value.trim();
-                
-                if (currentText && 
-                    this.elements.enabledTranscriptionCheckbox.checked && 
+                if (currentText &&
+                    this.elements.enabledTranscriptionCheckbox.checked &&
                     currentText !== this.state.lastTranscription.trim()) {
-                    
                     console.log("Processing final text from interrupted recognition:", currentText);
                     this.translateText(currentText);
-                    
-                    // Update context tracking
                     this.state.secondTranscription = this.state.lastTranscription;
                     this.state.lastTranscription = currentText.replace(/\.?$/, '.') + ' ';
                     this.state.finalTranscript = '';
                 }
             },
-            
-            // Translate text using Google Translate API
             translateText: function(textToTranslate, isInterim = false) {
                 if (!textToTranslate?.trim() || !this.elements.enabledTranscriptionCheckbox.checked) {
                     return;
                 }
-                
-                // Make sure source and target are different
                 if (this.state.myLangCode === this.state.targetLang) {
                     console.warn("Source and target languages are the same:", this.state.myLangCode);
                     this.state.targetLang = (this.state.myLangCode === 'en') ? 'de' : 'en';
                     this.updateLanguageSelectors();
                 }
-                
-                // Add context if enabled
                 let contextText = textToTranslate;
                 if (this.elements.fullContextCheckbox.checked) {
                     let fullText = [];
@@ -898,44 +783,31 @@
                     if (textToTranslate?.trim()) {
                         fullText.push(textToTranslate.trim());
                     }
-                    
                     contextText = fullText.join(' ');
                     console.log("Translating with context:", contextText);
                 }
-                
-                // Check for rate limiting
                 const now = Date.now();
                 const timeSinceLastRequest = now - this.state.lastRequestTime;
                 if (timeSinceLastRequest < 250) {
                     console.log("Rate limiting in effect, skipping request");
                     return;
                 }
-                
                 this.state.lastRequestTime = now;
-                
-                // Cancel any active request
                 if (this.state.activeRequest) {
                     this.state.activeRequest.abort();
                     this.state.activeRequest = null;
                 }
-                
-                // Build API URL
                 const url = this.state.apiKey
                     ? `https://www.googleapis.com/language/translate/v2/?key=${this.state.apiKey}&q=${encodeURIComponent(contextText)}&target=${this.state.targetLang}&source=${this.state.myLangCode}`
                     : `https://captionninjapremium.vdo.workers.dev/?ts=${Date.now()}&q=${encodeURIComponent(contextText)}&target=${this.state.targetLang}&source=${this.state.myLangCode}`;
-                
-                // Check cache first
                 const cachedTranslation = this.getCachedTranslation(url);
                 if (cachedTranslation) {
                     console.log('Using cached translation');
                     this.updateTranslation(cachedTranslation, isInterim);
                     return;
                 }
-                
-                // Create fetch request with timeout
                 const controller = new AbortController();
                 this.state.activeRequest = controller;
-                
                 const timeoutId = setTimeout(() => {
                     if (this.state.activeRequest === controller) {
                         console.log('Request timeout');
@@ -943,7 +815,6 @@
                         this.state.activeRequest = null;
                     }
                 }, 3000);
-                
                 fetch(url, {
                     method: 'GET',
                     headers: {
@@ -962,13 +833,8 @@
                     if (!data?.data?.translations?.[0]) {
                         throw new Error('Invalid response format from translation service');
                     }
-                    
                     const translatedText = data.data.translations[0].translatedText;
-                    
-                    // Cache the translation
                     this.cacheTranslation(url, data.data);
-                    
-                    // Update UI with translation
                     this.updateTranslation(translatedText, isInterim);
                 })
                 .catch(error => {
@@ -976,10 +842,7 @@
                         console.log('Request was aborted');
                         return;
                     }
-                    
                     console.error('Translation error:', error);
-                    
-                    // Handle rate limiting
                     if (error.message.includes('HTTP error! status: 429')) {
                         if (this.elements.incrementalUpdatesCheckbox.checked) {
                             this.elements.incrementalUpdatesCheckbox.checked = false;
@@ -987,8 +850,6 @@
                             this.restartRecognition();
                         }
                     }
-                    
-                    // Show error to user (but not too frequently)
                     const now = Date.now();
                     if (!window.lastErrorTime || (now - window.lastErrorTime) > 5000) {
                         window.lastErrorTime = now;
@@ -1002,19 +863,10 @@
                     }
                 });
             },
-            
-            // Update UI with translation and send to WebSocket
             updateTranslation: function(translatedText, isInterim) {
-                // Store for backup
                 window.lastSuccessfulTranslation = translatedText;
-                
-                // Update UI
                 this.elements.outputDiv.innerHTML = this.formatTranslatedText(translatedText);
-                
-                // Increment message counter
                 this.state.counter += 1;
-                
-                // Send to WebSocket for overlay
                 if (this.socket && this.socket.readyState === WebSocket.OPEN) {
                     this.socket.send(JSON.stringify({
                         "msg": true,
@@ -1025,17 +877,11 @@
                     }));
                 }
             },
-            
-            // Format translated text with spans for better readability
             formatTranslatedText: function(text) {
-                // Split text by sentences or periods
                 const segments = text.split(/(?<=\.)\s+/);
-                
                 if (segments.length <= 1) {
                     return `<span>${text}</span>`;
                 }
-                
-                // Format with spans for each segment
                 return segments.map(segment => {
                     if (segment.trim()) {
                         return `<span>${segment}</span>`;
@@ -1043,11 +889,8 @@
                     return '';
                 }).join(' ');
             },
-            
-            // Handle translation errors
             handleTranslationError: function(error) {
                 let errorMessage = '';
-                
                 if (error instanceof TypeError && error.message.includes('CORS')) {
                     errorMessage = 'CORS Error: Unable to access the translation service. Check your API key.';
                 } else if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
@@ -1063,36 +906,35 @@
                 } else {
                     errorMessage = `Translation Error: ${error.message}`;
                 }
-                
                 this.showError(errorMessage);
             },
-            
-            // Restart speech recognition
             restartRecognition: function() {
-                if (this.recognition) {
-                    this.recognition.onend = null; // Prevent auto-restart
-                    this.recognition.stop();
-                    
-                    setTimeout(() => {
-                        this.recognition = null;
-                        this.setupSpeechRecognition();
-                    }, 300);
-                } else {
-                    this.setupSpeechRecognition();
-                }
-            },
-            
-            // Show error message to user
+				try {
+					if (this.recognition) {
+						this.recognition.onend = null;
+						this.recognition.stop();
+						setTimeout(() => {
+							this.recognition = null;
+							this.setupSpeechRecognition();
+						}, 300);
+					} else {
+						this.setupSpeechRecognition();
+					}
+				} catch (error) {
+					console.error("Error restarting recognition:", error);
+					this.showError("Recognition error occurred. Please reload the page if problems persist.");
+					this.state.isPaused = true;
+					this.elements.toggleTranscriptionBtn.textContent = 'Resume Transcription';
+					this.elements.toggleTranscriptionBtn.classList.add('paused');
+				}
+			},
             showError: function(message) {
                 this.elements.errorContainer.textContent = message;
                 this.elements.errorContainer.classList.remove('hidden');
-                
                 setTimeout(() => {
                     this.elements.errorContainer.classList.add('hidden');
                 }, 5000);
             },
-            
-            // Sanitize text input
             sanitizeText: function(string) {
                 const temp = document.createElement('div');
                 temp.textContent = string;
@@ -1100,14 +942,11 @@
                     .substring(0, Math.min(temp.textContent.length, 500))
                     .trim();
             },
-            
-            // Get cached translation
             getCachedTranslation: function(url) {
                 try {
                     const cached = localStorage.getItem('translation_' + url);
                     if (cached) {
                         const { data, timestamp } = JSON.parse(cached);
-                        // Cache valid for 24 hours
                         if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
                             return data?.translations?.[0]?.translatedText || null;
                         }
@@ -1118,8 +957,6 @@
                 }
                 return null;
             },
-            
-            // Cache translation results
             cacheTranslation: function(url, data) {
                 try {
                     localStorage.setItem('translation_' + url, JSON.stringify({
@@ -1128,7 +965,6 @@
                     }));
                 } catch (e) {
                     console.error('Cache storage error:', e);
-                    // Clean up old cache entries if storage is full
                     try {
                         const keys = Object.keys(localStorage);
                         for (let key of keys) {
@@ -1141,30 +977,24 @@
                     }
                 }
             },
-            
-            // Local storage utility functions
             getStorage: function(key) {
                 try {
                     const itemStr = localStorage.getItem(key);
                     if (!itemStr) {
                         return null;
                     }
-                    
                     const item = JSON.parse(itemStr);
                     const now = new Date();
-                    
                     if (now.getTime() > item.expiry) {
                         localStorage.removeItem(key);
                         return null;
                     }
-                    
                     return item.value;
                 } catch (e) {
                     console.error('Storage error:', e);
                     return null;
                 }
             },
-            
             setStorage: function(key, value, hours = 24) {
                 try {
                     const now = new Date();
@@ -1172,30 +1002,23 @@
                         value: value,
                         expiry: now.getTime() + (hours * 60 * 60 * 1000)
                     };
-                    
                     localStorage.setItem(key, JSON.stringify(item));
                 } catch (e) {
                     console.error('Storage save error:', e);
                 }
             },
-            
-            // Update URL with new parameters
             updateURL: function(param, replace = false) {
                 const urlParams = new URLSearchParams(window.location.search);
                 const paramParts = param.split('=');
                 const paramName = paramParts[0];
                 const paramValue = paramParts.length > 1 ? paramParts[1] : '';
-                
                 if (replace || !urlParams.has(paramName)) {
                     urlParams.set(paramName, paramValue);
-                    
                     const newUrl = window.location.pathname + '?' + urlParams.toString();
                     window.history.pushState({ path: newUrl }, '', newUrl);
                 }
             }
         };
-
-        // Initialize the app when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
             app.init();
         });
