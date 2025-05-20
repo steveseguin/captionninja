@@ -28,8 +28,12 @@
             color: var(--text-color);
             background-color: var(--background-color);
             margin: 0;
-            padding: 20px;
+            padding: 0
         }
+		
+		#apiKey {
+			font-size: 20px;
+		}
 
         h2 {
             color: var(--secondary-color);
@@ -51,7 +55,7 @@
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 0
         }
 
         .control-panel {
@@ -70,7 +74,6 @@
 
         .output {
             font-family: Cousine, monospace;
-            margin-top: 15px;
             color: black;
             min-height: 120px;
             font-size: 2.5em;
@@ -118,7 +121,6 @@
         }
         
         #status {
-            margin-top: 10px;
             font-style: italic;
             color: var(--secondary-color);
         }
@@ -132,7 +134,7 @@
 
         .api-key-status {
             display: inline-block;
-            padding: 5px 10px;
+            padding: 5px 22px;
             border-radius: var(--border-radius);
             font-weight: bold;
         }
@@ -151,7 +153,7 @@
             background-color: var(--primary-color);
             color: white;
             border: none;
-            padding: 8px 16px;
+            padding: 8px 26px;
             border-radius: var(--border-radius);
             cursor: pointer;
             font-weight: bold;
@@ -165,6 +167,10 @@
         .button.paused {
             background-color: #dc3545;
         }
+		
+		#saveApiKey, #copyLink {
+			margin-left: 20px;
+		}
 
         .error-message {
             color: #dc3545;
@@ -194,62 +200,127 @@
                 width: 100%;
             }
         }
+		
+		#customization-info {
+			margin: 20px 0;
+			padding: 15px;
+			background-color: #f5f5f5;
+			border-radius: var(--border-radius);
+			border-left: 4px solid var(--primary-color);
+		}
+
+		#customization-info h4 {
+			margin-top: 0;
+			color: var(--secondary-color);
+		}
+
+		#customization-info ul {
+			margin-bottom: 0;
+		}
+
+		#customization-info code {
+			background-color: #e9e9e9;
+			padding: 2px 5px;
+			border-radius: 3px;
+			font-family: monospace;
+		}
+
+		footer {
+			margin-top: 30px;
+			padding-top: 20px;
+			border-top: 1px solid #eee;
+			text-align: center;
+			font-size: 0.9em;
+			color: #666;
+		}
+
+		footer a {
+			color: var(--primary-color);
+		}
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Real-time Translation App - Premium Version</h2>
-        
-        <p>This app uses speech recognition to transcribe your voice and translate it in real-time. It uses Google Cloud API, which has a broader selection of languages vs free alternatives.</p>
-        
-        <div class="api-key-container">
-            <label for="apiKey">Google Translation API Key:</label>
-            <input type="password" id="apiKey" placeholder="Enter your API key here">
-            <button id="saveApiKey" class="button">Save Key</button>
-            <span id="apiKeyStatus" class="api-key-status status-inactive">No API Key</span>
-        </div>
-        
-        <div class="overlay-link">
-            Overlay URL (for OBS): <a id="shareLink" href="#" target="_blank">Loading...</a>
-            <button id="copyLink" class="button">Copy Link</button>
-        </div>
-        
-        <div class="control-panel">
-            <div class="language-selector">
-                <label for="langFrom">From:</label>
-                <select id="langFrom"></select>
-            </div>
-            
-            <div class="language-selector">
-                <label for="langTo">To:</label>
-                <select id="langTo"></select>
-            </div>
-            
-            <label>
-                <input type="checkbox" id="fullContext">
-                Include previous context
-            </label>
-            
-            <label>
-                <input type="checkbox" id="enabledTranscription">
-                Enable translation
-            </label>
-            
-            <label>
-                <input type="checkbox" id="incrementalUpdates">
-                Incremental updates
-            </label>
-            
-            <button id="toggleTranscription" class="button">Pause Transcription</button>
-        </div>
-        
-        <div id="errorContainer" class="error-message hidden"></div>
-        <div id="status"></div>
-        
-        <textarea id="input" placeholder="Transcribed text will appear here..."></textarea>
-        
-        <div id="output" class="output">Translated text will appear here...</div>
-    </div>
+		<h2>Real-time Translation App - Premium Version</h2>
+		
+		<p>This app uses speech recognition to transcribe your voice and translate it in real-time.</p>
+		<p>The translation is powered by Google Cloud Translation, which <a href='https://console.cloud.google.com/apis/api/translate.googleapis.com/credentials' target="_blank">requires an API key -- get yours here.</a> <br /> <a href='./translate'>There is non-premium version for free of course also, but it's quite a bit more limited.</a> Check out more options and details on <a href='https://github.com/steveseguin/captionninja'>GitHub</a>.</p>
+		<p>To use this app, accept the microphone permissions on page load and then just say something outloud to see the live Transciption. Once that is working, ensure you have your Google API key enteed, and then just enable the Translation Output. The overlay link will mirror the output.</p>
+		<div class="api-key-container">
+			<label for="apiKey">Google Translation API Key:</label>
+			<input type="password" id="apiKey" placeholder="Enter your API key here">
+			<button id="saveApiKey" class="button">Save Key</button>
+			<span id="apiKeyStatus" class="api-key-status status-inactive">No API Key</span>
+		</div>
+		
+		<p><strong>Important:</strong> Only open one instance of this tool at a time to avoid microphone access conflicts.</p>
+		
+		<div class="control-panel">
+			<div class="language-selector">
+				<label for="langFrom">From:</label>
+				<select id="langFrom" title="Set input language via the URL `&lang=en-US` option"></select>
+			</div>
+			
+			<div class="language-selector">
+				<label for="langTo">To:</label>
+				<select id="langTo"></select>
+			</div>
+			
+			<label>
+				<input type="checkbox" id="fullContext">
+				Translate with added context
+			</label>
+			
+			<label>
+				<input type="checkbox" id="enabledTranscription">
+				<span style="color:green;"><b>Start</b></span> Translation Output (💸)
+			</label>
+			
+			<label>
+				<input type="checkbox" id="incrementalUpdates">
+				Enable incremental updates (💸💸💸)
+			</label>
+			
+			<button id="toggleTranscription" class="button">Pause Transcription</button>
+			<div id="status"></div>
+			<div id="errorContainer" class="error-message hidden"></div>
+		</div>
+		
+		
+		
+		
+		<textarea id="input" placeholder="Transcribed text will appear here..."></textarea>
+		
+		<div id="output" class="output">Translated text will appear here...</div>
+		
+		<p>Please note that this app uses your default microphone as the audio input source. 
+		You sometimes can change the default audio source via the browser's setting, but you can also change it at your system level by changing the default recording device. 
+		You can also change audio sources by using a Virtual Audio Cable, <a href='https://www.vb-audio.com/Cable/'> such as this one.</a> 
+		Using it, it becomes possible to select other sources, including microphones, speakers, and other applications.</p>
+		
+		
+		<div class="overlay-link">
+			Overlay URL (for OBS): <a id="shareLink" href="#" target="_blank">Loading...</a>
+			<button id="copyLink" class="button">Copy Link</button>
+		</div>
+		<div id="customization-info">
+			<h4>Customizing the Overlay</h4>
+			<p>The overlay page supports several URL parameters for customization:</p>
+			<ul>
+				<li><code>clear=1</code> - Clear existing captions when new ones arrive</li>
+				<li><code>showtime=5000</code> - Set timeout for captions in milliseconds</li>
+				<li><code>html=1</code> - Allow HTML in captions (use with caution)</li>
+				<li><code>speech=1</code> - Enable text-to-speech for captions</li>
+			</ul>
+		</div>
+		
+		
+		
+		<footer>
+			<p>Made with ❤️ by <a href="https://github.com/steveseguin" target="_blank">Steve Seguin</a>. Find this project on <a href="https://github.com/steveseguin/captionninja" target="_blank">GitHub</a>.</p>
+			<p>A free alternative version of this tool available at <a href="https://caption.ninja/translate" target="_blank">caption.ninja/translate</a>.</p>
+		</footer>
+	</div>
 
     <script>const app = {
             state: {
