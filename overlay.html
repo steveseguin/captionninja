@@ -5,7 +5,7 @@
 	<meta content="utf-8" http-equiv="encoding" />
 	<meta name="copyright" content="&copy; 2020 Steve Seguin" />
 	<link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon" />
-	<!-- Primary Meta Tags -->
+						   
 	<title>Caption Overlay Window</title>
 	<meta name="title" content="CAPTION.Ninja: Overlay" />
 	<meta name="description" content="This is a free-to-use captioning tool for OBS. Speech-to-text is done using Machine Learning" />
@@ -714,12 +714,11 @@
 			return string;
 		}
 		var temp = document.createElement('div');
-		temp.innerText = string;
-		temp.innerText = temp.innerHTML;
-		temp = temp.textContent || temp.innerText || "";
-		temp = temp.substring(0, Math.min(temp.length, 500));
-		return temp.trim();
-	};
+		temp.innerHTML = string; // Assign to innerHTML to parse entities and HTML structure
+		let decodedAndStrippedText = temp.textContent || temp.innerText || ""; // Get plain text content; this decodes entities and strips tags
+		
+		decodedAndStrippedText = decodedAndStrippedText.substring(0, Math.min(decodedAndStrippedText.length, 500));
+		return decodedAndStrippedText.trim();
 	
 	
 	
