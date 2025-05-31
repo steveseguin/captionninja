@@ -413,7 +413,8 @@
 		  }
 		};
 
-		this.fetchAudio(url, {
+		// ElevenLabs returns binary audio data, not JSON
+		fetch(url, {
 		  headers: {
 			"content-type": "application/json",
 			"xi-api-key": this.settings.elevenLabs.apiKey,
@@ -421,10 +422,24 @@
 		  },
 		  body: JSON.stringify(data),
 		  method: "POST"
-		}, async response => {
-		  const blob = await response.blob();
-		  return URL.createObjectURL(new Blob([blob]));
-		});
+		})
+		  .then(response => response.blob())
+		  .then(blob => {
+			const blobUrl = URL.createObjectURL(blob);
+			if (!this.audio) {
+			  this.audio = document.createElement("audio");
+			  this.audio.onended = () => this.finishedAudio();
+			}
+			this.audio.src = blobUrl;
+			if (this.settings.volume) {
+			  this.audio.volume = this.settings.volume;
+			}
+			return this.audio.play();
+		  })
+		  .catch(error => {
+			this.finishedAudio();
+			console.error("ElevenLabs TTS error:", error);
+		  });
 	  }
 
 	  speechifyTTS(text) {
@@ -449,10 +464,10 @@
 		}, response => `data:audio/mp3;base64,${response.audio_data}`);
 	  }
 
-	  async fetchAudio(url, options, processResponse) {
+	  async fetchAudio(url, options, processResponse, responseType = 'json') {
 		try {
 		  const response = await fetch(url, options);
-		  const data = await response.json();
+		  const data = responseType === 'blob' ? await response.blob() : await response.json();
 		  
 		  if (!this.audio) {
 			this.audio = document.createElement("audio");
