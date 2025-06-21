@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Security Warning Test</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .test-link {
+            display: block;
+            padding: 10px;
+            background: #f0f0f0;
+            text-decoration: none;
+            color: #333;
+            border-radius: 4px;
+            text-align: center;
+            transition: background 0.2s;
+        }
+        .test-link:hover {
+            background: #e0e0e0;
+        }
+        .insecure {
+            background: #ffe0e0;
+        }
+        .insecure:hover {
+            background: #ffcccc;
+        }
+        .secure {
+            background: #e0ffe0;
+        }
+        .secure:hover {
+            background: #ccffcc;
+        }
+        .description {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Security Warning Test Page</h1>
+    
+    <div class="description">
+        <p>This page tests the insecure stream ID warning system. Click on any link below to test different stream IDs:</p>
+        <ul>
+            <li>Red links = Insecure IDs (should trigger warning)</li>
+            <li>Green links = Secure IDs (should not trigger warning)</li>
+        </ul>
+    </div>
+    
+    <h2>Test Links</h2>
+    
+    <h3>Insecure Stream IDs (should show warning):</h3>
+    <div class="test-grid">
+        <a href="index.html?room=test" class="test-link insecure">test</a>
+        <a href="index.html?room=demo" class="test-link insecure">demo</a>
+        <a href="index.html?room=guest" class="test-link insecure">guest</a>
+        <a href="index.html?room=guest3" class="test-link insecure">guest3</a>
+        <a href="index.html?room=user123" class="test-link insecure">user123</a>
+        <a href="index.html?room=admin" class="test-link insecure">admin</a>
+        <a href="index.html?room=1234" class="test-link insecure">1234</a>
+        <a href="index.html?room=abc" class="test-link insecure">abc (too short)</a>
+        <a href="index.html?room=111" class="test-link insecure">111 (repeated)</a>
+        <a href="index.html?room=room1" class="test-link insecure">room1</a>
+        <a href="index.html?room=cc" class="test-link insecure">cc</a>
+        <a href="index.html?room=caption" class="test-link insecure">caption</a>
+        <a href="index.html?room=caption5" class="test-link insecure">caption5</a>
+        <a href="index.html?room=english" class="test-link insecure">english</a>
+        <a href="index.html?room=stream" class="test-link insecure">stream</a>
+        <a href="index.html?room=show" class="test-link insecure">show</a>
+        <a href="index.html?room=a" class="test-link insecure">a</a>
+        <a href="index.html?room=meeting" class="test-link insecure">meeting</a>
+        <a href="index.html?room=class1" class="test-link insecure">class1</a>
+        <a href="index.html?room=monday" class="test-link insecure">monday</a>
+        <a href="translate.html?room=webinar" class="test-link insecure">translate: webinar</a>
+        <a href="translate.html?room=presenter2" class="test-link insecure">translate: presenter2</a>
+        <a href="translate_premium.html?room=office" class="test-link insecure">premium: office</a>
+        <a href="translate_premium.html?room=january" class="test-link insecure">premium: january</a>
+    </div>
+    
+    <h3>Secure Stream IDs (should NOT show warning):</h3>
+    <div class="test-grid">
+        <a href="index.html?room=Xk9Zp3Qm7N" class="test-link secure">Xk9Zp3Qm7N</a>
+        <a href="index.html?room=MySecureRoom123" class="test-link secure">MySecureRoom123</a>
+        <a href="index.html?room=UniqueID2024" class="test-link secure">UniqueID2024</a>
+        <a href="translate.html?room=ProdMeeting789" class="test-link secure">translate: ProdMeeting789</a>
+        <a href="translate_premium.html?room=SecureStream456" class="test-link secure">premium: SecureStream456</a>
+    </div>
+    
+    <h3>Edge Cases:</h3>
+    <div class="test-grid">
+        <a href="index.html?room=GUEST" class="test-link insecure">GUEST (uppercase)</a>
+        <a href="index.html?room=TeSt" class="test-link insecure">TeSt (mixed case)</a>
+        <a href="index.html?room=guest_user" class="test-link secure">guest_user (underscore)</a>
+        <a href="index.html?room=guestroom" class="test-link secure">guestroom (compound)</a>
+    </div>
+    
+    <div class="description">
+        <p><strong>Note:</strong> The warning will automatically dismiss when transcription/TTS starts.</p>
+    </div>
+</body>
+</html>
