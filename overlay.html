@@ -118,6 +118,19 @@
 	  (translationParams.map(param => urlParams.get(param)).find(val => val) || "en") : false;
 	const langTo = translationLang ? translationLang.split("-")[0] : false;
 
+	// Google Translation settings
+	const googleApiKey = urlParams.get("googlekey") || urlParams.get("gkey") || false;
+	const forceLocal = urlParams.has("forcelocal");
+
+	// Context settings
+	const useContext = urlParams.has("context") || urlParams.has("fullcontext");
+	const contextSize = parseInt(urlParams.get("contextsize")) || 2;
+	let messageHistory = [];
+
+	// Translation cache for Google API
+	const translationCache = new Map();
+	const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
 	// TTS settings initialization - only set if explicitly specified
 	const ttsParams = ["speech", "speak", "tts"];
 	const hasTTS = ttsParams.some(param => urlParams.has(param));
@@ -172,6 +185,60 @@
 			}
 		}
 	}
+	
+	// Google Translation function
+	async function translateViaGoogle(text, sourceLang, targetLang) {
+		if (!googleApiKey || !text.trim()) return null;
+		
+		// Check cache first
+		const cacheKey = `${text}-${sourceLang}-${targetLang}`;
+		const cached = translationCache.get(cacheKey);
+		if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+			return cached.translation;
+		}
+		
+		const url = `https://www.googleapis.com/language/translate/v2/?key=${googleApiKey}&q=${encodeURIComponent(text)}&target=${targetLang}&source=${sourceLang}`;
+		
+		try {
+			const response = await fetch(url, {
+				method: 'GET',
+				headers: {
+					'Content-Type': 'application/json',
+					'Accept': 'application/json'
+				}
+			});
+			
+			if (!response.ok) {
+				throw new Error(`HTTP error! status: ${response.status}`);
+			}
+			
+			const data = await response.json();
+			if (data?.data?.translations?.[0]) {
+				const translation = data.data.translations[0].translatedText;
+				// Cache the translation
+				translationCache.set(cacheKey, {
+					translation: translation,
+					timestamp: Date.now()
+				});
+				return translation;
+			}
+		} catch (error) {
+			console.error('Google Translation error:', error);
+			status(`Translation error: ${error.message}`);
+		}
+		
+		return null;
+	}
+	
+	// Clean up old cache entries periodically
+	setInterval(() => {
+		const now = Date.now();
+		for (const [key, value] of translationCache.entries()) {
+			if (now - value.timestamp > CACHE_DURATION) {
+				translationCache.delete(key);
+			}
+		}
+	}, 60 * 60 * 1000); // Run every hour
 	
 	class TextToSpeech {
 	  constructor(urlParams = new URLSearchParams(window.location.search)) {
@@ -553,52 +620,111 @@
 	// document.body.appendChild(tts.createUI());
 	
 	if (langTo){
-		var langFrom = "en";
-		if (window.Worker) {
-			worker = new Worker("worker.js");
-			worker.postMessage(["import"]);
+		var langFrom = urlParams.get("fromlang") || "en";
+		var needsTranslation = langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase();
+		
+		// Only initialize local translation if translation is needed and no Google API key or force local
+		if (needsTranslation && (!googleApiKey || forceLocal)) {
+			if (window.Worker) {
+				worker = new Worker("worker.js");
+				worker.postMessage(["import"]);
+			}
 		}
 
-		var translateCall = (text, meta, interm=false) => { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+		var translateCall = async (text, meta, interm=false) => { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
 			if (!text.trim().length) return;
-			const paragraphs = text.split("\n");
-			worker.postMessage(["translate", langFrom, langTo, paragraphs, meta, interm]);
-		};
-
-		worker.onmessage = function (e) {
-			if (e.data[0] === "translate_reply" && e.data[1]) {
-				if (!e.data[2]){
-					document.getElementById("output").innerText = e.data[1].join("<br /><br />");
-				} else if (e.data[2].final){
-					e.data[2].final = e.data[1].join("<br /><br />");
-					processReply(e.data[2], (e.data[3]||false));
-				} else if (e.data[2].interm){
-					e.data[2].interm = e.data[1].join("<br /><br />");
-					processReply(e.data[2], (e.data[3]||false));
+			
+			// Check if translation is needed (recalculate in case langFrom changed)
+			needsTranslation = langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase();
+			
+			// Pass through if same language
+			if (!needsTranslation) {
+				if (!meta){
+					document.getElementById("output").innerText = text;
+				} else if (meta.final){
+					// Pass through without translation
+					processReply(meta);
+				} else if (meta.interm){
+					// Pass through without translation
+					processReply(meta);
 				} else {
-					document.getElementById("output").innerText = e.data[1].join("<br /><br />");
+					document.getElementById("output").innerText = text;
 				}
-			} else if (e.data[0] === "load_model_reply" && e.data[1]) {
-				status(e.data[1]);
-			} else if (e.data[0] === "import_reply" && e.data[1]) {
-				modelRegistry = e.data[1];
-				version = e.data[2];
-				init();
+				return;
+			}
+			
+			// Use Google Translation if available and not forced to local
+			if (googleApiKey && !forceLocal) {
+				try {
+					const translation = await translateViaGoogle(text, langFrom, langTo);
+					if (translation) {
+						if (!meta){
+							document.getElementById("output").innerText = translation;
+						} else if (meta.final){
+							meta.final = translation;
+							processReply(meta, interm);
+						} else if (meta.interm){
+							meta.interm = translation;
+							processReply(meta, interm);
+						} else {
+							document.getElementById("output").innerText = translation;
+						}
+					}
+				} catch (error) {
+					console.error("Google translation failed, falling back to local:", error);
+					// Fall back to local translation if Google fails
+					if (worker) {
+						const paragraphs = text.split("\n");
+						worker.postMessage(["translate", langFrom, langTo, paragraphs, meta, interm]);
+					}
+				}
+			} else if (worker) {
+				// Use local translation
+				const paragraphs = text.split("\n");
+				worker.postMessage(["translate", langFrom, langTo, paragraphs, meta, interm]);
 			}
 		};
+
+		if (worker) {
+			worker.onmessage = function (e) {
+				if (e.data[0] === "translate_reply" && e.data[1]) {
+					if (!e.data[2]){
+						document.getElementById("output").innerText = e.data[1].join("<br /><br />");
+					} else if (e.data[2].final){
+						e.data[2].final = e.data[1].join("<br /><br />");
+						processReply(e.data[2], (e.data[3]||false));
+					} else if (e.data[2].interm){
+						e.data[2].interm = e.data[1].join("<br /><br />");
+						processReply(e.data[2], (e.data[3]||false));
+					} else {
+						document.getElementById("output").innerText = e.data[1].join("<br /><br />");
+					}
+				} else if (e.data[0] === "load_model_reply" && e.data[1]) {
+					status(e.data[1]);
+				} else if (e.data[0] === "import_reply" && e.data[1]) {
+					modelRegistry = e.data[1];
+					version = e.data[2];
+					init();
+				}
+			};
+		}
 
 		var isSupported = (lngFrom, lngTo) => {
 			return true; //(`${lngFrom}${lngTo}` in modelRegistry) || ((`${lngFrom}en` in modelRegistry) && (`en${lngTo}` in modelRegistry))
 		}
 
 		var loadModel = () => {
-			if (langFrom !== langTo) {
+			// Recalculate if translation is needed
+			needsTranslation = langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase();
+			
+			if (needsTranslation && worker) {
 				status(`Installing model...`);
 				console.log(`Loading model '${langFrom}${langTo}'`);
 				worker.postMessage(["load_model", langFrom, langTo]);
+			} else if (!needsTranslation) {
+				console.log("Same language - no translation needed");
 			} else {
 				console.log("No model loaded yet");
-				// do nothing.
 			}
 		};
 
@@ -708,14 +834,40 @@
 			currentLanguage = data.ln;
 		  }
 		}
-		if (langTo && data.ln) {
-		  if (langFrom !== data.ln.split("-")[0]) {
-			langFrom = data.ln.split("-")[0];
-			loadModel();
-		  }
-		  translateCall(data.final || data.interm, data, data.interm||false);
+		
+		// Handle context for translation
+		if (langTo && useContext && data.final) {
+			// Store message in history
+			messageHistory.push(data.final);
+			if (messageHistory.length > contextSize + 1) {
+				messageHistory.shift(); // Keep only recent messages
+			}
+			
+			// Create context text
+			const contextText = messageHistory.join(' ');
+			
+			if (data.ln && langFrom !== data.ln.split("-")[0]) {
+				langFrom = data.ln.split("-")[0];
+				// Recalculate if translation is needed after language change
+				needsTranslation = langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase();
+				if (needsTranslation && (!googleApiKey || forceLocal)) {
+					loadModel();
+				}
+			}
+			translateCall(contextText, data, data.interm||false);
+		} else if (langTo) {
+			// Original behavior without context
+			if (data.ln && langFrom !== data.ln.split("-")[0]) {
+				langFrom = data.ln.split("-")[0];
+				// Recalculate if translation is needed after language change
+				needsTranslation = langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase();
+				if (needsTranslation && (!googleApiKey || forceLocal)) {
+					loadModel();
+				}
+			}
+			translateCall(data.final || data.interm, data, data.interm||false);
 		} else {
-		  processReply(data);
+			processReply(data);
 		}
 	  }
 	});

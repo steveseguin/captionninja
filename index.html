@@ -255,14 +255,21 @@
 		<ul>
 			<li>Use Google Chrome or Microsoft Edge for best results. Some users Chrome has a truncation issue though, so maybe just use Edge.</li>
 			<li>To save the transcription: Select all (CTRL+A), copy (CTRL+C), and paste into a text editor (CTRL+V).</li>
-			<li>Change languages by updating the URL. <a href="https://cloud.google.com/speech-to-text/docs/languages" target="_blank">View language codes here</a></li>
+		</ul>
+
+		<strong>🌐 Translation Options:</strong>
+		<ul>
+			<li><a href='./translation-guide.html'>📖 Complete Translation Guide</a> - All translation methods explained</li>
+			<li><a href='./translate'>Free Translation</a> - 17 languages, no API key required</li>
+			<li><a href='./translate_premium'>Premium Translation</a> - 100+ languages with Google Cloud API</li>
+			<li>Quick overlay translation: Add <code>&translate=es</code> (or other <a href="https://cloud.google.com/translate/docs/languages" target="_blank">language code</a>) to any overlay URL</li>
+			<li>Supported free languages: bg, cs, nl, en, et, de, fr, is, it, nb, nn, fa, pl, pt, ru, es, uk</li>
 		</ul>
 
 		<strong>🔬🛠️ Advanced Features:</strong>
 		<ul>
-			<li>Try our <a href='./translate'>LIVE TRANSLATION version here</a>❗ Free to use, along with Text-to-Speech support 🗣️</li>
+			<li>Change input language: Add <code>&lang=fr-FR</code> to the URL (<a href="https://cloud.google.com/speech-to-text/docs/languages" target="_blank">speech recognition codes</a>)</li>
 			<li>Use a <a href='https://www.vb-audio.com/Cable/'>Virtual Audio Cable</a> to caption from other audio sources</li>
-			<li>Add &translate={bg,cs,nl,en,et,de,fr,is,it,nb,nn,fa,pl,pt,ru,es,uk} to the overlay page URL for translation</li>
 		</ul>
 
 		<strong>🆘 Need Help?</strong>
@@ -465,7 +472,7 @@
 	if (isInsecureStreamId(roomID)) {
 		injectSecurityStyles();
 		showSecurityWarning(
-			'Warning: You are using an insecure stream ID that could be easily guessed. Consider using a more secure ID for privacy.',
+			'Warning: You are using an insecure room ID that could be easily guessed. Consider using a more secure ID for privacy.',
 			0 // No auto-dismiss, user must close manually
 		);
 	}

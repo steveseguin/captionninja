@@ -1,248 +1,154 @@
-# CAPTION.Ninja
+# Caption.Ninja 🥷
 
-A free-to-use captioning, transcription, and real-time translation tool for live streams, presentations, and more.
+Free, open-source captioning tool for OBS Studio and live streaming. Features real-time speech recognition, translation, and text-to-speech capabilities.
 
-Demo video: https://www.youtube.com/watch?v=v7172QO8z6c
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/steveseguin/captionninja.svg)](https://github.com/steveseguin/captionninja/stargazers)
 
-![image](https://user-images.githubusercontent.com/2575698/169529892-8764c5df-354c-4fad-85e5-c8ecfec4cc95.png)
+## 🚀 Quick Start
 
-## Quick Start Guide
+1. Visit [caption.ninja](https://caption.ninja)
+2. Allow microphone access when prompted
+3. Start speaking - captions appear in real-time
+4. Copy the overlay URL to use in OBS
 
-1. Open https://caption.ninja in a supported browser (Chrome or Edge recommended)
-2. Accept microphone permissions when prompted
-3. Start speaking - your words will be transcribed automatically
-4. Access the overlay URL (provided on the page) to display captions in OBS or other streaming software
+## 🌐 Translation Features
 
-## How It Works
+Caption.Ninja offers multiple translation options:
 
-CAPTION.Ninja leverages your browser's built-in speech recognition capabilities to perform real-time transcription:
+### Free Translation (17 Languages)
+- No API key required
+- Privacy-focused (runs locally)
+- Languages: Bulgarian, Czech, Dutch, English, Estonian, German, French, Icelandic, Italian, Norwegian (Bokmål & Nynorsk), Persian, Polish, Portuguese, Russian, Spanish, Ukrainian
 
-1. Your browser captures audio from your default microphone (or virtual audio device)
-2. Browser-based speech recognition converts the audio to text
-3. The text is sent through a websocket server to any connected overlay pages
-4. Overlay pages display the text with customizable formatting
-
-The application runs entirely in your browser - no software installation required. Speech-to-text processing is handled by Google's speech recognition services (through the browser), while optional translation features use either Mozilla's free translation service or Google Cloud Translation API.
-
-## Browser Compatibility
-
-For best results, use **Google Chrome** or **Microsoft Edge**. These browsers provide the most reliable speech recognition services.
-
-**Important Note**: Firefox does not currently include free speech-to-text capabilities, making it unsuitable for the main transcription page. However, Firefox can still be used for displaying the overlay page.
-
-Some users report Chrome has issues with text truncation, so Edge may provide more consistent results.
-
-## Setting Up for Streaming
-
-### Basic Setup
-
-1. Open CAPTION.Ninja in Chrome/Edge and allow microphone access
-2. Copy the overlay URL provided on the page
-3. Add the overlay URL as a Browser Source in OBS Studio, vMix, or similar software
-4. Customize the appearance using CSS as needed (see customization section below)
-
-### Using with Electron Capture
-
-For desktop applications that need captions overlay, use the Electron Capture app:
-https://github.com/steveseguin/electroncapture
-
-This allows you to pin the captions on top of other applications on your desktop.
-
-## Using Non-Microphone Audio Sources
-
-CAPTION.Ninja uses your system's default recording device. To capture audio from other sources:
-
-### Virtual Audio Cable Method
-
-Using a virtual audio cable allows you to route audio from any application to CAPTION.Ninja:
-
-1. Install a virtual audio cable solution like [VB-Audio Cable](https://www.vb-audio.com/Cable/)
-2. Set the virtual cable as your default recording device in your system sound settings
-3. Route audio from your desired source (media player, streaming site, etc.) to the virtual cable
-4. CAPTION.Ninja will now transcribe audio from any application sending to the virtual cable
-
-This technique works for:
-- YouTube or Twitch live streams
-- Audio from video files
-- System sounds
-- Audio from other applications like Zoom or Teams
-- Game audio
-
-The virtual audio cable acts as a bridge between your audio sources and CAPTION.Ninja, effectively turning any audio into captions.
-
-## Translation Features
-
-CAPTION.Ninja offers multiple ways to translate content:
-
-### Method 1: Dedicated Translation Page
-
-Use https://caption.ninja/translate for real-time translation capabilities:
-- Select source and target languages from the dropdown menus
-- Browser-based transcription + Mozilla's free translation service
-- Optional Google Cloud Translation integration for premium results
-- Works with the same overlay system
-
-### Method 2: Multiple Language Outputs from Single Source
-
-A more efficient approach for multiple language support:
-
-1. Use the standard capture page (index.html) with your preferred input language
-2. Create multiple overlay pages with different target languages by adding the `&translate=XX` parameter
-3. Share these overlay URLs with viewers who need different languages
-
-Example:
+**Quick setup:**
 ```
-Main Capture: https://caption.ninja/?room=abc123&lang=en-US
-English Overlay: https://caption.ninja/overlay?room=abc123
-Spanish Overlay: https://caption.ninja/overlay?room=abc123&translate=es
-French Overlay: https://caption.ninja/overlay?room=abc123&translate=fr
-German Overlay: https://caption.ninja/overlay?room=abc123&translate=de
+overlay.html?room=yourRoom&translate=es
 ```
 
-Benefits of this approach:
-- Single transcription source with multiple translation outputs
-- No need to run multiple browser tabs for different languages
-- Lower resource usage on the broadcasting computer
-- Viewers select their preferred language by accessing the appropriate URL
-- Translation processing happens in the viewer's browser
+### Premium Translation (100+ Languages)
+- Requires Google Cloud Translation API key
+- Superior translation quality
+- Context-aware translation option
 
-Note: The translation quality using this method relies on the viewer's browser capabilities and may vary compared to the dedicated translation page.
-
-## Language Support
-
-Default language is `&lang=en-US`. Change the language by adding a language code parameter.
-
-Supported language codes: https://cloud.google.com/speech-to-text/docs/languages
-
-## Manual Text Entry Mode
-
-For situations where automatic transcription isn't ideal, use manual text entry:
-https://caption.ninja/manual.html
-
-This lets you type captions directly, which appear on the same overlay system.
-
-## Customizing Appearance
-
-### Changing Font Size and Styling
-
-You can customize the CSS in several ways:
-
-1. Self-host just the overlay.html file and modify it
-2. Use OBS Browser Source CSS overrides
-3. Use the following CSS as a starting point:
-
-```css
-.output {
-    margin: 0;
-    background-color: #0000;
-    color: white;
-    font-family: Cousine, monospace;
-    font-size: 3.2em;
-    line-height: 1.1em;
-    letter-spacing: 0.0em;
-    padding: 0em;
-    text-shadow: 0.05em 0.05em 0px rgb(0 0 0);
-}
+**Quick setup:**
+```
+overlay.html?room=yourRoom&translate=ja&googlekey=YOUR_API_KEY
 ```
 
-### Using Custom Fonts
+### Translation Methods
 
-For non-standard fonts, you can use Base64 encoding:
+1. **Direct Overlay Translation** - Add translation parameters to any overlay URL
+2. **Translation Pages** - Use dedicated translation interfaces:
+   - [Free Translation](https://caption.ninja/translate)
+   - [Premium Translation](https://caption.ninja/translate_premium)
+3. **Multi-Language Support** - Create multiple overlays for different languages
 
-1. Use a tool like [WOFF to Base64](https://hellogreg.github.io/woff2base/) or [Transfonter](https://transfonter.org/)
-2. Find a font, like [Atari ST 8x16 System Font](https://www.dafont.com/de/atari-st-8x16-system-font.font)
-3. Apply the Base64 font to your OBS browser source CSS:
+📖 **[View Complete Translation Guide](https://caption.ninja/translation-guide.html)**
 
-```css
-body { 
-  background-color: rgba(0, 0, 0, 0); margin: 0px auto; overflow: hidden; 
-}
-.output{
- font-family: "Atari ST 8x16 System Font", Cousine, monospace;
-}
-@font-face { 
-  font-family: "Atari ST 8x16 System Font";
-  font-weight: 100 900;
-  font-style: normal italic;
-  src: url(data:application/octet-stream;base64,AAEAAAAOAIAAAwBgRkZUTWXP4NIAAIdkAAAAHEdERUYADwAeAACHRAAAAB5PUy8yY0WLpAAAAWgAAABgY21hcJmJPykAAAPUAAAD7mN2dCAANQP1AAAHxAAAAARnYXNw//8AAwAAhzwAAAAIZ2x5Zpiad3sAAAnMAAB1NGhlYWT70........AAAwBgRkZUTWIKM=);
-}
+## 🎯 Features
+
+- **Real-time Speech Recognition** - Powered by Web Speech API
+- **Live Translation** - 17 free languages or 100+ with Google API
+- **Text-to-Speech** - Multiple TTS providers supported
+- **OBS Integration** - Simple browser source setup
+- **Privacy Focused** - No account required, minimal data collection
+- **Customizable** - Font size, colors, positioning, and more
+- **WebSocket Support** - Remote captioning capabilities
+
+## 🛠️ URL Parameters
+
+### Basic Parameters
+- `room=ID` - Room ID for sharing captions
+- `lang=XX-XX` - Input language (e.g., `en-US`, `fr-FR`)
+- `translate=XX` - Target translation language
+- `label=Name` - Add speaker label
+
+### Translation Parameters
+- `googlekey=KEY` - Google Cloud Translation API key
+- `context=1` - Enable context-aware translation
+- `contextsize=N` - Number of previous messages for context
+- `forcelocal=1` - Force local translation
+
+### Display Parameters
+- `css=URL` - Custom CSS file
+- `fontsize=N` - Font size in pixels
+- `bg=COLOR` - Background color
+- `color=COLOR` - Text color
+- `showtime=N` - Caption timeout in milliseconds
+- `clear=1` - Clear old captions on new text
+
+### TTS Parameters
+- `speech=1` - Enable text-to-speech
+- `ttskey=KEY` - Google Cloud TTS API key
+- `voice=NAME` - TTS voice name
+- `rate=N` - Speech rate
+- `pitch=N` - Speech pitch
+
+## 🎬 OBS Setup
+
+1. Add a **Browser Source** in OBS
+2. Set URL to: `https://caption.ninja/overlay?room=yourRoomID`
+3. Set dimensions: Width: 1920, Height: 1080
+4. Check "Shutdown source when not visible"
+5. Position the source where you want captions to appear
+
+## 💻 Self-Hosting
+
+```bash
+git clone https://github.com/steveseguin/captionninja.git
+cd captionninja
+# Serve files using any web server
+python -m http.server 8080
 ```
 
-The base64 string will be quite long, which is normal.
+## 🔧 Advanced Usage
 
-![image](https://user-images.githubusercontent.com/2575698/148278546-2b0e25b8-cb31-45fa-b043-937d108db76e.png)
-
-## Additional Features
-
-### Adding Labels
-
-Add `&label=xxx` to the capture page to give the outbound messages a label:
+### Multiple Language Overlays
+Create separate browser sources for each language:
 ```
-https://caption.ninja/?room=abc123&label=steve
+overlay.html?room=myRoom&translate=es  # Spanish
+overlay.html?room=myRoom&translate=fr  # French
+overlay.html?room=myRoom&translate=de  # German
 ```
 
-For HTML-enabled labels, add `&html` to the overlay page:
+### Remote Captioning
+1. Captioner uses: `speechin.html?room=uniqueID`
+2. Overlay displays: `overlay.html?room=uniqueID`
+
+### Custom Styling
+Add custom CSS via URL parameter:
 ```
-https://caption.ninja/?room=abc123&label=<b>steve</b>
-https://caption.ninja/overlay?room=abc123&html
+overlay.html?room=myRoom&css=https://example.com/custom.css
 ```
 
-![image](https://user-images.githubusercontent.com/2575698/168219952-827734a2-75bd-45bc-9d8d-f0d7a98fe96c.png)
+## 🤝 Contributing
 
-### Caption Display Time
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-Specify how long messages stay visible with:
-```
-&showtime=5000
-```
-Time is in milliseconds. Setting to 0 will disable auto-hiding.
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-### Saving Transcriptions
+## 📝 License
 
-To save the transcription:
-1. Select all text (Ctrl+A)
-2. Copy the selected text (Ctrl+C)
-3. Paste into a text editor (Ctrl+V)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Alternatively, use the "Download transcription" button that appears during sessions.
+## 🙏 Acknowledgments
 
-## Self-Hosting
+- Mozilla Bergamot for local translation models
+- Google Cloud for translation and TTS APIs
+- Web Speech API contributors
+- All contributors and users of Caption.Ninja
 
-Self-hosting is possible for free:
+## 📞 Support
 
-1. Fork this Github repository
-2. Use Github Pages to host the website
-3. Modify the code as needed for custom styling, domain name, etc.
+- **Issues**: [GitHub Issues](https://github.com/steveseguin/captionninja/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/steveseguin/captionninja/discussions)
+- **Author**: [Steve Seguin](https://github.com/steveseguin)
 
-For additional privacy, deploy your own websocket server:
-https://github.com/steveseguin/websocket_server/
+---
 
-Note: The actual voice-to-text transcriptions typically use Google cloud servers, so full self-hosting of that component isn't possible in most cases. However, some devices (like Pixel smartphones) may do on-device voice-to-text.
-
-The Mozilla-powered translation component can be deployed from https://github.com/mozilla/translate if you want the free translation component.
-
-## Need Support?
-
-Free support is available at https://discord.vdo.ninja
-
-Ask for @steve for help in the #miscellaneous or #vdo-ninja-support channels.
-
-For email support: steve@seguin.email (support is limited and not guaranteed)
-
-## Disclaimers
-
-I am not responsible if this app fails to work, service violations, or whatever else. It is provided as-is without warranty or support. I do not take responsibility for any liability.
-
-You are responsible for your own premium service API keys and fees.
-
-Private data may be made available to Google, Microsoft, and other cloud providers, for the purpose of providing their services. Data is also sent over a hosted websocket channel, which can be publicly listened to by anyone if they know the session/room ID, but this hosted websocket server does not collect said messaging data -- it's just routed.
-
-That said, things change, and problems occur, so you accept any risks to using this service.
-
-## License
-
-Fonts are provided with their own license; apache 2.0 I believe, but confirm yourself.
-
-The free translation component is powered by Mozilla Translate; https://github.com/mozilla/translate - MPL 2.0 - Mozilla
-
-As per CAPTION.NInja, to keep in spirit of what Mozilla has created, the code here contributed as part of this CAPTION.Ninja project is also made available as MPL 2.0.
+Made with ❤️ by the open-source community

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caption.Ninja Translation Guide</title>
+    <style>
+        :root {
+            --primary-color: #2498Eb;
+            --secondary-color: #2c3e50;
+            --background-color: #f5f5f5;
+            --text-color: #333;
+            --border-radius: 4px;
+            --card-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: var(--secondary-color);
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h2 {
+            color: var(--secondary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-top: 40px;
+        }
+
+        h3 {
+            color: var(--primary-color);
+            margin-top: 25px;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            box-shadow: var(--card-shadow);
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+
+        .comparison-table th {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .comparison-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        .method-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: var(--card-shadow);
+        }
+
+        .example-box {
+            background: #f0f0f0;
+            border-left: 4px solid var(--primary-color);
+            padding: 15px;
+            margin: 15px 0;
+            font-family: monospace;
+            overflow-x: auto;
+        }
+
+        .language-list {
+            background: #e9e9e9;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            margin: 15px 0;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .info-box {
+            background: #d1ecf1;
+            border-left: 4px solid #0c5460;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        code {
+            background: #e9e9e9;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        .nav-links {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+        }
+
+        .nav-links a {
+            margin: 0 15px;
+            font-weight: bold;
+        }
+
+        ul {
+            line-height: 2;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+        }
+
+        .feature-card h4 {
+            color: var(--primary-color);
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🌐 Caption.Ninja Translation Guide</h1>
+    
+    <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/translate">Free Translation</a>
+        <a href="/translate_premium">Premium Translation</a>
+        <a href="https://github.com/steveseguin/captionninja">GitHub</a>
+    </div>
+
+    <div class="info-box">
+        <strong>Quick Start:</strong> Caption.Ninja offers multiple ways to translate captions in real-time. Choose between free local translation (17 languages) or premium Google Cloud Translation (100+ languages).
+    </div>
+
+    <h2>Translation Methods Overview</h2>
+    
+    <table class="comparison-table">
+        <thead>
+            <tr>
+                <th>Method</th>
+                <th>Languages</th>
+                <th>Cost</th>
+                <th>Quality</th>
+                <th>Setup Required</th>
+                <th>Best For</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Local Translation</strong><br>(Mozilla Bergamot)</td>
+                <td>17 languages</td>
+                <td>Free</td>
+                <td>Good</td>
+                <td>None</td>
+                <td>Personal use, privacy-focused</td>
+            </tr>
+            <tr>
+                <td><strong>Google Cloud Translation</strong></td>
+                <td>100+ languages</td>
+                <td>Pay-per-use</td>
+                <td>Excellent</td>
+                <td>API Key required</td>
+                <td>Professional, multi-language</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>Method 1: Direct Overlay Translation (Simplest)</h2>
+    
+    <div class="method-card">
+        <h3>Free Local Translation</h3>
+        <p>Add translation directly to any overlay URL using Mozilla's Bergamot translation engine.</p>
+        
+        <div class="example-box">
+            overlay.html?room=yourRoomID&translate=es
+        </div>
+        
+        <h4>Supported Languages:</h4>
+        <div class="language-list">
+            <code>bg</code> (Bulgarian), <code>cs</code> (Czech), <code>nl</code> (Dutch), <code>en</code> (English), 
+            <code>et</code> (Estonian), <code>de</code> (German), <code>fr</code> (French), <code>is</code> (Icelandic), 
+            <code>it</code> (Italian), <code>nb</code> (Norwegian Bokmål), <code>nn</code> (Norwegian Nynorsk), 
+            <code>fa</code> (Persian), <code>pl</code> (Polish), <code>pt</code> (Portuguese), <code>ru</code> (Russian), 
+            <code>es</code> (Spanish), <code>uk</code> (Ukrainian)
+        </div>
+        
+        <h4>URL Parameters:</h4>
+        <ul>
+            <li><code>translate=XX</code> - Target language code</li>
+            <li><code>lang=XX</code> - Alternative parameter (same as translate)</li>
+            <li><code>ln=XX</code> - Alternative parameter (same as translate)</li>
+            <li><code>fromlang=XX</code> - Override source language detection (default: auto-detect)</li>
+        </ul>
+    </div>
+
+    <div class="method-card">
+        <h3>Google Cloud Translation in Overlay</h3>
+        <p>Use Google's premium translation API directly in the overlay for 100+ languages.</p>
+        
+        <div class="example-box">
+            overlay.html?room=yourRoomID&translate=es&googlekey=YOUR_API_KEY
+        </div>
+        
+        <h4>Additional Parameters:</h4>
+        <ul>
+            <li><code>googlekey=KEY</code> or <code>gkey=KEY</code> - Your Google Cloud API key</li>
+            <li><code>context=1</code> - Enable context-aware translation</li>
+            <li><code>contextsize=3</code> - Number of previous messages for context (default: 2)</li>
+            <li><code>forcelocal=1</code> - Force local translation even with API key</li>
+        </ul>
+
+        <div class="info-box">
+            <strong>Get Google API Key:</strong> <a href="https://console.cloud.google.com/apis/api/translate.googleapis.com/credentials" target="_blank">Google Cloud Console</a>
+        </div>
+    </div>
+
+    <h2>Method 2: Premium Translation Page</h2>
+    
+    <div class="method-card">
+        <p>The <a href="/translate_premium">premium translation page</a> provides a full interface for speech recognition and translation.</p>
+        
+        <h4>Features:</h4>
+        <ul>
+            <li>Speech recognition with language selection</li>
+            <li>Real-time translation with Google Cloud API</li>
+            <li>Context-aware translation option</li>
+            <li>Incremental updates for faster response</li>
+            <li>Generates overlay URL automatically</li>
+        </ul>
+        
+        <h4>Workflow:</h4>
+        <ol>
+            <li>Open <code>translate_premium.html</code></li>
+            <li>Enter your Google API key</li>
+            <li>Select source and target languages</li>
+            <li>Enable microphone and start speaking</li>
+            <li>Use the generated overlay URL in OBS</li>
+        </ol>
+    </div>
+
+    <h2>Method 3: Free Translation Page</h2>
+    
+    <div class="method-card">
+        <p>The <a href="/translate">free translation page</a> uses local Mozilla Bergamot models.</p>
+        
+        <h4>Features:</h4>
+        <ul>
+            <li>No API key required</li>
+            <li>Privacy-focused (translation happens locally)</li>
+            <li>Limited to 17 languages</li>
+            <li>Works offline once models are loaded</li>
+        </ul>
+        
+        <div class="warning-box">
+            <strong>Note:</strong> First-time use requires downloading translation models (~20MB per language pair).
+        </div>
+    </div>
+
+    <h2>Advanced Features</h2>
+
+    <div class="feature-grid">
+        <div class="feature-card">
+            <h4>🌍 Multiple Language Overlays</h4>
+            <p>Create separate overlay windows for different languages:</p>
+            <div class="example-box">
+                Window 1: overlay.html?room=abc&translate=es<br>
+                Window 2: overlay.html?room=abc&translate=fr<br>
+                Window 3: overlay.html?room=abc&translate=de
+            </div>
+        </div>
+
+        <div class="feature-card">
+            <h4>📝 Context-Aware Translation</h4>
+            <p>Include previous messages for better translation accuracy:</p>
+            <div class="example-box">
+                &context=1&contextsize=5
+            </div>
+            <p>Especially useful for conversations and technical content.</p>
+        </div>
+
+        <div class="feature-card">
+            <h4>🔊 Text-to-Speech Integration</h4>
+            <p>Add speech synthesis to translated captions:</p>
+            <div class="example-box">
+                &speech=1&voice=Google US English
+            </div>
+            <p>Supports native browser TTS and premium services.</p>
+        </div>
+
+        <div class="feature-card">
+            <h4>🎨 Styling Options</h4>
+            <p>Customize overlay appearance:</p>
+            <div class="example-box">
+                &clear=1&showtime=3000&html=1
+            </div>
+            <p>Control caption persistence and formatting.</p>
+        </div>
+    </div>
+
+    <h2>Language Codes Reference</h2>
+    
+    <div class="info-box">
+        <p><strong>Full Language Code List:</strong> View all supported language codes at:</p>
+        <ul>
+            <li><a href="https://cloud.google.com/translate/docs/languages" target="_blank">Google Cloud Translation Languages</a> (100+ languages)</li>
+            <li><a href="https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes" target="_blank">ISO 639-1 Language Codes</a></li>
+        </ul>
+    </div>
+
+    <h2>Common Use Cases</h2>
+
+    <div class="method-card">
+        <h3>Live Streaming with Multi-Language Support</h3>
+        <ol>
+            <li>Set up your main caption source (e.g., <code>speechin.html</code>)</li>
+            <li>Create multiple overlay URLs with different target languages</li>
+            <li>Add each overlay as a separate browser source in OBS</li>
+            <li>Position overlays for different regions or create scene variants</li>
+        </ol>
+    </div>
+
+    <div class="method-card">
+        <h3>International Conferences</h3>
+        <ol>
+            <li>Use <code>translate_premium.html</code> for source language input</li>
+            <li>Enable context-aware translation for accuracy</li>
+            <li>Create overlay URLs for each target language</li>
+            <li>Provide separate streams or overlay options for attendees</li>
+        </ol>
+    </div>
+
+    <h2>Troubleshooting</h2>
+
+    <div class="warning-box">
+        <h4>Common Issues:</h4>
+        <ul>
+            <li><strong>WASM Loading Error:</strong> Occurs when trying to load translation for same source/target language. Solution: Remove translation parameter or ensure source and target differ.</li>
+            <li><strong>API Key Invalid:</strong> Ensure your Google Cloud Translation API is enabled and key has proper permissions.</li>
+            <li><strong>No Translation Happening:</strong> Check browser console for errors. Verify language codes are correct.</li>
+            <li><strong>Rate Limiting:</strong> Google API has quotas. Consider caching or reducing update frequency.</li>
+        </ul>
+    </div>
+
+    <h2>Cost Considerations</h2>
+
+    <div class="method-card">
+        <h3>Google Cloud Translation Pricing</h3>
+        <ul>
+            <li>First 500,000 characters per month: Free</li>
+            <li>Beyond 500,000 characters: ~$20 per million characters</li>
+            <li>Prices vary by region and features used</li>
+        </ul>
+        
+        <div class="info-box">
+            <strong>Cost Optimization Tips:</strong>
+            <ul>
+                <li>Enable caching in overlay (automatic)</li>
+                <li>Avoid incremental updates for cost savings</li>
+                <li>Use context wisely (increases character count)</li>
+                <li>Consider local translation for supported languages</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="nav-links">
+        <a href="/">Back to Home</a>
+        <a href="https://github.com/steveseguin/captionninja/issues">Report Issues</a>
+        <a href="https://github.com/steveseguin/captionninja">Contribute</a>
+    </div>
+
+    <footer style="text-align: center; margin-top: 50px; padding: 20px; color: #666;">
+        <p>Caption.Ninja - Free and Open Source Captioning Tool</p>
+        <p>Made with ❤️ by <a href="https://github.com/steveseguin">Steve Seguin</a></p>
+    </footer>
+</body>
+</html>
