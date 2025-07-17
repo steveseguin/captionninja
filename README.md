@@ -2,7 +2,7 @@
 
 Free, open-source captioning tool for OBS Studio and live streaming. Features real-time speech recognition, translation, and text-to-speech capabilities.
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MPL-blue.svg)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/steveseguin/captionninja.svg)](https://github.com/steveseguin/captionninja/stargazers)
 
 ## 🚀 Quick Start
