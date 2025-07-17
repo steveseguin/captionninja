@@ -148,7 +148,6 @@ This Source Code Form is subject to the terms of the Mozilla Public License, v. 
 ## 📞 Support
 
 - **Issues**: [GitHub Issues](https://github.com/steveseguin/captionninja/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/steveseguin/captionninja/discussions)
 - **Author**: [Steve Seguin](https://github.com/steveseguin)
 
 ---
