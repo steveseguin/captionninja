@@ -742,6 +742,11 @@
 		    console.log("FINAL:", final_transcript);
 		    startd = true;
 		    try {
+		      // Re-initialize timestamp_intern if it's null (for all transcripts after the first)
+		      if (timestamp_intern === null) {
+		        timestamp_intern = Date.now();
+		      }
+		      
 		      timestamp_stop = Date.now();
 		      timestamp_stop = Date.now() - timestamp_start;
 		      var date = new Date(0);
