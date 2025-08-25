@@ -54,11 +54,10 @@
 	</style>
 </head>
 <body>
-	 
+	
 	<div id="interm" class="output"></div>
 	<div id="output" class="output"></div>
 	<div id="status" style="display:none;"></div>
-	<script src="tts-integration.js"></script>
 	<script>
 	
 	(function (w) {
@@ -622,10 +621,9 @@
 	
 	if (langTo){
 		var langFrom = urlParams.get("fromlang") || "en";
-		var needsTranslation = langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase();
 		
-		// Only initialize local translation if translation is needed and no Google API key or force local
-		if (needsTranslation && (!googleApiKey || forceLocal)) {
+		// Only initialize local translation if no Google API key or force local
+		if (!googleApiKey || forceLocal) {
 			if (window.Worker) {
 				worker = new Worker("worker.js");
 				worker.postMessage(["import"]);
@@ -634,25 +632,6 @@
 
 		var translateCall = async (text, meta, interm=false) => { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
 			if (!text.trim().length) return;
-			
-			// Check if translation is needed (recalculate in case langFrom changed)
-			needsTranslation = langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase();
-			
-			// Pass through if same language
-			if (!needsTranslation) {
-				if (!meta){
-					document.getElementById("output").innerText = text;
-				} else if (meta.final){
-					// Pass through without translation
-					processReply(meta);
-				} else if (meta.interm){
-					// Pass through without translation
-					processReply(meta);
-				} else {
-					document.getElementById("output").innerText = text;
-				}
-				return;
-			}
 			
 			// Use Google Translation if available and not forced to local
 			if (googleApiKey && !forceLocal) {
@@ -715,17 +694,13 @@
 		}
 
 		var loadModel = () => {
-			// Recalculate if translation is needed
-			needsTranslation = langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase();
-			
-			if (needsTranslation && worker) {
+			if (langFrom !== langTo && worker) {
 				status(`Installing model...`);
 				console.log(`Loading model '${langFrom}${langTo}'`);
 				worker.postMessage(["load_model", langFrom, langTo]);
-			} else if (!needsTranslation) {
-				console.log("Same language - no translation needed");
 			} else {
 				console.log("No model loaded yet");
+				// do nothing.
 			}
 		};
 
@@ -754,23 +729,8 @@
 	} else if (urlParams.has("ROOM")){
 		roomID = urlParams.get("ROOM");
 	} else {
-		// Try to use a previously stored room ID before redirecting
-		try {
-			var storedRoom = localStorage.getItem('cn_room_id') || "";
-			if (storedRoom && /^[A-Za-z0-9]{12,}$/.test(storedRoom)) {
-				roomID = storedRoom;
-				if (typeof updateURL === 'function') {
-					updateURL("room="+roomID);
-				}
-			} else {
-				window.location.href = "./speechin";
-			}
-		} catch (e) {
-			window.location.href = "./speechin";
-		}
+		window.location.href = "./speechin";
 	}
-	// Persist the room ID for future sessions
-	try { localStorage.setItem('cn_room_id', roomID); } catch (e) {}
 	
 	var clearOnNew = false;
 	if (urlParams.has("clear")){
@@ -864,9 +824,7 @@
 			
 			if (data.ln && langFrom !== data.ln.split("-")[0]) {
 				langFrom = data.ln.split("-")[0];
-				// Recalculate if translation is needed after language change
-				needsTranslation = langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase();
-				if (needsTranslation && (!googleApiKey || forceLocal)) {
+				if (!googleApiKey || forceLocal) {
 					loadModel();
 				}
 			}
@@ -875,9 +833,7 @@
 			// Original behavior without context
 			if (data.ln && langFrom !== data.ln.split("-")[0]) {
 				langFrom = data.ln.split("-")[0];
-				// Recalculate if translation is needed after language change
-				needsTranslation = langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase();
-				if (needsTranslation && (!googleApiKey || forceLocal)) {
+				if (!googleApiKey || forceLocal) {
 					loadModel();
 				}
 			}
@@ -907,7 +863,7 @@
 	
 	function processReply(data){
 		var newLabel = false;
-		 
+		
 		if (data.label){
 			console.log(data.label);
 			try {
@@ -923,27 +879,10 @@
 		// console.log(data);
 		if ("interm" in data){
 			document.getElementById("interm").innerHTML = label+"<span>"+sanitize(data.interm)+"</span><br/>";
-			// Optional streaming TTS via tts.rocks when requested
-			try {
-				if (window.CAPTION_TTS && window.CAPTION_TTS.stream && typeof window.CAPTION_TTS.speak === 'function') {
-					window.CAPTION_TTS.speak(data.interm, true);
-				}
-			} catch(e){ console.warn(e); }
 		} else if ("final" in data){
-		 
-			// Decide between built-in overlay TTS and external tts.rocks
-			var provider = (urlParams.get('ttsprovider')||'').toLowerCase();
-			var forceExternal = (urlParams.get('ttslib')||'').toLowerCase() === 'rocks';
-			var externalPreferred = forceExternal || ['kokoro','piper','espeak','kitten','openai'].includes(provider);
-			try {
-				if (externalPreferred && window.CAPTION_TTS && typeof window.CAPTION_TTS.speak === 'function') {
-					window.CAPTION_TTS.speak(data.final);
-				} else {
-					// Fall back to built-in overlay TTS
-					tts.speak(data.final);
-				}
-			} catch(e){ console.warn(e); }
-		 
+		
+			tts.speak(data.final);
+		
 			if (clearOnNew || data.c){
 				document.getElementById("output").innerHTML = label+"<span>"+sanitize(data.final)+"</span><br/>";
 			} else {
@@ -968,17 +907,7 @@
 	socket.onclose = function (){
 		setTimeout(function(){window.location.reload(true);},100);
 	};
-
-	// Optional: open a separate TTS window powered by tts.rocks bridge
-	try {
-	  if (urlParams.has('ttspopout')) {
-	    var qs = new URLSearchParams(window.location.search);
-	    qs.set('room', roomID);
-	    var bridgeUrl = window.location.origin + window.location.pathname.replace(/\/[^^/]*$/, '') + '/tts.rocks/caption-bridge.html?' + qs.toString();
-	    window.open(bridgeUrl, '_blank', 'noopener');
-	  }
-	} catch (e) { console.warn(e); }
-	 
+	
 	</script>
 	</body>
 </html>

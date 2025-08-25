@@ -287,6 +287,7 @@
 	<button id="toggleTranscription" class="hidden control-button">Pause Transcription</button>
 
 	<script src="security-utils.js"></script>
+	<script src="tts-integration.js"></script>
 	<script>
 	
 	function detectTextDirection(text) {
@@ -449,6 +450,16 @@
 
 		return text;
 	};
+
+	// Secure alphanumeric room ID generator (>=12 chars)
+	function generateSecureRoomID(len = 16) {
+		const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+		let out = '';
+		for (let i = 0; i < len; i++) {
+			out += chars.charAt(Math.floor(Math.random() * chars.length));
+		}
+		return out;
+	}
 	
 	function generateStreamID(){
 		var text = "";
@@ -459,14 +470,20 @@
 		return text;
 	};
 	var roomID = "test";
+	let storedRoom = "";
+	try { storedRoom = localStorage.getItem('cn_room_id') || ""; } catch (e) {}
 	if (urlParams.has("room")){
 		roomID = urlParams.get("room");
 	} else if (urlParams.has("ROOM")){
 		roomID = urlParams.get("ROOM");
+	} else if (storedRoom && /^[A-Za-z0-9]{12,}$/.test(storedRoom)) {
+		roomID = storedRoom;
+		updateURL("room="+roomID);
 	} else {
-		roomID = generateRandomString();
+		roomID = generateSecureRoomID(16);
 		updateURL("room="+roomID);
 	}
+	try { localStorage.setItem('cn_room_id', roomID); } catch (e) {}
 	
 	// Check for insecure stream ID and show warning
 	if (isInsecureStreamId(roomID)) {
@@ -703,6 +720,10 @@
 		        } else {
 		          socket.send(JSON.stringify({"msg":true, "final":transcript, "id":counter, "ln": myLang}));
 		        }
+		        // Optional: speak final results locally if TTS is enabled
+		        if (window.CAPTION_TTS && typeof window.CAPTION_TTS.speak === 'function') {
+		          window.CAPTION_TTS.speak(transcript);
+		        }
 		      } catch(e) {
 		        console.error(e);
 		      }
@@ -722,6 +743,10 @@
 		        socket.send(JSON.stringify({"msg":true, "interm":interim_transcript.trim(), "id":counter, "label":label, "ln": myLang}));
 		      } else {
 		        socket.send(JSON.stringify({"msg":true, "interm":interim_transcript.trim(), "id":counter, "ln": myLang}));
+		      }
+		      // Optional: streaming TTS for interim when explicitly requested
+		      if (window.CAPTION_TTS && window.CAPTION_TTS.stream && typeof window.CAPTION_TTS.speak === 'function') {
+		        window.CAPTION_TTS.speak(interim_transcript.trim(), true);
 		      }
 		    } catch(e) {
 		      console.error(e);
@@ -765,6 +790,10 @@
 		      timestamp_intern = null;
 		      srtFile += ">> " + final_transcript + "\n\n";
 		      setStorage("transcription_"+roomID+"_"+timestamp_start, srtFile, 1);
+		      // Speak any aggregated final text that was appended on end
+		      if (window.CAPTION_TTS && typeof window.CAPTION_TTS.speak === 'function') {
+		        window.CAPTION_TTS.speak(final_transcript);
+		      }
 		      
 		      if (logcounter === 1) {
 		        // UI setup code remains unchanged
@@ -808,6 +837,17 @@
 		}
 	  }
 	}
+
+	// Optional: open a separate TTS window powered by tts.rocks bridge
+	try {
+	  if (urlParams.has('ttspopout')) {
+	    var qs = new URLSearchParams(window.location.search);
+	    // Ensure room param is present
+	    qs.set('room', roomID);
+	    var bridgeUrl = window.location.origin + window.location.pathname.replace(/\/[^^/]*$/, '') + '/tts.rocks/caption-bridge.html?' + qs.toString();
+	    window.open(bridgeUrl, '_blank', 'noopener');
+	  }
+	} catch (e) { console.warn(e); }
 			
 	if (urlParams.has("test")){
 		setInterval(function(){

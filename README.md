@@ -144,6 +144,25 @@ This provides professional-grade translation quality while maintaining the simpl
 
 For a comprehensive guide to all translation features, visit: https://caption.ninja/translation-guide.html
 
+## TTS Integration
+
+Caption.Ninja can read captions aloud using browser/system TTS or the tts.rocks engine (Kokoro, Piper, ElevenLabs, Google, OpenAI, etc.). Enable it via URL parameters; nothing changes by default.
+
+- Overlay readout: `overlay.html?room=abc123&tts=en-US`
+  - Built‑in providers: `&ttsprovider=google&ttskey=YOUR_KEY`, `&ttsprovider=elevenlabs&elevenlabskey=KEY&voice11=VOICE_ID`
+  - Use tts.rocks engine: `&ttslib=rocks&ttsprovider=kokoro&voicekokoro=af_aoede&korospeed=1.0`
+  - Optional interim streaming: `&ttsstream=1`
+- Capture readout: `index.html?room=abc123&lang=en-US&tts=en-US`
+- Manual readout: `manual.html?room=abc123&tts=en-US`
+- Pop‑out TTS window (tts.rocks bridge): add `&ttspopout=1` to auto‑open, or go directly:
+  - `tts.rocks/caption-bridge.html?room=abc123&tts=en-US&ttsprovider=kokoro`
+
+Quick discovery (GUI):
+- tts.rocks homepage now includes a “Use with Caption.Ninja” panel to generate ready‑to‑use links (Overlay, Capture, Manual, Bridge) based on your chosen engine, keys, voices, and rates.
+- Voice picker and URL builder: `tts.rocks/tts.html` lists local voices and generates example URLs.
+
+Security note: API keys in URLs are visible to anyone with the link. Prefer local/native providers when possible, or only share overlays that do not embed keys.
+
 ## Language Support
 
 Default language is `&lang=en-US`. Change the language by adding a language code parameter.
