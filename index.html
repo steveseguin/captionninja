@@ -506,11 +506,55 @@
 		updateURL("lang="+myLang);
 	}
 	console.log("Language: "+myLang);
-	var srtFile = "";
-	var timestamp_start = null
-	var timestamp_stop = null
-	var timestamp_intern  = null;
-	var logcounter=0;
+var srtFile = "";
+var timestamp_start = null
+var timestamp_stop = null
+var timestamp_intern  = null;
+var logcounter=0;
+// Track previous cue's end time in ms (relative to session start)
+var lastStopMs = 0;
+// Maintain structured cues so we can post-trim to avoid overlaps
+var srtCues = []; // {startMs, endMs, text}
+// minimum duration for a cue (override with &minCueMs=###)
+var MIN_CUE_MS = (function() {
+  var val = urlParams && urlParams.get && urlParams.get('minCueMs');
+  var n = parseInt(val, 10);
+  return (Number.isFinite(n) && n >= 0) ? n : 500;
+})();
+
+function formatSrtTime(ms) {
+  var t = Math.max(0, Math.floor(ms));
+  var hh = Math.floor(t / 3600000); t -= hh * 3600000;
+  var mm = Math.floor(t / 60000);   t -= mm * 60000;
+  var ss = Math.floor(t / 1000);    t -= ss * 1000;
+  var ms3 = t;
+  function pad(n, len) { n = String(n); while (n.length < len) n = '0' + n; return n; }
+  return pad(hh,2) + ':' + pad(mm,2) + ':' + pad(ss,2) + ',' + pad(ms3,3);
+}
+
+function rebuildSrtFile() {
+  var out = "";
+  // Create a shallow copy to adjust on render, ensuring non-overlap & min durations
+  for (var i = 0; i < srtCues.length; i++) {
+    var c = srtCues[i];
+    var start = Math.max(0, c.startMs|0);
+    var end = Math.max(start, c.endMs|0);
+    var nextStart = (i+1 < srtCues.length) ? Math.max(0, srtCues[i+1].startMs|0) : null;
+
+    // Enforce minimum duration when possible
+    var desiredEnd = Math.max(end, start + MIN_CUE_MS);
+    if (nextStart !== null && desiredEnd > nextStart) {
+      end = nextStart; // don't overlap next
+    } else {
+      end = desiredEnd;
+    }
+
+    out += (i+1) + "\n";
+    out += formatSrtTime(start) + " --> " + formatSrtTime(end) + "\n";
+    out += ">> " + c.text + "\n\n";
+  }
+  srtFile = out;
+}
 	var counter=0;
 	var url = document.URL.substr(0,document.URL.lastIndexOf('/'));
 	var oldSaves = Object.keys(localStorage);
@@ -735,8 +779,10 @@
 		    }
 		  }
 		  
-		  if (interim_transcript.trim()) {
-		    const direction = detectTextDirection(interim_transcript);
+  if (interim_transcript.trim()) {
+    // Mark the start of this segment on first interim token
+    if (timestamp_intern === null) { timestamp_intern = Date.now(); }
+    const direction = detectTextDirection(interim_transcript);
 		    document.getElementById("interm").innerHTML = `<span dir='${direction}'>${interim_transcript.trim()}</span><br />`;
 		    
 		    try {
@@ -756,54 +802,72 @@
 		  
 		  final_transcript = new_final_transcript.trim();
 		  
-		  if (final_transcript && timestamp_start === null) {
-		    timestamp_start = Date.now();
-		    timestamp_intern = Date.now();
-		  } else if (interim_transcript.trim() && timestamp_start === null) {
-		    timestamp_start = Date.now();
-		    timestamp_intern = Date.now();
-		  }
+      // Initialize session start once; do not set per-cue start here
+      if (timestamp_start === null) {
+        timestamp_start = Date.now();
+      }
 		  
 		  if (final_transcript) {
 		    console.log("FINAL:", final_transcript);
 		    startd = true;
 		    try {
-		      // Re-initialize timestamp_intern if it's null (for all transcripts after the first)
-		      if (timestamp_intern === null) {
-		        timestamp_intern = Date.now();
-		      }
-		      
-		      timestamp_stop = Date.now();
-		      timestamp_stop = Date.now() - timestamp_start;
-		      var date = new Date(0);
-		      date.setSeconds(timestamp_stop/1000);
-		      timestamp_stop = date.toISOString().replace(".",",").replace("1970-01-01T","");
-		      timestamp_stop = timestamp_stop.substring(0, timestamp_stop.length - 1);
-		      timestamp_intern -= timestamp_start;
-		      var date = new Date(0);
-		      date.setSeconds(timestamp_intern/1000);
-		      timestamp_intern = date.toISOString().replace(".",",").replace("1970-01-01T","");
-		      timestamp_intern = timestamp_intern.substring(0, timestamp_intern.length - 1);
-		      
-		      logcounter += 1;
-		      srtFile += logcounter + "\n";
-		      srtFile += timestamp_intern + " --\> " + timestamp_stop + "\n";
-		      timestamp_intern = null;
-		      srtFile += ">> " + final_transcript + "\n\n";
+      // Compute start and end times for this cue
+      // End time is now relative to session start
+      var endMs = Date.now() - timestamp_start;
+      // Start time is when the first interim of this segment arrived; if we didn't
+      // get any interim (edge case), fall back to previous cue's end
+      var startMs;
+      if (timestamp_intern === null) {
+        // Prefer last cue's end if we have trimmed it; fallback to lastStopMs
+        if (srtCues.length > 0) {
+          startMs = srtCues[srtCues.length - 1].endMs;
+        } else {
+          startMs = lastStopMs;
+        }
+      } else {
+        startMs = timestamp_intern - timestamp_start;
+      }
+
+      // Enforce minimum cue duration unless it would overlap the next cue
+      if ((endMs - startMs) < MIN_CUE_MS) {
+        endMs = startMs + MIN_CUE_MS;
+      }
+
+      // If this cue starts before/at the previous cue's end, trim the previous cue
+      // and try to keep at least MIN_CUE_MS when there is room.
+      if (srtCues.length > 0) {
+        var prev = srtCues[srtCues.length - 1];
+        var maxEndAllowed = startMs; // cannot exceed new cue's start
+        var minEndDesired = prev.startMs + MIN_CUE_MS; // prefer this if space allows
+        // First, ensure previous meets minimum if possible; then clamp to avoid overlap
+        prev.endMs = Math.min(maxEndAllowed, Math.max(prev.endMs, minEndDesired));
+        // Never allow end before start (can happen if maxEndAllowed < start+min)
+        if (prev.endMs < prev.startMs) prev.endMs = prev.startMs;
+      }
+
+      // Add this cue
+      srtCues.push({ startMs: startMs, endMs: endMs, text: final_transcript });
+      rebuildSrtFile();
+
+      // Prepare for the next segment
+      lastStopMs = endMs;
+      timestamp_intern = null;
 		      setStorage("transcription_"+roomID+"_"+timestamp_start, srtFile, 1);
 		      // Speak any aggregated final text that was appended on end
 		      if (window.CAPTION_TTS && typeof window.CAPTION_TTS.speak === 'function') {
 		        window.CAPTION_TTS.speak(final_transcript);
 		      }
 		      
-		      if (logcounter === 1) {
-		        // UI setup code remains unchanged
-		        var button = document.createElement("button");
-		        button.onclick = function() {
-		          download("transcription_"+roomID+"_"+timestamp_start+".srt", srtFile);
-		        };
-		        button.innerHTML = "Download transcription";
-		        button.className = "control-button";
+      if (srtCues.length === 1) {
+        // UI setup code remains unchanged
+        var button = document.createElement("button");
+        button.onclick = function() {
+          // Rebuild just before download to guarantee latest min/trim rules
+          try { rebuildSrtFile(); } catch (e) { console.warn(e); }
+          download("transcription_"+roomID+"_"+timestamp_start+".srt", srtFile);
+        };
+        button.innerHTML = "Download transcription";
+        button.className = "control-button";
 		
 		        var shareButton = document.createElement("button");
 		        shareButton.onclick = function() {

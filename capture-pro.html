@@ -1,0 +1,351 @@
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+  <meta content="utf-8" http-equiv="encoding" />
+  <title>CAPTION.Ninja — Capture Pro</title>
+  <style>
+    :root {
+      --bg: #0b0c10;
+      --panel: #151820;
+      --text: #e6e9ef;
+      --muted: #9aa3b2;
+      --primary: #2498eb;
+      --danger: #dc3545;
+      --success: #1db954;
+      --warning: #f0ad4e;
+      --radius: 8px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      display: grid; grid-template-rows: auto 1fr auto; gap: 10px;
+    }
+    .toolbar {
+      display: flex; gap: 8px; align-items: center; padding: 10px; background: var(--panel);
+      position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #202532;
+    }
+    .spacer { flex: 1; }
+    .pill { padding: 6px 10px; border-radius: 20px; font-size: 12px; background: #1e2430; color: var(--muted); }
+    .pill.ok { color: #c8ffd7; background: rgba(29,185,84,.15); border: 1px solid rgba(29,185,84,.4); }
+    .pill.warn { color: #ffe3b3; background: rgba(240,173,78,.12); border: 1px solid rgba(240,173,78,.35); }
+    .pill.err { color: #ffd0d0; background: rgba(220,53,69,.12); border: 1px solid rgba(220,53,69,.35); }
+    button, select { 
+      background: #232a36; color: var(--text); border: 1px solid #2d3543; border-radius: 6px; padding: 8px 12px; 
+      font-weight: 600; cursor: pointer; font-size: 14px;
+    }
+    button.primary { background: var(--primary); border-color: var(--primary); color: white; }
+    button.ghost { background: transparent; border-color: #384252; color: var(--muted); }
+    button.danger { background: var(--danger); border-color: var(--danger); color: white; }
+    button[disabled] { opacity: .6; cursor: not-allowed; }
+    .output-wrap { padding: 10px; display: grid; grid-template-columns: 1fr; gap: 10px; }
+    .panel { background: var(--panel); border: 1px solid #202532; border-radius: var(--radius); padding: 10px; }
+    .viewer { font-family: Cousine, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .final { font-size: 24px; line-height: 1.2; word-break: break-word; }
+    .interm { font-size: 18px; opacity: .85; color: #cfd6e4; }
+    .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .settings { display: none; }
+    .settings.open { display: block; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    label.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; color: var(--muted); }
+    input[type="number"], input[type="text"] { background: #232a36; color: var(--text); border: 1px solid #2d3543; border-radius: 6px; padding: 6px 8px; width: 100%; }
+    .footer { padding: 10px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <span id="recStatus" class="pill warn">idle</span>
+    <span id="wsStatus" class="pill warn">ws: connecting…</span>
+    <div class="spacer"></div>
+    <button id="btnToggle" class="primary">Start</button>
+    <button id="btnDownload">Download</button>
+    <button id="btnCopyLink" class="ghost">Copy Overlay Link</button>
+    <button id="btnMark" class="ghost">Mark Chapter</button>
+    <button id="btnClear" class="ghost">Clear</button>
+    <button id="btnSettings" class="ghost">Settings</button>
+  </div>
+
+  <div class="output-wrap">
+    <div class="panel controls">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <div>Room: <code id="roomCode">-</code></div>
+        <div>Lang:
+          <select id="lang">
+            <option value="en-US">English (US)</option>
+            <option value="en-GB">English (UK)</option>
+            <option value="es-ES">Español (ES)</option>
+            <option value="fr-FR">Français</option>
+            <option value="de-DE">Deutsch</option>
+            <option value="it-IT">Italiano</option>
+            <option value="ja-JP">日本語</option>
+            <option value="ko-KR">한국어</option>
+            <option value="pt-PT">Português</option>
+          </select>
+        </div>
+        <div id="overlayUrlWrap" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="panel viewer">
+      <div id="final" class="final"></div>
+      <div id="interm" class="interm"></div>
+    </div>
+
+    <div id="settings" class="panel settings">
+      <div class="grid-2">
+        <div>
+          <h3 style="margin:0 0 6px 0; font-size:14px; color:var(--muted)">Segmentation</h3>
+          <label class="row">Pause threshold (ms)
+            <input id="pauseMs" type="number" min="200" max="5000" step="50" value="600" />
+          </label>
+          <label class="row">Wrap line length (chars)
+            <input id="lineLen" type="number" min="20" max="60" step="2" value="42" />
+          </label>
+        </div>
+        <div>
+          <h3 style="margin:0 0 6px 0; font-size:14px; color:var(--muted)">Export</h3>
+          <label class="row">Include speaker tag
+            <input id="speakerTag" type="checkbox" checked />
+          </label>
+          <label class="row">Profanity filter
+            <input id="profanity" type="checkbox" />
+          </label>
+        </div>
+      </div>
+      <p style="margin:8px 0 0 0; color:var(--muted)">Note: Mic device selection is available on the premium STT page; this capture uses your browser’s default microphone.</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Shortcuts: Space = Pause/Resume, Ctrl+S = Download SRT, Ctrl+L = Copy overlay link, M = Mark chapter</span>
+  </div>
+
+  <script>
+  // URL helpers
+  (function (w) {
+    w.URLSearchParams = w.URLSearchParams || function (searchString) {
+      var self = this; self.searchString = searchString;
+      self.get = function (name) {
+        var results = new RegExp('[\\?&]' + name + '=([^&#]*)').exec(self.searchString);
+        if (results == null) { return null; } else { return decodeURI(results[1]) || 0; }
+      };
+    };
+  })(window);
+  var urlParams = new URLSearchParams(window.location.search);
+
+  // State
+  var roomID = (urlParams.has('room') ? urlParams.get('room') : null);
+  if (!roomID) {
+    roomID = Math.random().toString(36).slice(2, 10);
+    try {
+      var u = new URL(window.location.href); u.searchParams.set('room', roomID);
+      window.history.replaceState({}, '', u.toString());
+    } catch(e) {}
+  }
+  var myLang = urlParams.has('lang') ? urlParams.get('lang') : 'en-US';
+
+  var recognition = null;
+  var isRunning = false;
+  var isPaused = false;
+  var socket = null;
+  var startEpoch = null; // absolute ms when session started
+  var lastStopMs = 0;    // last cue end relative to startEpoch
+  var recBackoff = 500;  // ms
+  var saveKey = null;
+
+  var agg = {
+    open: false,
+    startMs: null,
+    lastMs: null,
+    text: ''
+  };
+  var silenceTimer = null;
+  var cues = []; // {startMs, endMs, text}
+  var chapters = []; // {ms, label}
+
+  // UI refs
+  var elRoom = document.getElementById('roomCode');
+  var elLang = document.getElementById('lang');
+  var elFinal = document.getElementById('final');
+  var elInterm = document.getElementById('interm');
+  var elPauseMs = document.getElementById('pauseMs');
+  var elLineLen = document.getElementById('lineLen');
+  var elSpeaker = document.getElementById('speakerTag');
+  var elProf = document.getElementById('profanity');
+  var elRec = document.getElementById('recStatus');
+  var elWs = document.getElementById('wsStatus');
+  var elOverlayWrap = document.getElementById('overlayUrlWrap');
+
+  elRoom.textContent = roomID;
+  elLang.value = myLang;
+  elLang.addEventListener('change', function(){
+    myLang = this.value; try { var u = new URL(window.location.href); u.searchParams.set('lang', myLang); history.replaceState({},'',u.toString()); } catch(e) {}
+    if (recognition && isRunning) { try { recognition.lang = myLang; } catch(e){} }
+  });
+
+  // Overlay link
+  var baseUrl = document.URL.substr(0, document.URL.lastIndexOf('/'));
+  var overlayUrl = baseUrl + '/overlay?room=' + encodeURIComponent(roomID);
+  elOverlayWrap.style.display = 'block';
+  elOverlayWrap.textContent = overlayUrl;
+
+  function setRecStatus(type, text) {
+    elRec.className = 'pill ' + (type||''); elRec.textContent = text;
+  }
+  function setWsStatus(type, text) {
+    elWs.className = 'pill ' + (type||''); elWs.textContent = text;
+  }
+
+  // Profanity filter (simple)
+  var bads = ['fuck','shit','bitch'];
+  function maskProfanity(s) {
+    if (!elProf.checked) return s;
+    var r = s; for (var i=0;i<bads.length;i++){ var w=bads[i]; var re=new RegExp('\\b'+w+'\\b','ig'); r = r.replace(re, w[0] + '*'.repeat(Math.max(0,w.length-2)) + w[w.length-1]); }
+    return r;
+  }
+
+  function sanitize(string) {
+    var temp = document.createElement('div'); temp.textContent = string; var text = temp.textContent.substring(0, 500).trim();
+    var isRTL = /[\u0591-\u07FF\u200F\u202B\u202E\uFB1D-\uFDFD\uFE70-\uFEFC]/.test(text);
+    if (isRTL) { text = text.replaceAll(/[.,!?،؟؛]/g, ' '); }
+    return maskProfanity(text);
+  }
+
+  function formatSrtTime(ms) {
+    var d = new Date(0); d.setSeconds(ms/1000);
+    var s = d.toISOString().replace('.', ',').replace('1970-01-01T','');
+    return s.substring(0, s.length-1);
+  }
+  function wrapLines(text, maxLen) {
+    var words = text.split(/\s+/); var lines = []; var cur = '';
+    for (var i=0;i<words.length;i++){
+      var w = words[i];
+      if ((cur + ' ' + w).trim().length > maxLen) { lines.push(cur.trim()); cur = w; }
+      else { cur = (cur?cur+' ':'') + w; }
+    }
+    if (cur.trim()) lines.push(cur.trim());
+    return lines.join('\n');
+  }
+  function buildSrt() {
+    var out = ''; for (var i=0;i<cues.length;i++){ var c=cues[i]; out += (i+1)+'\n'+formatSrtTime(c.startMs)+' --> '+formatSrtTime(c.endMs)+'\n'+ (elSpeaker.checked?('>> '):'') + wrapLines(c.text, parseInt(elLineLen.value||'42')) + '\n\n'; }
+    return out;
+  }
+  function buildVtt() {
+    var out = 'WEBVTT\n\n'; for (var i=0;i<cues.length;i++){ var c=cues[i]; var start = formatSrtTime(c.startMs).replace(',', '.'); var end = formatSrtTime(c.endMs).replace(',', '.'); out += start + ' --> ' + end + '\n' + (elSpeaker.checked?('>> '):'') + wrapLines(c.text, parseInt(elLineLen.value||'42')) + '\n\n'; }
+    return out;
+  }
+  function buildTxt() {
+    var out=''; for (var i=0;i<cues.length;i++){ out += wrapLines(cues[i].text, 80)+'\n'; } return out;
+  }
+  function download(name, text) {
+    var a = document.createElement('a'); a.href = 'data:text/plain;charset=utf-8,'+encodeURIComponent(text); a.download = name; a.style.display='none'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+  function saveSnapshot() {
+    try { if (!saveKey) return; localStorage.setItem(saveKey, JSON.stringify({ ts: Date.now(), cues: cues })); } catch(e) {}
+  }
+
+  function startRecognition(){
+    if (!('webkitSpeechRecognition' in window)) { setRecStatus('err','unsupported'); alert('Speech recognition not supported. Use Chrome or Edge.'); return; }
+    recognition = new webkitSpeechRecognition(); recognition.lang = myLang; recognition.continuous = true; recognition.interimResults = true;
+    setRecStatus('ok','listening');
+    recognition.onstart = function(){ setRecStatus('ok','listening'); };
+    recognition.onerror = function(e){ setRecStatus('err', 'error: '+e.error); };
+    recognition.onend = function(){ if (!isRunning || isPaused) { setRecStatus('warn','paused'); return; } setRecStatus('warn','restarting…'); setTimeout(function(){ try { recognition.start(); } catch(err) { try { startRecognition(); } catch(e){} } }, recBackoff); };
+    recognition.onresult = function(event){
+      var now = Date.now(); if (!startEpoch) startEpoch = now; var rel = now - startEpoch;
+      var interim = '';
+      for (var i = event.resultIndex; i < event.results.length; ++i) {
+        var t = sanitize(event.results[i][0].transcript);
+        if (event.results[i].isFinal) {
+          if (!agg.open) { agg.open = true; agg.startMs = (agg.lastMs!=null ? agg.lastMs : lastStopMs); }
+          agg.text += (agg.text? ' ' : '') + t; agg.lastMs = rel;
+          if (silenceTimer) clearTimeout(silenceTimer);
+          silenceTimer = setTimeout(flushSegment, parseInt(elPauseMs.value||'600'));
+        } else {
+          interim += (interim? ' ' : '') + t; agg.lastMs = rel; if (!agg.open) { agg.open = true; agg.startMs = rel; }
+        }
+      }
+      // Show interim
+      if (interim.trim()) { elInterm.textContent = interim.trim(); try { socket && socket.send(JSON.stringify({ msg:true, interm:interim.trim(), id: cues.length+1, ln: myLang })); } catch(e){} }
+    };
+    try { recognition.start(); isRunning = true; isPaused = false; } catch(e) { setRecStatus('err','failed'); }
+  }
+
+  function flushSegment(){
+    if (!agg.open || !agg.text.trim()) return;
+    var endMs = agg.lastMs || lastStopMs; var startMs = (agg.startMs!=null ? agg.startMs : lastStopMs);
+    if (endMs < startMs) endMs = startMs;
+    var text = agg.text.trim();
+    cues.push({ startMs: startMs, endMs: endMs, text: text });
+    lastStopMs = endMs;
+    elFinal.innerHTML += (elSpeaker.checked? '&gt;&gt; ' : '') + wrapLines(text, parseInt(elLineLen.value||'42')).replace(/\n/g,'<br />') + '<br /><br />';
+    elInterm.textContent = '';
+    // Send final to overlay (simple)
+    try { socket && socket.send(JSON.stringify({ msg:true, final: text, id: cues.length, ln: myLang })); } catch(e){}
+    // Persist snapshot
+    saveSnapshot();
+    // Reset aggregator
+    agg.open = false; agg.startMs = null; agg.lastMs = null; agg.text='';
+  }
+
+  // WebSocket
+  function connectWS(){
+    try { socket && socket.close(); } catch(e){}
+    try {
+      socket = new WebSocket('wss://api.caption.ninja:443');
+      socket.onopen = function(){ setWsStatus('ok','ws: connected'); try { socket.send(JSON.stringify({ join: roomID })); } catch(e){} };
+      socket.onclose = function(){ setWsStatus('warn','ws: reconnecting…'); setTimeout(connectWS, 1000); };
+      socket.onerror = function(){ setWsStatus('err','ws: error'); };
+    } catch(e) { setWsStatus('err','ws: failed'); }
+  }
+  connectWS();
+
+  // Controls
+  document.getElementById('btnToggle').addEventListener('click', function(){
+    if (!isRunning || isPaused) {
+      if (!startEpoch) { startEpoch = Date.now(); saveKey = 'transcription_'+roomID+'_'+startEpoch; }
+      startRecognition(); this.textContent = 'Pause'; this.classList.remove('primary');
+    } else {
+      try { recognition && recognition.stop(); } catch(e){}
+      isPaused = true; isRunning = false; setRecStatus('warn','paused'); this.textContent='Resume'; this.classList.add('primary'); flushSegment();
+    }
+  });
+  document.getElementById('btnSettings').addEventListener('click', function(){ document.getElementById('settings').classList.toggle('open'); });
+  document.getElementById('btnCopyLink').addEventListener('click', function(){ navigator.clipboard.writeText(overlayUrl).then(()=>{ this.textContent='Copied!'; setTimeout(()=> this.textContent='Copy Overlay Link', 1000); }); });
+  document.getElementById('btnClear').addEventListener('click', function(){ if (!confirm('Clear transcript?')) return; cues = []; chapters = []; elFinal.innerHTML=''; elInterm.textContent=''; lastStopMs=0; localStorage.removeItem(saveKey); });
+  document.getElementById('btnDownload').addEventListener('click', function(){ flushSegment(); download('transcription_'+roomID+'_'+(startEpoch||Date.now())+'.srt', buildSrt()); });
+  document.getElementById('btnMark').addEventListener('click', function(){ var now = Date.now(); if (!startEpoch) return; var rel = now - startEpoch; chapters.push({ ms: rel, label: 'Chapter '+(chapters.length+1) }); });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function(e){
+    var tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase(); if (tag === 'input' || tag === 'textarea') return;
+    if (e.code === 'Space') { e.preventDefault(); document.getElementById('btnToggle').click(); }
+    if (e.ctrlKey && (e.key === 's' || e.key === 'S')) { e.preventDefault(); document.getElementById('btnDownload').click(); }
+    if (e.ctrlKey && (e.key === 'l' || e.key === 'L')) { e.preventDefault(); navigator.clipboard.writeText(overlayUrl); }
+    if (e.key === 'm' || e.key === 'M') { e.preventDefault(); document.getElementById('btnMark').click(); }
+  });
+
+  // Persist every 30s
+  setInterval(saveSnapshot, 30000);
+
+  // On unload, flush
+  window.addEventListener('beforeunload', function(){ try { flushSegment(); } catch(e){} });
+
+  // Recover snapshot button if exists
+  (function showRecovery(){
+    var keys = Object.keys(localStorage).filter(k => k.startsWith('transcription_'+roomID+'_'));
+    if (!keys.length) return;
+    var k = keys.sort().pop();
+    var btn = document.createElement('button'); btn.textContent = 'Recover last session';
+    btn.addEventListener('click', function(){ try { var data = JSON.parse(localStorage.getItem(k)); if (data && data.cues) { cues = data.cues; startEpoch = Date.now(); saveKey = k; lastStopMs = cues.length? cues[cues.length-1].endMs : 0; elFinal.innerHTML=''; for (var i=0;i<cues.length;i++){ elFinal.innerHTML += (elSpeaker.checked? '&gt;&gt; ' : '') + wrapLines(cues[i].text, parseInt(elLineLen.value||'42')).replace(/\n/g,'<br />') + '<br /><br />'; } } } catch(e){} this.remove(); });
+    document.querySelector('.toolbar').appendChild(btn);
+  })();
+
+  // Initial statuses
+  setRecStatus('warn','idle'); setWsStatus('warn','ws: connecting…');
+  </script>
+</body>
+</html>
+
