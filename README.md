@@ -319,4 +319,5 @@ Fonts are provided with their own license; apache 2.0 I believe, but confirm you
 The free translation component is powered by Mozilla Translate; https://github.com/mozilla/translate - MPL 2.0 - Mozilla
 
 
-As per CAPTION.NInja, to keep in spirit of what Mozilla has created, the code here contributed as part of this CAPTION.Ninja project is also made available as MPL 2.0.
+As per CAPTION.Ninja, to keep in spirit of what Mozilla has created, the code here contributed as part of this CAPTION.Ninja project is also made available as MPL 2.0.
+
