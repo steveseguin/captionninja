@@ -264,7 +264,7 @@ Alternatively, use the "Download transcription" button that appears during sessi
 ## Capture Pages
 
 - `index.html`: Simple, minimal capture experience. Uses your browser’s default microphone and built-in speech recognition (best in Chrome/Edge). Downloads SRT and streams to overlay.
-  - Non-visual change: SRT export now computes correct start/end times (fixes duplicate timestamps). No UI changes; behavior otherwise unchanged.
+  - Non-visual change: SRT export now computes correct start/end times (fixes duplicate timestamps).
 - `capture-pro.html`: A newer enhanced Capture UI page with better usability and exports. Same local recognition under the hood, plus:
   - Pause-based segmentation (configurable threshold) for cleaner SRT cues
   - Smarter line wrapping for SRT/WebVTT
@@ -320,4 +320,5 @@ The free translation component is powered by Mozilla Translate; https://github.c
 
 
 As per CAPTION.Ninja, to keep in spirit of what Mozilla has created, the code here contributed as part of this CAPTION.Ninja project is also made available as MPL 2.0.
+
 
