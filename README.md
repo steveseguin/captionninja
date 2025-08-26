@@ -13,24 +13,6 @@ Demo video: https://www.youtube.com/watch?v=v7172QO8z6c
 3. Start speaking - your words will be transcribed automatically
 4. Access the overlay URL (provided on the page) to display captions in OBS or other streaming software
 
-## Capture Pages
-
-- `index.html`: Simple, minimal capture experience. Uses your browser’s default microphone and built-in speech recognition (best in Chrome/Edge). Downloads SRT and streams to overlay.
-  - Non-visual change: SRT export now computes correct start/end times (fixes duplicate timestamps). No UI changes; behavior otherwise unchanged.
-- `capture-pro.html`: Enhanced “Capture Pro” UI with better usability and exports. Same local recognition under the hood, plus:
-  - Pause-based segmentation (configurable threshold) for cleaner SRT cues
-  - Smarter line wrapping for SRT/WebVTT
-  - One-click downloads: SRT, WebVTT, Plain Text
-  - Autosave + recovery of last session
-  - Keyboard shortcuts: Space (pause/resume), Ctrl+S (download SRT), Ctrl+L (copy overlay URL), M (chapter mark)
-  - Status indicators for recognition and overlay connection
-  - Overlay link helper with one-click copy
-  - Optional profanity masking
-
-Notes:
-- Mic device selection remains on the premium STT track; this page uses the system default microphone (same as `index.html`).
-- TTS popout bridge is supported via `&ttspopout=1`.
-
 ## How It Works
 
 CAPTION.Ninja leverages your browser's built-in speech recognition capabilities to perform real-time transcription:
@@ -279,6 +261,24 @@ To save the transcription:
 
 Alternatively, use the "Download transcription" button that appears during sessions.
 
+## Capture Pages
+
+- `index.html`: Simple, minimal capture experience. Uses your browser’s default microphone and built-in speech recognition (best in Chrome/Edge). Downloads SRT and streams to overlay.
+  - Non-visual change: SRT export now computes correct start/end times (fixes duplicate timestamps). No UI changes; behavior otherwise unchanged.
+- `capture-pro.html`: A newer enhanced Capture UI page with better usability and exports. Same local recognition under the hood, plus:
+  - Pause-based segmentation (configurable threshold) for cleaner SRT cues
+  - Smarter line wrapping for SRT/WebVTT
+  - One-click downloads: SRT, WebVTT, Plain Text
+  - Autosave + recovery of last session
+  - Keyboard shortcuts: Space (pause/resume), Ctrl+S (download SRT), Ctrl+L (copy overlay URL), M (chapter mark)
+  - Status indicators for recognition and overlay connection
+  - Overlay link helper with one-click copy
+  - Optional profanity masking
+
+Notes:
+- Mic device selection remains on the premium STT track; this page uses the system default microphone (same as `index.html`).
+- TTS popout bridge is supported via `&ttspopout=1`.
+
 ## Self-Hosting
 
 Self-hosting is possible for free:
@@ -317,5 +317,6 @@ That said, things change, and problems occur, so you accept any risks to using t
 Fonts are provided with their own license; apache 2.0 I believe, but confirm yourself.
 
 The free translation component is powered by Mozilla Translate; https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+
 
 As per CAPTION.NInja, to keep in spirit of what Mozilla has created, the code here contributed as part of this CAPTION.Ninja project is also made available as MPL 2.0.
