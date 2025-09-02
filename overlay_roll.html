@@ -1,0 +1,147 @@
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+  <meta content="utf-8" http-equiv="encoding" />
+  <meta name="copyright" content="© 2020 Steve Seguin" />
+  <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon" />
+  <title>Caption Overlay: Credits Roll</title>
+  <meta name="title" content="CAPTION.Ninja: Credits Roll" />
+  <meta name="description" content="Credits-style rolling overlay controlled remotely." />
+  <meta name="author" content="Steve Seguin" />
+  <style>
+    @font-face { font-family: 'Cousine'; src: url('fonts/Cousine-Bold.ttf') format('truetype'); }
+    html, body { margin:0; padding:0; height:100%; background: transparent; }
+    body { position: relative; overflow: hidden; }
+    .container { position:absolute; left:0; right:0; top:0; bottom:0; overflow:hidden; padding: 0 10px; display:block; }
+    .content { position:absolute; left:0; right:0; top:0; transform: translateY(0); will-change: transform; }
+    .line { color: white; background:black; display:block; font-family: Cousine, monospace; font-size: var(--fs, 3.2em); line-height: 1.2em; letter-spacing: 0.0em; text-shadow: 0.05em 0.05em 0px rgba(0,0,0,1); padding: 0.15em 0.25em 0 0.25em; margin: 0.15em 0 0 0; }
+  </style>
+</head>
+<body>
+  <div class="container" id="container">
+    <div class="content" id="content"></div>
+  </div>
+  <div id="status" style="display:none;"></div>
+  <script>
+    // Minimal URLSearchParams polyfill
+    (function (w) {
+      w.URLSearchParams = w.URLSearchParams || function (searchString) {
+        var self = this; self.searchString = searchString; self.get = function (name) {
+          var results = new RegExp('[\\?&]' + name + '=([^&#]*)').exec(self.searchString);
+          if (results == null) { return null; } else { return decodeURI(results[1]) || 0; }
+        }; self.has = function(n){ return new RegExp('[\\?&]' + n + '=').test(self.searchString); };
+      }; })(window);
+    const urlParams = new URLSearchParams(window.location.search);
+
+    // Room
+    let roomID = urlParams.get('room') || urlParams.get('ROOM') || 'test';
+    // Config
+    const autoMode = urlParams.has('auto') || urlParams.has('autospeed');
+    const fontSize = parseFloat(urlParams.get('fontsize')) || 3.2; // em
+    const minPxPerSec = 10; const maxPxPerSec = 160; // scroll speed bounds
+
+    // DOM
+    const container = document.getElementById('container');
+    const content = document.getElementById('content');
+    document.documentElement.style.setProperty('--fs', fontSize + 'em');
+
+    // Roll state
+    let playing = false; let basePxPerSec = 40; let pxPerSec = 40; let offset = 0; let lastTs = 0;
+    let words = []; let textRaw = ''; let matchIndex = 0; // for auto align
+
+    // Render helpers
+    function renderText(txt){
+      textRaw = txt || '';
+      content.innerHTML = '';
+      // Add spacer so text rolls in from bottom
+      const spacer = document.createElement('div'); spacer.id = 'topSpacer'; spacer.style.height = container.clientHeight + 'px'; content.appendChild(spacer);
+      const lines = (txt||'').split(/\n+/);
+      for (const ln of lines){ if (!ln.trim()) continue; const el = document.createElement('span'); el.className='line'; el.textContent = ln; content.appendChild(el); }
+      offset = 0; lastTs = 0; matchIndex = 0; // reset
+      // Prepare words for auto mode
+      words = (txt||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(Boolean);
+    }
+    function updateSpacer(){ const sp = document.getElementById('topSpacer'); if (sp) sp.style.height = container.clientHeight + 'px'; }
+
+    function maxScroll(){ return Math.max(0, content.scrollHeight - container.clientHeight); }
+
+    function raf(ts){
+      if (!playing) { lastTs = ts; requestAnimationFrame(raf); return; }
+      if (!lastTs) lastTs = ts;
+      const dt = (ts - lastTs) / 1000; lastTs = ts;
+      // Auto mode adjust towards target
+      if (autoMode && words.length){
+        // Compute desired offset from matchIndex
+        const ratio = Math.min(1, matchIndex / Math.max(1, words.length));
+        const target = maxScroll() * ratio;
+        const delta = target - offset;
+        const adjust = Math.max(minPxPerSec, Math.min(maxPxPerSec, basePxPerSec + delta * 0.5));
+        pxPerSec = adjust;
+      }
+      offset += pxPerSec * dt;
+      if (offset > maxScroll() + 40) { playing = false; }
+      content.style.transform = 'translateY(' + (-offset) + 'px)';
+      requestAnimationFrame(raf);
+    }
+    requestAnimationFrame(raf);
+    window.addEventListener('resize', updateSpacer);
+
+    // WS
+    let socket;
+    function connect(){
+      socket = new WebSocket('wss://api.caption.ninja:443');
+      socket.onopen = function(){ socket.send(JSON.stringify({join: roomID})); };
+      socket.onclose = function(){ setTimeout(connect, 1000); };
+      socket.onerror = function(){ setTimeout(connect, 1500); };
+      socket.onmessage = function(ev){ try{ const data = JSON.parse(ev.data); handleMessage(data); }catch(e){} };
+    }
+    connect();
+
+    function normWords(t){ return (t||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(Boolean); }
+    function handleSTT(data){
+      if (!autoMode || !words.length) return;
+      const spoken = normWords(data.final || data.interm || ''); if (!spoken.length) return;
+      // Try to align by finding a small anchor (first 2-3 words) near current position
+      const anchorLen = Math.min(3, spoken.length);
+      const anchor = spoken.slice(0, anchorLen).join(' ');
+      const startSearch = Math.max(0, matchIndex - 50);
+      const endSearch = Math.min(words.length, matchIndex + 200);
+      const hay = words.slice(startSearch, endSearch).join(' ');
+      const idx = hay.indexOf(anchor);
+      if (idx >= 0){
+        // Rough character-based index to word-based estimate
+        const pre = hay.slice(0, idx).trim();
+        const preCount = pre ? pre.split(/\s+/).length : 0;
+        // Update match index forward
+        matchIndex = Math.max(matchIndex, startSearch + preCount + Math.max(anchorLen, Math.floor(spoken.length*0.6)));
+      }
+    }
+
+    function handleRollControl(data){
+      switch(String(data.action||'').toLowerCase()){
+        case 'load':
+          renderText(String(data.text||''));
+          break;
+        case 'play':
+          basePxPerSec = Math.max(minPxPerSec, Math.min(maxPxPerSec, (Number(data.speed)||1) * 40));
+          pxPerSec = basePxPerSec; playing = true; break;
+        case 'pause': playing = false; break;
+        case 'resume': playing = true; break;
+        case 'stop': playing = false; offset = 0; content.style.transform = 'translateY(0px)'; break;
+        case 'speed':
+          basePxPerSec = Math.max(minPxPerSec, Math.min(maxPxPerSec, (Number(data.speed)||1) * 40));
+          pxPerSec = basePxPerSec; break;
+        case 'goto':
+          const ratio = Math.max(0, Math.min(1, Number(data.ratio)||0));
+          offset = maxScroll() * ratio; break;
+      }
+    }
+
+    function handleMessage(data){
+      if (data && data.roll){ handleRollControl(data); return; }
+      if (data && (data.final || data.interm)){ handleSTT(data); }
+    }
+  </script>
+</body>
+</html>

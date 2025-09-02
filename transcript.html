@@ -1,0 +1,308 @@
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+  <meta content="utf-8" http-equiv="encoding" />
+  <meta name="copyright" content="© 2020 Steve Seguin" />
+  <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon" />
+  <title>CAPTION.Ninja: Transcript Playlist</title>
+  <meta name="title" content="CAPTION.Ninja: Transcript Playlist" />
+  <meta name="description" content="Feed a long transcript in sections; edit, reorder, and auto-play as captions." />
+  <meta name="author" content="Steve Seguin" />
+  <style>
+    @font-face {
+      font-family: 'Cousine';
+      src: url('fonts/Cousine-Bold.ttf') format('truetype');
+    }
+    :root {
+      --bg: #0b0b0e;
+      --panel: #121218;
+      --panel-2: #171723;
+      --text: #e7e7ef;
+      --muted: #a6a8b3;
+      --accent: #4fa1ff;
+      --accent-2: #8bd18b;
+      --danger: #ff5a5a;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text);
+      font-family: Cousine, monospace; letter-spacing: 0.02em;
+    }
+    .app {
+      display: grid; grid-template-columns: 360px 1fr; gap: 10px; height: 100vh; padding: 10px;
+    }
+    .sidebar {
+      background: var(--panel); border: 1px solid #22242e; border-radius: 8px; display: flex; flex-direction: column; min-width: 320px;
+    }
+    .sidebar .toolbar { padding: 10px; border-bottom: 1px solid #22242e; display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+    .sidebar .toolbar button, .controls button {
+      background: var(--panel-2); color: var(--text); border: 1px solid #2a2d3a; border-radius: 6px;
+      padding: 8px 10px; cursor: pointer; font-size: 14px;
+    }
+    .sidebar .toolbar button:hover, .controls button:hover { background: #1e2030; }
+    .sidebar .toolbar .danger { border-color: #3a1f1f; color: #ffaaaa; }
+    .list { overflow: auto; height: 100%; }
+    .item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid #1b1d27; }
+    .item.active { background: #17192a; }
+    .item .title { font-size: 14px; color: var(--text); }
+    .item .meta { font-size: 12px; color: var(--muted); }
+    .item .btns { display: flex; gap: 6px; }
+    .item .btns button { padding: 4px 6px; font-size: 12px; }
+    .editor {
+      background: var(--panel); border: 1px solid #22242e; border-radius: 8px; display: flex; flex-direction: column; min-width: 420px;
+    }
+    .controls { display: flex; gap: 8px; align-items: center; padding: 10px; border-bottom: 1px solid #22242e; flex-wrap: wrap; }
+    .controls .spacer { flex: 1; }
+    .controls label { font-size: 12px; color: var(--muted); margin-right: 6px; }
+    .controls input[type="range"] { width: 160px; }
+    .editor .section-title { padding: 10px; border-bottom: 1px solid #22242e; display:flex; gap:8px; align-items:center; }
+    .editor .section-title input { flex: 1; padding: 8px; background: var(--panel-2); border: 1px solid #2a2d3a; color: var(--text); border-radius: 6px; }
+    textarea { flex: 1; resize: none; border: none; outline: none; font-family: Cousine, monospace; font-size: 14px; line-height: 1.4; padding: 10px; background: #0f1017; color: var(--text); border-radius: 0 0 8px 8px; }
+    .status { padding: 8px 10px; font-size: 12px; color: var(--muted); border-top: 1px solid #22242e; }
+    .pill { padding: 2px 6px; border: 1px solid #2a2d3a; border-radius: 999px; font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="sidebar">
+      <div class="toolbar">
+        <button id="addSection">+ Add Section</button>
+        <button id="splitPara">Split by Paragraphs</button>
+        <button id="clearAll" class="danger">Clear All</button>
+        <span class="pill" id="roomBadge"></span>
+      </div>
+      <div class="list" id="sectionList"></div>
+    </div>
+    <div class="editor">
+      <div class="controls">
+        <button id="playAll">Play</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="restartBtn">Restart</button>
+        <button id="prevBtn">Prev</button>
+        <button id="nextBtn">Next</button>
+        <div class="spacer"></div>
+        <label for="speed">Speed</label>
+        <input type="range" id="speed" min="0.5" max="2.0" value="1.0" step="0.1" />
+        <span id="speedVal" class="pill">1.0x</span>
+        <label><input type="checkbox" id="autoPace" /> Auto pace</label>
+        <label><input type="checkbox" id="controlRoll" /> Control credits overlay</label>
+      </div>
+      <div class="section-title">
+        <input id="titleInput" placeholder="Section title" />
+        <button id="playCurrent">Play Section</button>
+      </div>
+      <textarea id="textInput" placeholder="Paste or type section text here..."></textarea>
+      <div class="status" id="status">Idle.</div>
+    </div>
+  </div>
+  <script>
+    (function (w) {
+      w.URLSearchParams = w.URLSearchParams || function (searchString) {
+        var self = this; self.searchString = searchString; self.get = function (name) {
+          var results = new RegExp('[\\?&]' + name + '=([^&#]*)').exec(self.searchString);
+          if (results == null) { return null; } else { return decodeURI(results[1]) || 0; }
+        }; self.has = function(n){ return new RegExp('[\\?&]' + n + '=').test(self.searchString); };
+      }; })(window);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    function setStatus(msg){ document.getElementById('status').innerText = msg; }
+
+    // Room handling
+    function generateSecureRoomID(len=16){
+      var text = ""; var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+      for (var i = 0; i < len; i++){ text += possible.charAt(Math.floor(Math.random() * possible.length)); }
+      return text;
+    }
+
+    function updateURL(param){
+      var para = param.split('='); var href = new URL(window.location.href);
+      if (para.length==1){ href.searchParams.set(para[0].toLowerCase(), ""); }
+      else { href.searchParams.set(para[0].toLowerCase(), para[1]); }
+      window.history.pushState({path:href.toString()},'',href.toString());
+    }
+
+    let roomID = 'test';
+    if (urlParams.has('room')) roomID = urlParams.get('room');
+    else if (urlParams.has('ROOM')) roomID = urlParams.get('ROOM');
+    else {
+      var storedRoom = '';
+      try { storedRoom = localStorage.getItem('cn_room_id') || ''; } catch(e){}
+      if (storedRoom && /^[A-Za-z0-9]{12,}$/.test(storedRoom)) { roomID = storedRoom; updateURL('room='+roomID); }
+      else { roomID = generateSecureRoomID(16); updateURL('room='+roomID); }
+    }
+    try { localStorage.setItem('cn_room_id', roomID); } catch(e){}
+    document.getElementById('roomBadge').innerText = 'room=' + roomID;
+
+    let socket; let counter=0; let label = urlParams.get('label') || false;
+    function connectWebSocket(){
+      socket = new WebSocket("wss://api.caption.ninja:443");
+      socket.onopen = function(){ socket.send(JSON.stringify({join: roomID})); };
+      socket.onclose = function(){ setTimeout(connectWebSocket, 1000); };
+      socket.onerror = function(){ setTimeout(connectWebSocket, 2000); };
+    }
+    connectWebSocket();
+
+    function sendCaptionFinal(text){
+      counter += 1; const payload = {msg:true, final:text, id:counter}; if (label) payload.label = label;
+      try { socket && socket.send(JSON.stringify(payload)); } catch(e){}
+    }
+    function sendRollControl(action, data={}){
+      const payload = Object.assign({roll:true, action:action, room:roomID, ts:Date.now()}, data);
+      try { socket && socket.send(JSON.stringify(payload)); } catch(e){}
+    }
+
+    // Sections state
+    let sections = [];
+    let currentId = null;
+    const listEl = document.getElementById('sectionList');
+    const titleEl = document.getElementById('titleInput');
+    const textEl = document.getElementById('textInput');
+
+    function uid(){ return Math.random().toString(36).slice(2,10); }
+    function summarize(text){
+      if (!text) return '';
+      const first = text.trim().split(/\n|\.\s/)[0] || '';
+      return first.slice(0, 60) + (first.length>60 ? '…' : '');
+    }
+    function recalcMeta(text){
+      const words = (text.match(/\S+/g)||[]).length;
+      const chars = text.length;
+      return words + ' words • ' + chars + ' chars';
+    }
+
+    function renderList(){
+      listEl.innerHTML = '';
+      sections.forEach((s, idx) => {
+        const row = document.createElement('div');
+        row.className = 'item' + (s.id===currentId ? ' active' : '');
+        const left = document.createElement('div');
+        const title = document.createElement('div'); title.className='title'; title.textContent = s.title || ('Section ' + (idx+1));
+        const meta = document.createElement('div'); meta.className='meta'; meta.textContent = summarize(s.text) + (s.text?' • ':'') + recalcMeta(s.text||'');
+        left.appendChild(title); left.appendChild(meta);
+        const btns = document.createElement('div'); btns.className='btns';
+        const up=document.createElement('button'); up.textContent='↑'; up.title='Move up'; up.onclick=()=>{ if(idx>0){ const t=sections[idx]; sections[idx]=sections[idx-1]; sections[idx-1]=t; renderList(); } };
+        const down=document.createElement('button'); down.textContent='↓'; down.title='Move down'; down.onclick=()=>{ if(idx<sections.length-1){ const t=sections[idx]; sections[idx]=sections[idx+1]; sections[idx+1]=t; renderList(); } };
+        const play=document.createElement('button'); play.textContent='Play'; play.onclick=()=>{ selectSection(s.id); startSectionPlayback(s.id, true); };
+        const del=document.createElement('button'); del.textContent='Del'; del.onclick=()=>{ if(confirm('Delete this section?')){ const wasCurrent = s.id===currentId; sections = sections.filter(x=>x.id!==s.id); if (wasCurrent){ currentId = sections[0]?.id || null; loadEditor(currentId); } renderList(); } };
+        btns.appendChild(up); btns.appendChild(down); btns.appendChild(play); btns.appendChild(del);
+        row.appendChild(left); row.appendChild(btns);
+        row.onclick = (e)=>{ if(e.target.tagName==='BUTTON') return; selectSection(s.id); };
+        listEl.appendChild(row);
+      });
+    }
+
+    function selectSection(id){ currentId = id; loadEditor(id); renderList(); }
+    function loadEditor(id){
+      const s = sections.find(x=>x.id===id) || null;
+      titleEl.value = s?.title || '';
+      textEl.value = s?.text || '';
+      setStatus(s? 'Editing: ' + (s.title||('Section '+(sections.indexOf(s)+1))) : 'No section');
+    }
+
+    document.getElementById('addSection').onclick = function(){
+      const s = { id: uid(), title: '', text: '' };
+      sections.push(s); currentId = s.id; renderList(); loadEditor(currentId);
+    };
+    document.getElementById('clearAll').onclick = function(){ if(confirm('Clear all sections?')){ sections=[]; currentId=null; renderList(); loadEditor(null);} };
+    document.getElementById('splitPara').onclick = function(){
+      const txt = textEl.value || '';
+      const parts = txt.split(/\n\s*\n+/).map(s=>s.trim()).filter(Boolean);
+      if (!parts.length) { alert('No paragraphs to split.'); return; }
+      parts.forEach(p=>sections.push({id:uid(), title: summarize(p), text: p}));
+      currentId = sections[sections.length-1].id; renderList(); loadEditor(currentId);
+      textEl.value = '';
+    };
+
+    titleEl.oninput = function(){ const s = sections.find(x=>x.id===currentId); if(s){ s.title = titleEl.value; renderList(); } };
+    textEl.oninput = function(){ const s = sections.find(x=>x.id===currentId); if(s){ s.text = textEl.value; renderList(); } };
+
+    // Playback engine
+    const speedEl = document.getElementById('speed'); const speedVal = document.getElementById('speedVal');
+    const autoPaceEl = document.getElementById('autoPace'); const controlRollEl = document.getElementById('controlRoll');
+    speedEl.oninput = ()=>{ speedVal.textContent = parseFloat(speedEl.value).toFixed(1)+'x'; if (controlRollEl.checked) sendRollControl('speed', {speed: parseFloat(speedEl.value)}); };
+
+    let playing = false; let paused = false; let timers = []; let queue = []; let queueIndex = 0; let playAll = false; let playingSectionId = null;
+
+    function clearTimers(){ timers.forEach(t=>clearTimeout(t)); timers=[]; }
+
+    function splitIntoChunks(text){
+      let t = (text||'').replace(/\s+/g,' ').trim();
+      if (!t) return [];
+      const sentences = t.split(/(?<=[\.!?])\s+/);
+      const chunks = [];
+      const target = 60; const hard = 90;
+      for (const s of sentences){
+        if (s.length <= hard) { chunks.push(s); continue; }
+        const words = s.split(/\s+/);
+        let cur='';
+        for (const w of words){
+          if ((cur+ ' ' + w).trim().length > target) { if (cur) chunks.push(cur.trim()); cur=w; }
+          else { cur = (cur?cur+' ':'') + w; }
+        }
+        if (cur) chunks.push(cur.trim());
+      }
+      return chunks;
+    }
+
+    function estimateDelayMs(chunk){
+      const baseCps = 14; // baseline chars/sec at 1.0x
+      const speed = parseFloat(speedEl.value || '1.0');
+      let secs = Math.max(0.3, chunk.length / (baseCps * speed));
+      const commas = (chunk.match(/[,;:]/g)||[]).length; secs += commas * 0.12;
+      const stops = (chunk.match(/[\.!?]/g)||[]).length; secs += stops * 0.18;
+      const digits = (chunk.match(/\d/g)||[]).length; if (digits){
+        const mult = Math.min(1.5, 1 + Math.log10(1+digits) * 0.35); secs *= mult;
+        if (/\d{3,}/.test(chunk)) secs += 0.2; // long number buffer
+      }
+      return Math.min(8.0, secs) * 1000;
+    }
+
+    function scheduleQueueSend(){
+      if (!playing || paused) return;
+      if (queueIndex >= queue.length) { // Section done
+        if (controlRollEl.checked) sendRollControl('stop', {});
+        // Continue to next section if playAll
+        const idx = sections.findIndex(x=>x.id===playingSectionId);
+        if (playAll && idx>=0 && idx < sections.length-1) {
+          startSectionPlayback(sections[idx+1].id, true);
+        } else {
+          playing = false; playingSectionId=null; setStatus('Completed section playback.');
+        }
+        return;
+      }
+      const chunk = queue[queueIndex];
+      sendCaptionFinal(chunk);
+      queueIndex += 1;
+      const delay = autoPaceEl.checked ? estimateDelayMs(chunk) : estimateDelayMs(chunk); // placeholder for future smarter auto
+      const t = setTimeout(scheduleQueueSend, delay);
+      timers.push(t);
+    }
+
+    function startSectionPlayback(id, andContinue){
+      const s = sections.find(x=>x.id===id); if (!s){ setStatus('No section selected.'); return; }
+      // Do not interrupt currently playing section; selection merely targets next
+      if (playing && playingSectionId && playingSectionId!==id && andContinue!==true) { setStatus('Already playing another section. Use Next or Restart.'); return; }
+      clearTimers();
+      queue = splitIntoChunks(s.text||''); queueIndex = 0;
+      playing = true; paused = false; playingSectionId = s.id; playAll = !!andContinue;
+      setStatus('Playing: ' + (s.title||'Untitled') + ' • ' + queue.length + ' chunks');
+      if (controlRollEl.checked) {
+        sendRollControl('load', { sectionId: s.id, title: s.title||'', text: s.text||'' });
+        sendRollControl('play', { speed: parseFloat(speedEl.value) });
+      }
+      scheduleQueueSend();
+    }
+
+    document.getElementById('playAll').onclick = function(){ if (!sections.length){ alert('Add a section first'); return; } if (!currentId) currentId = sections[0].id; startSectionPlayback(currentId, true); };
+    document.getElementById('playCurrent').onclick = function(){ if (!currentId){ alert('Select or add a section first'); return; } startSectionPlayback(currentId, false); };
+    document.getElementById('pauseBtn').onclick = function(){ if (!playing) return; paused = !paused; this.textContent = paused? 'Resume' : 'Pause'; if (controlRollEl.checked) sendRollControl(paused? 'pause':'resume', {}); if (!paused) scheduleQueueSend(); };
+    document.getElementById('restartBtn').onclick = function(){ if (!playingSectionId) return; startSectionPlayback(playingSectionId, playAll); };
+    document.getElementById('prevBtn').onclick = function(){ const idx = sections.findIndex(x=>x.id===playingSectionId || x.id===currentId); if (idx>0){ selectSection(sections[idx-1].id); } };
+    document.getElementById('nextBtn').onclick = function(){ const idx = sections.findIndex(x=>x.id===playingSectionId || x.id===currentId); if (idx>=0 && idx<sections.length-1){ selectSection(sections[idx+1].id); } };
+
+    // Initialize with one empty section
+    sections.push({ id: uid(), title: '', text: '' }); currentId = sections[0].id; renderList(); loadEditor(currentId);
+  </script>
+</body>
+</html>

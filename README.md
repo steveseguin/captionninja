@@ -176,6 +176,32 @@ https://caption.ninja/manual.html
 
 This lets you type captions directly, which appear on the same overlay system.
 
+## Transcript Playlist + Credits Roll
+
+For pre-written scripts or long transcripts, use the new playlist tools:
+
+- transcript.html: Build a playlist of sections, edit/reorder live, and auto-play to the room.
+  - Controls: Play, Pause/Resume, Restart, Prev/Next, per-section play, and a Speed slider (0.5x–2.0x).
+  - Pacing: Sensible timing that slows slightly for punctuation and long numbers; editable while another section plays.
+  - Optional: Toggle “Control credits overlay” to drive a rolling credits page remotely.
+- overlay_roll.html: Credits-style rolling overlay that scrolls lines upward.
+  - Manual speed from controller; or add `&auto=1` to auto-adjust speed by matching live STT text in the same room.
+  - Appearance: Set `&fontsize=3.2` (em units) to scale the roll.
+
+Quick start (serve over HTTP):
+
+```
+Transcript controller:
+  /transcript.html?room=abc123
+Credits roll overlay:
+  /overlay_roll.html?room=abc123        (manual speed)
+  /overlay_roll.html?room=abc123&auto=1 (auto speed from STT)
+Standard captions (optional, in parallel):
+  /overlay.html?room=abc123
+```
+
+Tip: You can also add `&label=Host` to tag outgoing transcript captions from the controller.
+
 ## Customizing Appearance
 
 ### Changing Font Size and Styling
@@ -320,5 +346,3 @@ The free translation component is powered by Mozilla Translate; https://github.c
 
 
 As per CAPTION.Ninja, to keep in spirit of what Mozilla has created, the code here contributed as part of this CAPTION.Ninja project is also made available as MPL 2.0.
-
-
