@@ -72,6 +72,52 @@
         <button id="clearAll" class="danger">Clear All</button>
         <span class="pill" id="roomBadge"></span>
       </div>
+      <div class="links-panel" style="padding:10px; border-bottom:1px solid #22242e; display:flex; flex-direction:column; gap:14px;">
+        <div>
+          <div style="font-size:12px; color: var(--muted); margin-bottom:4px;">Credits Roll (Primary)</div>
+          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:6px;">
+            <label style="font-size:12px; color:var(--muted);">fontsize</label>
+            <input id="rollFontsize" type="number" min="1" step="0.1" value="3.2" style="width:80px; padding:4px; background: var(--panel-2); border:1px solid #2a2d3a; color:var(--text); border-radius:4px;" />
+            <label style="font-size:12px; color:var(--muted);">speed</label>
+            <input id="rollSpeed" type="number" min="0.1" step="0.1" value="1.0" title="1.0 = default speed" style="width:80px; padding:4px; background: var(--panel-2); border:1px solid #2a2d3a; color:var(--text); border-radius:4px;" />
+            <label style="font-size:12px; color:var(--muted);">fg</label>
+            <input id="rollFg" type="text" value="#ffffff" placeholder="#ffffff" style="width:100px; padding:4px; background: var(--panel-2); border:1px solid #2a2d3a; color:var(--text); border-radius:4px;" />
+            <label style="font-size:12px; color:var(--muted);">bg</label>
+            <input id="rollBg" type="text" value="#000000" placeholder="#000000" style="width:100px; padding:4px; background: var(--panel-2); border:1px solid #2a2d3a; color:var(--text); border-radius:4px;" />
+            <label style="font-size:12px; color:var(--muted);">pad</label>
+            <input id="rollPad" type="number" min="0" step="0.05" value="0.25" title="em units" style="width:80px; padding:4px; background: var(--panel-2); border:1px solid #2a2d3a; color:var(--text); border-radius:4px;" />
+            <label style="font-size:12px; color:var(--muted);">gap</label>
+            <input id="rollGap" type="number" min="0" step="0.05" value="0.15" title="em units" style="width:80px; padding:4px; background: var(--panel-2); border:1px solid #2a2d3a; color:var(--text); border-radius:4px;" />
+            <label style="font-size:12px; color:var(--muted);"><input id="rollAuto" type="checkbox" /> auto</label>
+            <label style="font-size:12px; color:var(--muted);"><input id="rollLive" type="checkbox" checked /> live</label>
+            <label style="font-size:12px; color:var(--muted);"><input id="rollShadow" type="checkbox" checked /> shadow</label>
+            <label style="font-size:12px; color:var(--muted);"><input id="rollUpper" type="checkbox" /> UPPERCASE</label>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input id="rollLink" readonly style="flex:1; padding:6px; background: #0f1017; border:1px solid #2a2d3a; color:var(--text); border-radius:6px;" />
+            <button id="rollOpen">Open</button>
+            <button id="rollCopy">Copy</button>
+          </div>
+          <div style="font-size:11px; color:#a6a8b3; margin-top:4px;">
+            Tip: Check "Control credits overlay" above, then Play to send roll control to the credits overlay.
+          </div>
+        </div>
+        <div>
+          <div style="font-size:12px; color: var(--muted); margin-bottom:4px;">Overlay (captions)</div>
+          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:6px;">
+            <label style="font-size:12px; color:var(--muted);">showtime</label>
+            <input id="ovShowtime" type="number" min="0" step="100" value="5000" style="width:90px; padding:4px; background: var(--panel-2); border:1px solid #2a2d3a; color:var(--text); border-radius:4px;" />
+            <label style="font-size:12px; color:var(--muted);">maxlines</label>
+            <input id="ovMaxlines" type="number" min="0" step="1" value="0" title="0 means unlimited" style="width:70px; padding:4px; background: var(--panel-2); border:1px solid #2a2d3a; color:var(--text); border-radius:4px;" />
+            <label style="font-size:12px; color:var(--muted);"><input id="ovHtml" type="checkbox" /> html</label>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input id="ovLink" readonly style="flex:1; padding:6px; background: #0f1017; border:1px solid #2a2d3a; color:var(--text); border-radius:6px;" />
+            <button id="ovOpen">Open</button>
+            <button id="ovCopy">Copy</button>
+          </div>
+        </div>
+      </div>
       <div class="list" id="sectionList"></div>
     </div>
     <div class="editor">
@@ -133,6 +179,65 @@
     }
     try { localStorage.setItem('cn_room_id', roomID); } catch(e){}
     document.getElementById('roomBadge').innerText = 'room=' + roomID;
+    // Overlay link helpers
+    const ovShowtimeEl = document.getElementById('ovShowtime');
+    const ovMaxlinesEl = document.getElementById('ovMaxlines');
+    const ovHtmlEl = document.getElementById('ovHtml');
+    const ovLinkEl = document.getElementById('ovLink');
+    const ovOpenBtn = document.getElementById('ovOpen');
+    const ovCopyBtn = document.getElementById('ovCopy');
+    const rollFontEl = document.getElementById('rollFontsize');
+    const rollSpeedEl = document.getElementById('rollSpeed');
+    const rollFgEl = document.getElementById('rollFg');
+    const rollBgEl = document.getElementById('rollBg');
+    const rollPadEl = document.getElementById('rollPad');
+    const rollGapEl = document.getElementById('rollGap');
+    const rollAutoEl = document.getElementById('rollAuto');
+    const rollLiveEl = document.getElementById('rollLive');
+    const rollShadowEl = document.getElementById('rollShadow');
+    const rollUpperEl = document.getElementById('rollUpper');
+    const rollLinkEl = document.getElementById('rollLink');
+    const rollOpenBtn = document.getElementById('rollOpen');
+    const rollCopyBtn = document.getElementById('rollCopy');
+
+    function basePath(){
+      var p = window.location.pathname.replace(/\/[^^/]*$/, '');
+      return window.location.origin + (p || '');
+    }
+    function buildOverlayURL(){
+      var params = [];
+      params.push('room=' + encodeURIComponent(roomID));
+      var st = parseInt(ovShowtimeEl.value||''); if (!isNaN(st) && st>=0) params.push('showtime='+st);
+      var ml = parseInt(ovMaxlinesEl.value||''); if (!isNaN(ml) && ml>0) params.push('maxlines='+ml);
+      if (ovHtmlEl.checked) params.push('html');
+      return basePath() + '/overlay.html' + '?' + params.join('&');
+    }
+    function buildRollURL(){
+      var params = [];
+      params.push('room=' + encodeURIComponent(roomID));
+      var fs = parseFloat(rollFontEl.value||''); if (!isNaN(fs) && fs>0) params.push('fontsize='+fs);
+      var sp = parseFloat(rollSpeedEl.value||''); if (!isNaN(sp) && sp>0) params.push('speed='+sp);
+      var fg = (rollFgEl.value||'').trim(); if (fg) params.push('fg='+encodeURIComponent(fg));
+      var bg = (rollBgEl.value||'').trim(); if (bg) params.push('bg='+encodeURIComponent(bg));
+      var pad = parseFloat(rollPadEl.value||''); if (!isNaN(pad) && pad>=0) params.push('pad='+pad);
+      var gap = parseFloat(rollGapEl.value||''); if (!isNaN(gap) && gap>=0) params.push('gap='+gap);
+      if (rollAutoEl.checked) params.push('auto');
+      if (rollLiveEl.checked) params.push('live'); else params.push('rollonly');
+      if (!rollShadowEl.checked) params.push('shadow=0');
+      if (rollUpperEl.checked) params.push('upper');
+      return basePath() + '/overlay_roll.html' + '?' + params.join('&');
+    }
+    function refreshLinks(){
+      ovLinkEl.value = buildOverlayURL();
+      rollLinkEl.value = buildRollURL();
+    }
+    ovShowtimeEl.oninput = refreshLinks; ovMaxlinesEl.oninput = refreshLinks; ovHtmlEl.onchange = refreshLinks;
+    rollFontEl.oninput = refreshLinks; rollSpeedEl.oninput = refreshLinks; rollAutoEl.onchange = refreshLinks; rollLiveEl.onchange = refreshLinks; rollFgEl.oninput = refreshLinks; rollBgEl.oninput = refreshLinks; rollPadEl.oninput = refreshLinks; rollGapEl.oninput = refreshLinks; rollShadowEl.onchange = refreshLinks; rollUpperEl.onchange = refreshLinks;
+    ovOpenBtn.onclick = function(){ window.open(ovLinkEl.value, '_blank'); };
+    rollOpenBtn.onclick = function(){ window.open(rollLinkEl.value, '_blank'); };
+    ovCopyBtn.onclick = function(){ try{ navigator.clipboard.writeText(ovLinkEl.value); ovCopyBtn.textContent='Copied'; setTimeout(()=>ovCopyBtn.textContent='Copy',800);}catch(e){ prompt('Copy URL:', ovLinkEl.value); } };
+    rollCopyBtn.onclick = function(){ try{ navigator.clipboard.writeText(rollLinkEl.value); rollCopyBtn.textContent='Copied'; setTimeout(()=>rollCopyBtn.textContent='Copy',800);}catch(e){ prompt('Copy URL:', rollLinkEl.value); } };
+    refreshLinks();
 
     let socket; let counter=0; let label = urlParams.get('label') || false;
     function connectWebSocket(){

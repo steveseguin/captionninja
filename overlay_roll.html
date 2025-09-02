@@ -15,7 +15,14 @@
     body { position: relative; overflow: hidden; }
     .container { position:absolute; left:0; right:0; top:0; bottom:0; overflow:hidden; padding: 0 10px; display:block; }
     .content { position:absolute; left:0; right:0; top:0; transform: translateY(0); will-change: transform; }
-    .line { color: white; background:black; display:block; font-family: Cousine, monospace; font-size: var(--fs, 3.2em); line-height: 1.2em; letter-spacing: 0.0em; text-shadow: 0.05em 0.05em 0px rgba(0,0,0,1); padding: 0.15em 0.25em 0 0.25em; margin: 0.15em 0 0 0; }
+    .line { 
+      color: var(--fg, white); background: var(--bg, black); display:block; font-family: Cousine, monospace; 
+      font-size: var(--fs, 3.2em); line-height: 1.2em; letter-spacing: 0.0em; 
+      text-shadow: var(--shadow, 0.05em 0.05em 0px rgba(0,0,0,1)); 
+      padding: var(--pad-y, 0.15em) var(--pad-x, 0.25em) 0 var(--pad-x, 0.25em); 
+      margin: var(--gap, 0.15em) 0 0 0; 
+      text-transform: var(--transform, none);
+    }
   </style>
 </head>
 <body>
@@ -40,15 +47,32 @@
     const autoMode = urlParams.has('auto') || urlParams.has('autospeed');
     const fontSize = parseFloat(urlParams.get('fontsize')) || 3.2; // em
     const minPxPerSec = 10; const maxPxPerSec = 160; // scroll speed bounds
+    const baseSpeedScale = Math.max(0.1, parseFloat(urlParams.get('speed')) || 1.0); // 1.0 = default
+    const liveDefault = !(urlParams.has('nolive') || urlParams.has('rollonly')) || urlParams.has('live');
+
+    // Style customizations
+    const fg = urlParams.get('fg') || urlParams.get('color');
+    const bg = urlParams.get('bg') || null;
+    const pad = parseFloat(urlParams.get('pad'));
+    const gap = parseFloat(urlParams.get('gap'));
+    const shadow = urlParams.has('shadow') ? (String(urlParams.get('shadow')||'1') !== '0') : true;
+    const upper = urlParams.has('upper') || urlParams.has('uppercase');
 
     // DOM
     const container = document.getElementById('container');
     const content = document.getElementById('content');
     document.documentElement.style.setProperty('--fs', fontSize + 'em');
+    if (fg) document.documentElement.style.setProperty('--fg', fg);
+    if (bg) document.documentElement.style.setProperty('--bg', bg);
+    if (!shadow) document.documentElement.style.setProperty('--shadow', 'none');
+    if (!isNaN(pad)) { document.documentElement.style.setProperty('--pad-x', pad + 'em'); document.documentElement.style.setProperty('--pad-y', Math.max(0, pad*0.6).toFixed(3) + 'em'); }
+    if (!isNaN(gap)) document.documentElement.style.setProperty('--gap', Math.max(0, gap) + 'em');
+    if (upper) document.documentElement.style.setProperty('--transform', 'uppercase');
 
     // Roll state
-    let playing = false; let basePxPerSec = 40; let pxPerSec = 40; let offset = 0; let lastTs = 0;
+    let playing = false; let basePxPerSec = 40 * baseSpeedScale; let pxPerSec = basePxPerSec; let offset = 0; let lastTs = 0;
     let words = []; let textRaw = ''; let matchIndex = 0; // for auto align
+    let controlActive = false; let liveMode = liveDefault; let liveInit = false;
 
     // Render helpers
     function renderText(txt){
@@ -62,6 +86,8 @@
       // Prepare words for auto mode
       words = (txt||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(Boolean);
     }
+    function ensureLiveInit(){ if (liveInit) return; content.innerHTML=''; const spacer = document.createElement('div'); spacer.id='topSpacer'; spacer.style.height = container.clientHeight + 'px'; content.appendChild(spacer); liveInit = true; }
+    function appendLine(ln){ if (!ln || !ln.trim()) return; ensureLiveInit(); const el = document.createElement('span'); el.className='line'; el.textContent = ln; content.appendChild(el); if (!playing) { playing = true; } }
     function updateSpacer(){ const sp = document.getElementById('topSpacer'); if (sp) sp.style.height = container.clientHeight + 'px'; }
 
     function maxScroll(){ return Math.max(0, content.scrollHeight - container.clientHeight); }
@@ -119,6 +145,7 @@
     }
 
     function handleRollControl(data){
+      controlActive = true; // switch off live mode on first control message
       switch(String(data.action||'').toLowerCase()){
         case 'load':
           renderText(String(data.text||''));
@@ -140,7 +167,11 @@
 
     function handleMessage(data){
       if (data && data.roll){ handleRollControl(data); return; }
-      if (data && (data.final || data.interm)){ handleSTT(data); }
+      if (data && (data.final || data.interm)){
+        handleSTT(data);
+        // In live mode (no external control), append final lines to the roll
+        if (liveMode && !controlActive && data.final){ appendLine(String(data.final)); }
+      }
     }
   </script>
 </body>
