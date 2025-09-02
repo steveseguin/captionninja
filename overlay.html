@@ -777,6 +777,39 @@
 		clearOnNew = true;
 	}
 	
+	// Optional: limit the number of lines shown
+	var maxLines = null;
+	(function(){
+		let val = null;
+		if (urlParams.has("maxlines")) {
+			val = parseInt(urlParams.get("maxlines"));
+		} else if (urlParams.has("rows")) {
+			val = parseInt(urlParams.get("rows"));
+		} else if (urlParams.has("lines")) {
+			val = parseInt(urlParams.get("lines"));
+		}
+		if (!isNaN(val) && val > 0) {
+			maxLines = val;
+		}
+	})();
+
+	function enforceMaxLines(){
+		if (!maxLines) return;
+		const out = document.getElementById("output");
+		if (!out) return;
+		let brs = out.querySelectorAll('br');
+		while (brs.length > maxLines) {
+			// Remove nodes from the start until and including the first <br>
+			while (out.firstChild && out.firstChild.nodeName.toLowerCase() !== 'br') {
+				out.removeChild(out.firstChild);
+			}
+			if (out.firstChild && out.firstChild.nodeName.toLowerCase() === 'br') {
+				out.removeChild(out.firstChild);
+			}
+			brs = out.querySelectorAll('br');
+		}
+	}
+	
 	var timeoutSpeed = 5000;
 	if (urlParams.has("showtime")){
 		timeoutSpeed = parseInt(urlParams.get("showtime")) || 0;
@@ -944,12 +977,13 @@
 				}
 			} catch(e){ console.warn(e); }
 		 
-			if (clearOnNew || data.c){
-				document.getElementById("output").innerHTML = label+"<span>"+sanitize(data.final)+"</span><br/>";
-			} else {
-				document.getElementById("output").innerHTML += label+"<span>"+sanitize(data.final)+"</span><br/>";
-			} 
-			document.getElementById("interm").innerHTML="";
+				if (clearOnNew || data.c){
+					document.getElementById("output").innerHTML = label+"<span>"+sanitize(data.final)+"</span><br/>";
+				} else {
+					document.getElementById("output").innerHTML += label+"<span>"+sanitize(data.final)+"</span><br/>";
+				}
+				enforceMaxLines();
+				document.getElementById("interm").innerHTML="";
 		}
 		
 		if (!clearOnNew){
