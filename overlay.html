@@ -987,6 +987,10 @@
 					window.CAPTION_TTS.speak(data.interm, true);
 				}
 			} catch(e){ console.warn(e); }
+
+			if (urlParams.has("intermclear")) {
+				document.getElementById("output").innerHTML="";
+			}
 		} else if ("final" in data){
 		 
 			// Decide between built-in overlay TTS and external tts.rocks
