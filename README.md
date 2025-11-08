@@ -270,13 +270,29 @@ https://caption.ninja/overlay?room=abc123&html
 
 ![image](https://user-images.githubusercontent.com/2575698/168219952-827734a2-75bd-45bc-9d8d-f0d7a98fe96c.png)
 
-### Caption Display Time
+### Overlay Display Control
 
-Specify how long messages stay visible with:
+Control how long text remains visible and how much history is kept on the overlay:
+
+- `&showtime=MS`: inactivity-based auto-clear. After the last message, the overlay clears after MS milliseconds (default: `5000`). When new messages keep arriving, the timer resets; nothing clears until input stops.
+- `&clear`: clear on every final message. Shows only the latest line. Note: Enabling “Translate with added context?” on the translate page sets a `c` flag per message that the overlay treats like `&clear`.
+- `&maxlines=N`: keep only the most recent N final lines; older lines are trimmed even while new messages arrive.
+- `&maxage=MS`: remove lines older than MS milliseconds, pruning continuously during live updates.
+
+Examples:
 ```
-&showtime=5000
+.../overlay?room=abc123&clear                  # Always just the latest line
+.../overlay?room=abc123&showtime=1500          # Faster inactivity clear
+.../overlay?room=abc123&maxlines=3             # Keep last 3 lines while active
+.../overlay?room=abc123&maxage=10000           # Drop lines older than 10s
+.../overlay?room=abc123&maxlines=2&maxage=8000 # Combine both
 ```
-Time is in milliseconds. Setting to 0 will disable auto-hiding.
+
+### Build Overlay Links from translate.html
+
+On the translate page, scroll to “Overlay link options” to customize your overlay URL. You can toggle “Clear on each final”, set `showtime`, and add `maxlines` and `maxage`. The share link at the top updates automatically; copy it into OBS/vMix.
+
+These options work alongside TTS settings (if enabled) and translation parameters.
 
 ### Saving Transcriptions
 
@@ -345,4 +361,5 @@ Fonts are provided with their own license; apache 2.0 I believe, but confirm you
 The free translation component is powered by Mozilla Translate; https://github.com/mozilla/translate - MPL 2.0 - Mozilla
 
 
-As per CAPTION.Ninja, to keep in spirit of what Mozilla has created, the code here contributed as part of this CAPTION.Ninja project is also made available as MPL 2.0.
+
+As per CAPTION.NInja, to keep in spirit of what Mozilla has created, the code here contributed as part of this CAPTION.Ninja project is also made available as MPL 2.0.
