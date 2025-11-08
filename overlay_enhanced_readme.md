@@ -18,6 +18,8 @@ This enhanced version of overlay.html adds Google Cloud Translation API support 
 ### 3. Additional Parameters
 - `forcelocal=1` - Force local translation even when Google API key is provided
 - `fromlang=XX` - Override source language detection (e.g., `fromlang=es`)
+- `intermclear=1` - Clear the finished captions while interim text streams to save vertical space
+- `dual=1` (or `view=dual`) - When translating, stack the translated line above the original transcript in a single overlay
 
 ## Examples
 

@@ -45,6 +45,25 @@
 			background-color: black; 
 			padding: 8px 8px 0px 8px;
 			margin:0;
+			max-width: 100%;
+		}
+		.output .dual-line {
+			display: flex;
+			flex-direction: column;
+			gap: 0.15em;
+			line-height: 1.05em;
+			padding: 0;
+			background-color: transparent;
+		}
+		.output .dual-translation {
+			font-size: 0.9em;
+			padding: 4px 8px 0px 8px;
+		}
+		.output .dual-original {
+			font-size: 0.65em;
+			opacity: 0.85;
+			letter-spacing: normal;
+			padding: 2px 8px 0px 8px;
 		}
 		
 		a {
@@ -118,6 +137,12 @@
 	const translationLang = hasTranslation ? 
 	  (translationParams.map(param => urlParams.get(param)).find(val => val) || "en") : false;
 	const langTo = translationLang ? translationLang.split("-")[0] : false;
+	const dualOverlay = langTo && (
+		urlParams.has("dual") ||
+		urlParams.has("dualoverlay") ||
+		urlParams.has("showboth") ||
+		urlParams.get("view") === "dual"
+	);
 
 	// Google Translation settings
 	const googleApiKey = urlParams.get("googlekey") || urlParams.get("gkey") || false;
@@ -131,6 +156,16 @@
 	// Translation cache for Google API
 	const translationCache = new Map();
 	const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+	function preserveOriginal(meta, text, isInterim){
+		if (!dualOverlay || !meta || !text) {
+			return;
+		}
+		const key = isInterim ? "originalInterm" : "originalFinal";
+		if (!meta[key]) {
+			meta[key] = text;
+		}
+	}
 
 	// TTS settings initialization - only set if explicitly specified
 	const ttsParams = ["speech", "speak", "tts"];
@@ -635,6 +670,14 @@
 		var translateCall = async (text, meta, interm=false) => { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
 			if (!text.trim().length) return;
 			
+			const isInterim = Boolean(interm);
+			if (dualOverlay && meta) {
+				const sourceText = isInterim ? (meta?.interm || text) : (meta?.final || text);
+				if (sourceText) {
+					preserveOriginal(meta, sourceText, isInterim);
+				}
+			}
+			
 			// Check if translation is needed (recalculate in case langFrom changed)
 			needsTranslation = langFrom.split('-')[0].toLowerCase() !== langTo.split('-')[0].toLowerCase();
 			
@@ -776,6 +819,7 @@
 	if (urlParams.has("clear")){
 		clearOnNew = true;
 	}
+	var intermClear = urlParams.has("intermclear");
 	
 	// Optional: limit the number of lines shown
 	var maxLines = null;
@@ -960,6 +1004,20 @@
 		return decodedAndStrippedText.trim();
 	};
 	
+	function buildLineMarkup(text, originalText){
+		if (!text){
+			return "";
+		}
+		const displayText = sanitize(text);
+		if (dualOverlay && originalText){
+			const originalClean = sanitize(originalText);
+			if (originalClean && originalClean !== displayText){
+				return `${label}<span class="dual-line"><span class="dual-translation">${displayText}</span><span class="dual-original">${originalClean}</span></span><br/>`;
+			}
+		}
+		return `${label}<span>${displayText}</span><br/>`;
+	}
+	
 	
 	
 	function processReply(data){
@@ -979,7 +1037,16 @@
 		}
 		// console.log(data);
 		if ("interm" in data){
-			document.getElementById("interm").innerHTML = label+"<span>"+sanitize(data.interm)+"</span><br/>";
+			const outputEl = document.getElementById("output");
+			const intermEl = document.getElementById("interm");
+			const intermMarkup = buildLineMarkup(data.interm, data.originalInterm || data.originalFinal);
+			
+			if (intermClear) {
+				outputEl.innerHTML = "";
+				enforceMaxLines();
+			}
+
+			intermEl.innerHTML = intermMarkup;
 			try { adjustIntermVisibility(); } catch(e){}
 			// Optional streaming TTS via tts.rocks when requested
 			try {
@@ -987,10 +1054,6 @@
 					window.CAPTION_TTS.speak(data.interm, true);
 				}
 			} catch(e){ console.warn(e); }
-
-			if (urlParams.has("intermclear")) {
-				document.getElementById("output").innerHTML="";
-			}
 		} else if ("final" in data){
 		 
 			// Decide between built-in overlay TTS and external tts.rocks
@@ -1006,10 +1069,11 @@
 				}
 			} catch(e){ console.warn(e); }
 		 
+				const finalMarkup = buildLineMarkup(data.final, data.originalFinal || data.originalInterm);
 				if (clearOnNew || data.c){
-					document.getElementById("output").innerHTML = label+"<span>"+sanitize(data.final)+"</span><br/>";
+					document.getElementById("output").innerHTML = finalMarkup;
 				} else {
-					document.getElementById("output").innerHTML += label+"<span>"+sanitize(data.final)+"</span><br/>";
+					document.getElementById("output").innerHTML += finalMarkup;
 				}
 				enforceMaxLines();
 				document.getElementById("interm").innerHTML="";

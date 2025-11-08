@@ -110,6 +110,16 @@ Benefits of this approach:
 
 Note: The translation quality using this method relies on the viewer's browser capabilities and may vary compared to the dedicated translation page.
 
+### Method 2.5: Show Translation + Transcript in One Overlay
+
+Prefer one browser source that shows both languages? Add `&dual=1` (or `&view=dual`) to any translated overlay URL. The translated line renders first and the original transcript appears beneath it in a compact style, so the overlay stays roughly the same height.
+
+```
+https://caption.ninja/overlay?room=abc123&translate=ja&googlekey=YOUR_API_KEY&dual=1
+```
+
+`&clear`, `&showtime`, `&maxlines`, and other history flags still apply to the combined block, and TTS continues speaking the translated text while the original is just displayed.
+
 ### Method 3: Premium Google Translation in Overlay
 
 For professional-quality translation with 100+ language support, use Google Cloud Translation API directly in the overlay:
@@ -278,6 +288,7 @@ Control how long text remains visible and how much history is kept on the overla
 - `&clear`: clear on every final message. Shows only the latest line. Note: Enabling “Translate with added context?” on the translate page sets a `c` flag per message that the overlay treats like `&clear`.
 - `&maxlines=N`: keep only the most recent N final lines; older lines are trimmed even while new messages arrive.
 - `&maxage=MS`: remove lines older than MS milliseconds, pruning continuously during live updates.
+- `&intermclear=1`: hide previously finalized lines whenever interim text is streaming, freeing vertical space while still showing the in-progress sentence.
 
 Examples:
 ```
@@ -286,6 +297,7 @@ Examples:
 .../overlay?room=abc123&maxlines=3             # Keep last 3 lines while active
 .../overlay?room=abc123&maxage=10000           # Drop lines older than 10s
 .../overlay?room=abc123&maxlines=2&maxage=8000 # Combine both
+.../overlay?room=abc123&intermclear=1          # Only show the interim/current line
 ```
 
 ### Build Overlay Links from translate.html
