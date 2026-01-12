@@ -304,7 +304,7 @@ Examples:
 
 Browser speech recognition sometimes produces very long "interim" (non-finalized) results without breaking them into sentences. This is common when captioning talk shows, pre-recorded audio, or streams with continuous speech. The following options help manage long interim text blocks:
 
-#### Capture Page Options (index.html)
+#### Capture Page Options (index.html & translate.html)
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
@@ -312,6 +312,8 @@ Browser speech recognition sometimes produces very long "interim" (non-finalized
 | `&maxwords=N` | Truncate interim text to last N words | `&maxwords=50` |
 | `&maxchars=N` | Truncate interim text to last N characters | `&maxchars=200` |
 | `&autosplit` | Auto-finalize on sentence boundaries (. ! ?) | `&autosplit` |
+
+On `translate.html`, these options are also available via UI controls in the **"Interim Text Handling"** section (no URL parameters needed).
 
 #### Overlay Page Options (overlay.html)
 
@@ -326,6 +328,9 @@ Examples:
 
 # Capture with word limit and sentence auto-split
 .../index.html?room=abc123&maxwords=50&autosplit
+
+# Translate page with interim handling (great for esports/fast speech)
+.../translate?lang=en-US&translate=fr&room=abc123&autofinal=800&autosplit
 
 # Overlay with interim-aware line limiting
 .../overlay?room=abc123&maxlines=3&interimmaxlines=3
