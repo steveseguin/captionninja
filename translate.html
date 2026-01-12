@@ -249,6 +249,28 @@
 	  
 	 <button id="toggleTranscription" class="toggle-button">Pause Transcription</button>
 	 <br />
+
+	 <!-- Interim Text Handling Options -->
+	 <div id="interim-options" style="margin: 15px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+		<strong style="display: block; margin-bottom: 8px;">Interim Text Handling (for fast speech/talk shows):</strong>
+		<label style="margin-right: 15px;" title="Force finalization after silence (ms). Recommended: 800">
+			Auto-finalize (ms):
+			<input type="number" id="autoFinalInput" min="0" value="0" style="width: 70px;" placeholder="0=off" />
+		</label>
+		<label style="margin-right: 15px;" title="Auto-split on sentence boundaries (. ! ?)">
+			Auto-split sentences
+			<input type="checkbox" id="autoSplitInput" />
+		</label>
+		<label style="margin-right: 15px;" title="Limit interim text to N words (0=unlimited)">
+			Max words:
+			<input type="number" id="maxWordsInput" min="0" value="0" style="width: 60px;" />
+		</label>
+		<label title="Limit interim text to N characters (0=unlimited)">
+			Max chars:
+			<input type="number" id="maxCharsInput" min="0" value="0" style="width: 60px;" />
+		</label>
+	 </div>
+
 	<div id="tts-controls" style="margin-top: 10px;">
 	  <div id="tts-options" style="display: none; margin: 10px 0;">
 		<div class="tts-provider-select" style="margin-bottom: 10px;">
@@ -854,6 +876,65 @@ document.getElementById("shareLink").href = url + "/overlay?room=" + roomID;
 document.getElementById("shareLink").innerHTML = url + "/overlay?room=" + roomID;
 navigator.clipboard.writeText(url + "/overlay?room=" + roomID).then(() => {}, () => {});
 
+// Interim text handling options
+var autoFinalMs = 0;
+if (urlParams.has("autofinal")){
+	autoFinalMs = parseInt(urlParams.get("autofinal")) || 800;
+} else if (urlParams.has("autofinalize")){
+	autoFinalMs = parseInt(urlParams.get("autofinalize")) || 800;
+}
+
+var maxWords = 0;
+var maxChars = 0;
+if (urlParams.has("maxwords")){
+	maxWords = parseInt(urlParams.get("maxwords")) || 50;
+}
+if (urlParams.has("maxchars")){
+	maxChars = parseInt(urlParams.get("maxchars")) || 200;
+}
+
+var autoSplit = urlParams.has("autosplit");
+
+var silenceTimer = null;
+var pendingInterim = "";
+
+// Truncate interim text to keep only most recent words/chars
+function truncateInterim(text) {
+	if (!text) return text;
+
+	if (maxChars > 0 && text.length > maxChars) {
+		text = "..." + text.slice(-maxChars);
+	}
+
+	if (maxWords > 0) {
+		const words = text.split(/\s+/);
+		if (words.length > maxWords) {
+			text = "..." + words.slice(-maxWords).join(' ');
+		}
+	}
+
+	return text;
+}
+
+// Extract complete sentences for auto-split
+function extractCompleteSentences(text) {
+	const sentenceEndPattern = /([^.!?]*[.!?]+)\s+/g;
+	const matches = [];
+	let lastIndex = 0;
+	let match;
+
+	while ((match = sentenceEndPattern.exec(text)) !== null) {
+		matches.push(match[1].trim());
+		lastIndex = match.index + match[0].length;
+	}
+
+	const remaining = text.slice(lastIndex).trim();
+
+	return {
+		complete: matches,
+		remaining: remaining
+	};
+}
 
 var socket;
 let retryCount = 0;
@@ -1183,15 +1264,40 @@ function setup() {
 			}
 		};
 
+		// Force finalization of pending interim text
+		function forceFinalization() {
+			if (!pendingInterim) return;
+
+			transcript += (transcript ? ' ' : '') + pendingInterim;
+			document.getElementById("input").value = transcript;
+			console.log("auto-finalized transcript:", transcript);
+
+			// Send for translation
+			if (document.getElementById("fullContext").checked) {
+				translateCall([second_transcription, last_transcription, transcript]
+					.filter(Boolean)
+					.join(' '), false);
+			} else {
+				translateCall(transcript, false);
+			}
+
+			// Update memory
+			second_transcription = last_transcription;
+			last_transcription = transcript + ". ";
+			transcript = "";
+			pendingInterim = "";
+			silenceTimer = null;
+		}
+
 		// Replace the entire recognition.onresult handler with this
 		recognition.onresult = function(event) {
 		  counter += 1;
-		  
+
 		  if (typeof(event.results) == 'undefined') {
 			console.log(event);
 			return;
 		  }
-		  
+
 		  // Auto-dismiss security warning when we get actual speech results
 		  const warningElement = document.getElementById('stream-security-warning');
 		  if (warningElement) {
@@ -1202,7 +1308,7 @@ function setup() {
 		  // Track what's being processed in this batch
 		  let isFinal = false;
 		  let current_batch = '';
-		  
+
 		  // Process only the new results since last event
 		  for (var i = event.resultIndex; i < event.results.length; ++i) {
 			if (event.results[i].isFinal) {
@@ -1212,20 +1318,27 @@ function setup() {
 			  current_batch += ' ' + sanitize(event.results[i][0].transcript);
 			}
 		  }
-		  
+
 		  current_batch = current_batch.trim();
-		  
+
 		  if (!current_batch) {
 			return;
 		  }
-		  
+
 		  // Update the UI to show what's being recognized
 		  if (isFinal) {
+			// Clear silence timer since we got a real final
+			if (silenceTimer) {
+				clearTimeout(silenceTimer);
+				silenceTimer = null;
+			}
+			pendingInterim = "";
+
 			// When we get a final result, add it to transcript
 			transcript += (transcript ? ' ' : '') + current_batch;
 			document.getElementById("input").value = transcript;
 			console.log("final transcript:", transcript);
-			
+
 			// Send final result for translation
 			if (document.getElementById("fullContext").checked) {
 			  translateCall([second_transcription, last_transcription, transcript]
@@ -1240,28 +1353,69 @@ function setup() {
 			last_transcription = transcript + ". ";
 			transcript = "";
 		  } else {
-			// For interim results, combine previous final text with current interim text
-			let display_text = transcript + (transcript ? ' ' : '') + current_batch;
-			document.getElementById("input").value = display_text;
-			
-			// Don't send new interim results if queue is backed up
-			if (translationQueue.length > 3) {
-			  console.log("Skipping interim translation due to backlog");
-			  return;
+			// For interim results
+			let textToProcess = current_batch;
+
+			// Option 4: Auto-split on sentence boundaries
+			if (autoSplit) {
+				const { complete, remaining } = extractCompleteSentences(textToProcess);
+
+				// Process each complete sentence as final
+				for (const sentence of complete) {
+					transcript += (transcript ? ' ' : '') + sentence;
+					document.getElementById("input").value = transcript;
+
+					// Send for translation as final
+					if (document.getElementById("fullContext").checked) {
+						translateCall([second_transcription, last_transcription, transcript]
+							.filter(Boolean)
+							.join(' '), false);
+					} else {
+						translateCall(transcript, false);
+					}
+
+					// Update memory
+					second_transcription = last_transcription;
+					last_transcription = transcript + ". ";
+					transcript = "";
+				}
+
+				textToProcess = remaining;
 			}
-			
-			// For translation: only send what's new if not using context
-			let text_to_translate;
-			if (document.getElementById("fullContext").checked) {
-			  text_to_translate = [second_transcription, last_transcription, display_text]
-				.filter(Boolean)
-				.join(' ');
-			} else {
-			  // Only send the latest segment to avoid duplicates in translation
-			  text_to_translate = display_text;
+
+			// Option 2: Apply word/character truncation
+			textToProcess = truncateInterim(textToProcess);
+
+			if (textToProcess) {
+				// Option 1: Store for auto-finalization and reset timer
+				pendingInterim = textToProcess;
+				if (autoFinalMs > 0) {
+					if (silenceTimer) clearTimeout(silenceTimer);
+					silenceTimer = setTimeout(forceFinalization, autoFinalMs);
+				}
+
+				// Combine previous final text with current interim text
+				let display_text = transcript + (transcript ? ' ' : '') + textToProcess;
+				document.getElementById("input").value = display_text;
+
+				// Don't send new interim results if queue is backed up
+				if (translationQueue.length > 3) {
+					console.log("Skipping interim translation due to backlog");
+					return;
+				}
+
+				// For translation: only send what's new if not using context
+				let text_to_translate;
+				if (document.getElementById("fullContext").checked) {
+					text_to_translate = [second_transcription, last_transcription, display_text]
+						.filter(Boolean)
+						.join(' ');
+				} else {
+					text_to_translate = display_text;
+				}
+
+				translateCall(text_to_translate, true);
 			}
-			
-			translateCall(text_to_translate, true);
 		  }
 		};
 		if (isPaused) {
@@ -1280,7 +1434,34 @@ function checkForConflictingSettings() {
 	}
 }
 
-document.addEventListener('DOMContentLoaded', () => ttsMenu.init());
+document.addEventListener('DOMContentLoaded', () => {
+	ttsMenu.init();
+
+	// Initialize interim handling controls from URL params
+	const autoFinalInput = document.getElementById('autoFinalInput');
+	const autoSplitInput = document.getElementById('autoSplitInput');
+	const maxWordsInput = document.getElementById('maxWordsInput');
+	const maxCharsInput = document.getElementById('maxCharsInput');
+
+	if (autoFinalMs > 0) autoFinalInput.value = autoFinalMs;
+	if (autoSplit) autoSplitInput.checked = true;
+	if (maxWords > 0) maxWordsInput.value = maxWords;
+	if (maxChars > 0) maxCharsInput.value = maxChars;
+
+	// Update variables when controls change
+	autoFinalInput.addEventListener('change', function() {
+		autoFinalMs = parseInt(this.value) || 0;
+	});
+	autoSplitInput.addEventListener('change', function() {
+		autoSplit = this.checked;
+	});
+	maxWordsInput.addEventListener('change', function() {
+		maxWords = parseInt(this.value) || 0;
+	});
+	maxCharsInput.addEventListener('change', function() {
+		maxChars = parseInt(this.value) || 0;
+	});
+});
 document.getElementById('fullContext').addEventListener('change', checkForConflictingSettings);
 </script>
 	</body>

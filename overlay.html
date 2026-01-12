@@ -847,6 +847,49 @@
 		}
 	})();
 
+	// Option 3: Interim-aware maxlines (defaults to maxLines if not specified)
+	var interimMaxLines = null;
+	(function(){
+		let val = null;
+		if (urlParams.has("interimmaxlines")) {
+			val = parseInt(urlParams.get("interimmaxlines"));
+		} else if (urlParams.has("intermaxlines")) {
+			val = parseInt(urlParams.get("intermaxlines"));
+		}
+		if (!isNaN(val) && val > 0) {
+			interimMaxLines = val;
+		} else if (maxLines) {
+			// Default to same as maxLines
+			interimMaxLines = maxLines;
+		}
+	})();
+
+	// Truncate text to approximate N lines by sentence or word count
+	function truncateToLines(text, targetLines) {
+		if (!targetLines || !text) return text;
+
+		// First, try splitting on sentence boundaries
+		const sentencePattern = /[.!?]+\s+/g;
+		const sentences = text.split(sentencePattern).filter(s => s.trim());
+
+		if (sentences.length > targetLines) {
+			// Keep only the last N sentences
+			return "..." + sentences.slice(-targetLines).join('. ');
+		}
+
+		// If we have fewer sentences than target, try word-based limiting
+		// Estimate ~12 words per "line"
+		const wordsPerLine = 12;
+		const maxWordCount = targetLines * wordsPerLine;
+		const words = text.split(/\s+/);
+
+		if (words.length > maxWordCount) {
+			return "..." + words.slice(-maxWordCount).join(' ');
+		}
+
+		return text;
+	}
+
 	function adjustIntermVisibility(){
 		if (!maxLines) return;
 		const out = document.getElementById("output");
@@ -1039,8 +1082,15 @@
 		if ("interm" in data){
 			const outputEl = document.getElementById("output");
 			const intermEl = document.getElementById("interm");
-			const intermMarkup = buildLineMarkup(data.interm, data.originalInterm || data.originalFinal);
-			
+
+			// Option 3: Apply interim-aware line truncation
+			let intermText = data.interm;
+			if (interimMaxLines && intermText) {
+				intermText = truncateToLines(intermText, interimMaxLines);
+			}
+
+			const intermMarkup = buildLineMarkup(intermText, data.originalInterm || data.originalFinal);
+
 			if (intermClear) {
 				outputEl.innerHTML = "";
 				enforceMaxLines();

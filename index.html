@@ -225,10 +225,166 @@
 		  .output {
 			font-size: 1.6em;
 		  }
-		  
+
 		  .small-text-container font {
 			font-size: 50% !important;
 		  }
+		}
+
+		/* Customize Overlay Modal */
+		.modal-overlay {
+			display: none;
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: rgba(0,0,0,0.7);
+			z-index: 9999;
+			align-items: center;
+			justify-content: center;
+		}
+		.modal-overlay.open {
+			display: flex;
+		}
+		.modal-content {
+			background: #1e2430;
+			border-radius: 12px;
+			padding: 24px;
+			max-width: 600px;
+			width: 90%;
+			max-height: 80vh;
+			overflow-y: auto;
+			color: #e6e9ef;
+			box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+		}
+		.modal-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 20px;
+			border-bottom: 1px solid #2d3543;
+			padding-bottom: 12px;
+		}
+		.modal-header h2 {
+			margin: 0;
+			font-size: 1.4em;
+		}
+		.modal-close {
+			background: none;
+			border: none;
+			font-size: 24px;
+			color: #9aa3b2;
+			cursor: pointer;
+		}
+		.modal-close:hover {
+			color: #fff;
+		}
+		.modal-section {
+			margin-bottom: 20px;
+		}
+		.modal-section h3 {
+			font-size: 12px;
+			color: #9aa3b2;
+			margin: 0 0 12px 0;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
+		}
+		.modal-row {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			margin-bottom: 10px;
+		}
+		.modal-row label {
+			min-width: 140px;
+			font-size: 14px;
+		}
+		.modal-row input, .modal-row select {
+			flex: 1;
+			padding: 8px 12px;
+			background: #232a36;
+			border: 1px solid #2d3543;
+			border-radius: 6px;
+			color: #e6e9ef;
+			font-size: 14px;
+		}
+		.modal-row input:focus, .modal-row select:focus {
+			outline: none;
+			border-color: var(--primary-color);
+		}
+		.modal-row input[type="checkbox"] {
+			flex: 0;
+			width: 18px;
+			height: 18px;
+		}
+		.modal-row input[type="number"] {
+			max-width: 100px;
+		}
+		.url-preview {
+			background: #0f1017;
+			padding: 12px;
+			border-radius: 6px;
+			font-family: monospace;
+			font-size: 11px;
+			word-break: break-all;
+			margin-top: 16px;
+			border: 1px solid #2d3543;
+			max-height: 80px;
+			overflow-y: auto;
+		}
+		.url-preview strong {
+			color: #9aa3b2;
+		}
+		.capture-note {
+			margin-top: 8px;
+			font-size: 11px;
+			color: #9aa3b2;
+			background: #232a36;
+			padding: 8px;
+			border-radius: 4px;
+		}
+		.modal-actions {
+			display: flex;
+			gap: 12px;
+			margin-top: 20px;
+		}
+		.modal-actions button {
+			flex: 1;
+			padding: 12px;
+			border-radius: 6px;
+			font-weight: 600;
+			cursor: pointer;
+			border: none;
+			font-size: 14px;
+		}
+		.modal-actions .copy-btn {
+			background: var(--primary-color);
+			color: white;
+		}
+		.modal-actions .copy-btn:hover {
+			background: var(--secondary-color);
+		}
+		.modal-actions .cancel-btn {
+			background: #232a36;
+			color: #9aa3b2;
+			border: 1px solid #2d3543;
+		}
+		.modal-actions .cancel-btn:hover {
+			background: #2d3543;
+		}
+		@media (max-width: 600px) {
+			.modal-content {
+				padding: 16px;
+				max-height: 90vh;
+			}
+			.modal-row {
+				flex-wrap: wrap;
+			}
+			.modal-row label {
+				min-width: 100%;
+				margin-bottom: 4px;
+			}
 		}
 	</style>
 </head>
@@ -424,7 +580,74 @@
 
 		return text;
 	}
-	
+
+	// Option 2: Truncate interim text to keep only most recent words/chars
+	function truncateInterim(text) {
+		if (!text) return text;
+
+		// Apply character limit first (keep end)
+		if (maxChars > 0 && text.length > maxChars) {
+			text = "..." + text.slice(-maxChars);
+		}
+
+		// Apply word limit (keep end)
+		if (maxWords > 0) {
+			const words = text.split(/\s+/);
+			if (words.length > maxWords) {
+				text = "..." + words.slice(-maxWords).join(' ');
+			}
+		}
+
+		return text;
+	}
+
+	// Option 4: Extract complete sentences for auto-split
+	function extractCompleteSentences(text) {
+		// Pattern: sentences ending with . ? ! followed by space
+		const sentenceEndPattern = /([^.!?]*[.!?]+)\s+/g;
+		const matches = [];
+		let lastIndex = 0;
+		let match;
+
+		while ((match = sentenceEndPattern.exec(text)) !== null) {
+			matches.push(match[1].trim());
+			lastIndex = match.index + match[0].length;
+		}
+
+		const remaining = text.slice(lastIndex).trim();
+
+		return {
+			complete: matches,      // Array of complete sentences
+			remaining: remaining    // Incomplete sentence at the end
+		};
+	}
+
+	// Option 1: Force finalization of pending interim text
+	function forceFinalization() {
+		if (!pendingInterim) return;
+
+		counter += 1;
+		const direction = detectTextDirection(pendingInterim);
+		document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${pendingInterim}</span><br />`;
+		document.getElementById("interm").innerHTML = "";
+
+		try {
+			var msgObj = {"msg":true, "final":pendingInterim, "id":counter, "ln": myLang};
+			if (label) msgObj.label = label;
+			socket.send(JSON.stringify(msgObj));
+
+			// Optional: speak final results locally if TTS is enabled
+			if (window.CAPTION_TTS && typeof window.CAPTION_TTS.speak === 'function') {
+				window.CAPTION_TTS.speak(pendingInterim);
+			}
+		} catch(e) {
+			console.error(e);
+		}
+
+		pendingInterim = "";
+		silenceTimer = null;
+	}
+
 	var generateRandomString = function (LLL = 16) {
 		var text = "";
 		var words = ["the", "of", "to", "and", "a", "in", "is", "it", "you", "that", "he", "was", "for", "on", "are", "with", "as", "I", "his", "they", "be", "at", "one", "have", "this", "from", "or", "had", "by", "word", "but", "what", "some", "we", "can", "out", "other", "were", "all", "there", "when", "up", "use", "your", "how", "said", "an", "each", "she", "which", "do", "their", "time", "if", "will", "way", "about", "many", "then", "them", "write", "would", "like", "so", "these", "her", "long", "make", "thing", "see", "him", "two", "has", "look", "more", "day", "could", "go", "come", "did", "number", "sound", "no", "most", "people", "my", "over", "know", "water", "than", "call", "first", "who", "may", "down", "side", "been", "now", "find", "any", "new", "work", "part", "take", "get", "place", "made", "live", "where", "after", "back", "little", "only", "round", "man", "year", "came", "show", "every", "good", "me", "give", "our", "under", "name", "very", "through", "just", "form", "sentence", "great", "think", "say", "help", "low", "line", "differ", "turn", "cause", "much", "mean", "before", "move", "right", "boy", "old", "too", "same", "tell", "does", "set", "three", "want", "air", "well", "also", "play", "small", "end", "put", "home", "read", "hand", "port", "large", "spell", "add", "even", "land", "here", "must", "big", "high", "such", "follow", "act", "why", "ask", "men", "change", "went", "light", "kind", "off", "need", "house", "picture", "try", "us", "again", "animal", "point", "mother", "world", "near", "build", "self", "earth", "father", "head", "stand", "own", "page", "should", "country", "found", "answer", "school", "grow", "study", "still", "learn", "plant", "cover", "food", "sun", "four", "between", "state", "keep", "eye", "never", "last", "let", "thought", "city", "tree", "cross", "farm", "hard", "start", "might", "story", "saw", "far", "sea", "draw", "left", "late", "run", "dont", "while", "press", "close", "night", "real", "life", "few", "north", "open", "seem", "together", "next", "white", "children", "begin", "got", "walk", "example", "ease", "paper", "group", "always", "music", "those", "both", "mark", "often", "letter", "until", "mile", "river", "car", "feet", "care", "second", "book", "carry", "took", "science", "eat", "room", "friend", "began", "idea", "fish", "mountain", "stop", "once", "base", "hear", "horse", "cut", "sure", "watch", "color", "face", "wood", "main", "enough", "plain", "girl", "usual", "young", "ready", "above", "ever", "red", "list", "though", "feel", "talk", "bird", "soon", "body", "dog", "family", "direct", "pose", "leave", "song", "measure", "door", "product", "black", "short", "numeral", "class", "wind", "question", "happen", "complete", "ship", "area", "half", "rock", "order", "fire", "south", "problem", "piece", "told", "knew", "pass", "since", "top", "whole", "king", "space", "heard", "best", "hour", "better", "during", "hundred", "five", "remember", "step", "early", "hold", "west", "ground", "interest", "reach", "fast", "verb", "sing", "listen", "six", "table", "travel", "less", "morning", "ten", "simple", "several", "vowel", "toward", "war", "lay", "against", "pattern", "slow", "center", "love", "person", "money", "serve", "appear", "road", "map", "rain", "rule", "govern", "pull", "cold", "notice", "voice", "unit", "power", "town", "fine", "certain", "fly", "fall", "lead", "cry", "dark", "machine", "note", "wait", "plan", "figure", "star", "box", "noun", "field", "rest", "correct", "able", "pound", "done", "beauty", "drive", "stood", "contain", "front", "teach", "week", "final", "gave", "green", "oh", "quick", "develop", "ocean", "warm", "free", "minute", "strong", "special", "mind", "behind", "clear", "tail", "produce", "fact", "street", "inch", "multiply", "nothing", "course", "stay", "wheel", "full", "force", "blue", "object", "decide", "surface", "deep", "moon", "island", "foot", "system", "busy", "test", "record", "boat", "common", "gold", "possible", "plane", "stead", "dry", "wonder", "laugh", "thousand", "ago", "ran", "check", "game", "shape", "equate", "hot", "miss", "brought", "heat", "snow", "tire", "bring", "yes", "distant", "fill", "east", "paint", "language", "among", "grand", "ball", "yet", "wave", "drop", "heart", "am", "present", "heavy", "dance", "engine", "position", "arm", "wide", "sail", "material", "size", "vary", "settle", "speak", "weight", "general", "ice", "matter", "circle", "pair", "include", "divide", "syllable", "felt", "perhaps", "pick", "sudden", "count", "square", "reason", "length", "represent", "art", "subject", "region", "energy", "hunt", "probable", "bed", "brother", "egg", "ride", "cell", "believe", "fraction", "forest", "sit", "race", "window", "store", "summer", "train", "sleep", "prove", "lone", "leg", "exercise", "wall", "catch", "mount", "wish", "sky", "board", "joy", "winter", "sat", "written", "wild", "instrument", "kept", "glass", "grass", "cow", "job", "edge", "sign", "visit", "past", "soft", "fun", "bright", "gas", "weather", "month", "million", "bear", "finish", "happy", "hope", "flower", "clothe", "strange", "gone", "jump", "baby", "eight", "village", "meet", "root", "buy", "raise", "solve", "metal", "whether", "push", "seven", "paragraph", "third", "shall", "held", "hair", "describe", "cook", "floor", "either", "result", "burn", "hill", "safe", "cat", "century", "consider", "type", "law", "bit", "coast", "copy", "phrase", "silent", "tall", "sand", "soil", "roll", "temperature", "finger", "industry", "value", "fight", "lie", "beat", "excite", "natural", "view", "sense", "ear", "else", "quite", "broke", "case", "middle", "kill", "son", "lake", "moment", "scale", "loud", "spring", "observe", "child", "straight", "consonant", "nation", "dictionary", "milk", "speed", "method", "organ", "pay", "age", "section", "dress", "cloud", "surprise", "quiet", "stone", "tiny", "climb", "cool", "design", "poor", "lot", "experiment", "bottom", "key", "iron", "single", "stick", "flat", "twenty", "skin", "smile", "crease", "hole", "trade", "melody", "trip", "office", "receive", "row", "mouth", "exact", "symbol", "die", "least", "trouble", "shout", "except", "wrote", "seed", "tone", "join", "suggest", "clean", "break", "lady", "yard", "rise", "bad", "blow", "oil", "blood", "touch", "grew", "cent", "mix", "team", "wire", "cost", "lost", "brown", "wear", "garden", "equal", "sent", "choose", "fell", "fit", "flow", "fair", "bank", "collect", "save", "control", "decimal", "gentle", "woman", "captain", "practice", "separate", "difficult", "doctor", "please", "protect", "noon", "whose", "locate", "ring", "character", "insect", "caught", "period", "indicate", "radio", "spoke", "atom", "human", "history", "effect", "electric", "expect", "crop", "modern", "element", "hit", "student", "corner", "party", "supply", "bone", "rail", "imagine", "provide", "agree", "thus", "capital", "wont", "chair", "danger", "fruit", "rich", "thick", "soldier", "process", "operate", "guess", "necessary", "sharp", "wing", "create", "neighbor", "wash", "bat", "rather", "crowd", "corn", "compare", "poem", "string", "bell", "depend", "meat", "rub", "tube", "famous", "dollar", "stream", "fear", "sight", "thin", "triangle", "planet", "hurry", "chief", "colony", "clock", "mine", "tie", "enter", "major", "fresh", "search", "send", "yellow", "gun", "allow", "print", "dead", "spot", "desert", "suit", "current", "lift", "rose", "continue", "block", "chart", "hat", "sell", "success", "company", "subtract", "event", "particular", "deal", "swim", "term", "opposite", "wife", "shoe", "shoulder", "spread", "arrange", "camp", "invent", "cotton", "born", "determine", "quart", "nine", "truck", "noise", "level", "chance", "gather", "shop", "stretch", "throw", "shine", "property", "column", "molecule", "select", "wrong", "gray", "repeat", "require", "broad", "prepare", "salt", "nose", "plural", "anger", "claim", "continent", "oxygen", "sugar", "death", "pretty", "skill", "women", "season", "solution", "magnet", "silver", "thank", "branch", "match", "suffix", "especially", "fig", "afraid", "huge", "sister", "steel", "discuss", "forward", "similar", "guide", "experience", "score", "apple", "bought", "led", "pitch", "coat", "mass", "card", "band", "rope", "slip", "win", "dream", "evening", "condition", "feed", "tool", "total", "basic", "smell", "valley", "nor", "double", "seat", "arrive", "master", "track", "parent", "shore", "division", "sheet", "substance", "favor", "connect", "post", "spend", "chord", "fat", "glad", "original", "share", "station", "dad", "bread", "charge", "proper", "bar", "offer", "segment", "slave", "duck", "instant", "market", "degree", "populate", "chick", "dear", "enemy", "reply", "drink", "occur", "support", "speech", "nature", "range", "steam", "motion", "path", "liquid", "log", "meant", "quotient", "teeth", "shell", "neck"];
@@ -506,6 +729,28 @@
 		updateURL("lang="+myLang);
 	}
 	console.log("Language: "+myLang);
+
+// Option 1: Silence-based auto-finalization (ms, 0=disabled)
+var autoFinalMs = 0;
+if (urlParams.has("autofinal")){
+	autoFinalMs = parseInt(urlParams.get("autofinal")) || 800;
+} else if (urlParams.has("autofinalize")){
+	autoFinalMs = parseInt(urlParams.get("autofinalize")) || 800;
+}
+
+// Option 2: Word/character limits for interim text (0=disabled)
+var maxWords = 0;
+var maxChars = 0;
+if (urlParams.has("maxwords")){
+	maxWords = parseInt(urlParams.get("maxwords")) || 50;
+}
+if (urlParams.has("maxchars")){
+	maxChars = parseInt(urlParams.get("maxchars")) || 200;
+}
+
+// Option 4: Auto-split on sentence boundaries
+var autoSplit = urlParams.has("autosplit");
+
 var srtFile = "";
 var timestamp_start = null
 var timestamp_stop = null
@@ -672,6 +917,8 @@ function rebuildSrtFile() {
 	var interim_transcript = "";
 	var recognition = null;
 	var idle = null;
+	var silenceTimer = null;      // Option 1: timer for auto-finalization
+	var pendingInterim = "";      // Option 1: current interim text to finalize
 	setup();
 	var startd = false;
 	function setup() {
@@ -755,10 +1002,17 @@ function rebuildSrtFile() {
 		    const direction = detectTextDirection(transcript);
 		    
 		    if(event.results[i].isFinal) {
+		      // Clear silence timer since we got a real final
+		      if (silenceTimer) {
+		        clearTimeout(silenceTimer);
+		        silenceTimer = null;
+		      }
+		      pendingInterim = "";
+
 		      new_final_transcript += ' ' + transcript;
 		      document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${transcript}</span><br />`;
 		      document.getElementById("interm").innerHTML = "";
-		      
+
 		      try {
 		        if (label) {
 		          socket.send(JSON.stringify({"msg":true, "final":transcript, "id":counter, "label":label, "ln": myLang}));
@@ -782,23 +1036,62 @@ function rebuildSrtFile() {
   if (interim_transcript.trim()) {
     // Mark the start of this segment on first interim token
     if (timestamp_intern === null) { timestamp_intern = Date.now(); }
-    const direction = detectTextDirection(interim_transcript);
-		    document.getElementById("interm").innerHTML = `<span dir='${direction}'>${interim_transcript.trim()}</span><br />`;
-		    
-		    try {
-		      if (label) {
-		        socket.send(JSON.stringify({"msg":true, "interm":interim_transcript.trim(), "id":counter, "label":label, "ln": myLang}));
-		      } else {
-		        socket.send(JSON.stringify({"msg":true, "interm":interim_transcript.trim(), "id":counter, "ln": myLang}));
-		      }
-		      // Optional: streaming TTS for interim when explicitly requested
-		      if (window.CAPTION_TTS && window.CAPTION_TTS.stream && typeof window.CAPTION_TTS.speak === 'function') {
-		        window.CAPTION_TTS.speak(interim_transcript.trim(), true);
-		      }
-		    } catch(e) {
-		      console.error(e);
-		    }
-		  }
+
+    let textToProcess = interim_transcript.trim();
+
+    // Option 4: Auto-split on sentence boundaries
+    if (autoSplit) {
+      const { complete, remaining } = extractCompleteSentences(textToProcess);
+
+      // Send each complete sentence as final
+      for (const sentence of complete) {
+        counter += 1;
+        const dir = detectTextDirection(sentence);
+        document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${dir}'>${sentence}</span><br />`;
+
+        try {
+          var msgObj = {"msg":true, "final": sentence, "id":counter, "ln": myLang};
+          if (label) msgObj.label = label;
+          socket.send(JSON.stringify(msgObj));
+        } catch(e) {
+          console.error(e);
+        }
+      }
+
+      // Only keep remaining incomplete text as interim
+      textToProcess = remaining;
+    }
+
+    // Option 2: Apply word/character truncation
+    textToProcess = truncateInterim(textToProcess);
+
+    if (textToProcess) {
+      // Option 1: Store for potential auto-finalization and reset timer
+      pendingInterim = textToProcess;
+      if (autoFinalMs > 0) {
+        if (silenceTimer) clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(forceFinalization, autoFinalMs);
+      }
+
+      const direction = detectTextDirection(textToProcess);
+      document.getElementById("interm").innerHTML = `<span dir='${direction}'>${textToProcess}</span><br />`;
+
+      try {
+        var msgObj = {"msg":true, "interm":textToProcess, "id":counter, "ln": myLang};
+        if (label) msgObj.label = label;
+        socket.send(JSON.stringify(msgObj));
+
+        // Optional: streaming TTS for interim when explicitly requested
+        if (window.CAPTION_TTS && window.CAPTION_TTS.stream && typeof window.CAPTION_TTS.speak === 'function') {
+          window.CAPTION_TTS.speak(textToProcess, true);
+        }
+      } catch(e) {
+        console.error(e);
+      }
+    } else {
+      document.getElementById("interm").innerHTML = "";
+    }
+  }
 		  
 		  final_transcript = new_final_transcript.trim();
 		  
@@ -886,8 +1179,17 @@ function rebuildSrtFile() {
 		          controlContainer.className = "control-buttons";
 		          document.body.appendChild(controlContainer);
 		        }
+		        // Customize Overlay button
+		        var customizeButton = document.createElement("button");
+		        customizeButton.onclick = function() {
+		          openCustomizeModal();
+		        };
+		        customizeButton.innerHTML = "Customize Overlay";
+		        customizeButton.className = "control-button";
+
 		        controlContainer.appendChild(button);
 		        controlContainer.appendChild(shareButton);
+		        controlContainer.appendChild(customizeButton);
 		        toggleButton.classList.remove("hidden");
 		        document.querySelector('.control-buttons').appendChild(toggleButton);
 		      }
@@ -930,6 +1232,212 @@ function rebuildSrtFile() {
 	});
 	
 	</script>
-	
+
+	<!-- Customize Overlay Modal -->
+	<div id="customizeModal" class="modal-overlay">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h2>Customize Overlay</h2>
+				<button class="modal-close" onclick="closeCustomizeModal()">&times;</button>
+			</div>
+
+			<div class="modal-section">
+				<h3>Translation</h3>
+				<div class="modal-row">
+					<label>Translate to:</label>
+					<select id="modalTranslate">
+						<option value="">None (disabled)</option>
+						<option value="bg">Bulgarian</option>
+						<option value="cs">Czech</option>
+						<option value="nl">Dutch</option>
+						<option value="en">English</option>
+						<option value="et">Estonian</option>
+						<option value="de">German</option>
+						<option value="fr">French</option>
+						<option value="is">Icelandic</option>
+						<option value="it">Italian</option>
+						<option value="nb">Norwegian Bokmal</option>
+						<option value="nn">Norwegian Nynorsk</option>
+						<option value="fa">Persian</option>
+						<option value="pl">Polish</option>
+						<option value="pt">Portuguese</option>
+						<option value="ru">Russian</option>
+						<option value="es">Spanish</option>
+						<option value="uk">Ukrainian</option>
+					</select>
+				</div>
+				<div class="modal-row">
+					<label>Show both (dual):</label>
+					<input type="checkbox" id="modalDual" />
+				</div>
+				<div class="modal-row">
+					<label>Google API Key:</label>
+					<input type="text" id="modalGoogleKey" placeholder="Optional - for 100+ languages" />
+				</div>
+			</div>
+
+			<div class="modal-section">
+				<h3>Display Options</h3>
+				<div class="modal-row">
+					<label>Max lines:</label>
+					<input type="number" id="modalMaxlines" min="0" value="0" placeholder="0 = unlimited" />
+				</div>
+				<div class="modal-row">
+					<label>Show time (ms):</label>
+					<input type="number" id="modalShowtime" min="0" value="5000" />
+				</div>
+				<div class="modal-row">
+					<label>Clear each message:</label>
+					<input type="checkbox" id="modalClear" />
+				</div>
+				<div class="modal-row">
+					<label>Clear on interim:</label>
+					<input type="checkbox" id="modalIntermClear" />
+				</div>
+			</div>
+
+			<div class="modal-section">
+				<h3>Interim Text Handling</h3>
+				<div class="modal-row">
+					<label>Auto-finalize (ms):</label>
+					<input type="number" id="modalAutofinal" min="0" value="0" placeholder="0=off, 800 rec." />
+				</div>
+				<div class="modal-row">
+					<label>Max words:</label>
+					<input type="number" id="modalMaxwords" min="0" value="0" placeholder="0 = unlimited" />
+				</div>
+				<div class="modal-row">
+					<label>Max characters:</label>
+					<input type="number" id="modalMaxchars" min="0" value="0" placeholder="0 = unlimited" />
+				</div>
+				<div class="modal-row">
+					<label>Auto-split sentences:</label>
+					<input type="checkbox" id="modalAutosplit" />
+				</div>
+				<div class="modal-row">
+					<label>Interim max lines:</label>
+					<input type="number" id="modalInterimMaxlines" min="0" value="0" placeholder="0 = same as maxlines" />
+				</div>
+			</div>
+
+			<div class="modal-section">
+				<h3>Text to Speech</h3>
+				<div class="modal-row">
+					<label>Enable TTS:</label>
+					<input type="checkbox" id="modalTTS" />
+				</div>
+				<div class="modal-row">
+					<label>TTS Language:</label>
+					<input type="text" id="modalTTSLang" placeholder="e.g., en-US" />
+				</div>
+			</div>
+
+			<div class="url-preview">
+				<strong>Overlay URL:</strong><br/>
+				<span id="modalUrlPreview">Loading...</span>
+			</div>
+			<div id="captureNote" class="capture-note" style="display:none;">
+				<strong>Capture URL params:</strong> <span id="captureParams"></span>
+			</div>
+
+			<div class="modal-actions">
+				<button class="cancel-btn" onclick="closeCustomizeModal()">Cancel</button>
+				<button class="copy-btn" onclick="copyCustomizedUrl()">Copy Overlay URL</button>
+			</div>
+		</div>
+	</div>
+
+	<script>
+	// Customize Overlay Modal Functions
+	function openCustomizeModal() {
+		document.getElementById('customizeModal').classList.add('open');
+		updateModalUrlPreview();
+	}
+
+	function closeCustomizeModal() {
+		document.getElementById('customizeModal').classList.remove('open');
+	}
+
+	function updateModalUrlPreview() {
+		const base = url + "/overlay?room=" + roomID;
+		const params = [];
+
+		// Translation
+		const translate = document.getElementById('modalTranslate').value;
+		if (translate) params.push('translate=' + translate);
+		if (document.getElementById('modalDual').checked) params.push('dual=1');
+		const googleKey = document.getElementById('modalGoogleKey').value.trim();
+		if (googleKey) params.push('googlekey=' + encodeURIComponent(googleKey));
+
+		// Display options
+		const maxlines = parseInt(document.getElementById('modalMaxlines').value) || 0;
+		if (maxlines > 0) params.push('maxlines=' + maxlines);
+		const showtime = parseInt(document.getElementById('modalShowtime').value);
+		if (!isNaN(showtime) && showtime !== 5000) params.push('showtime=' + showtime);
+		if (document.getElementById('modalClear').checked) params.push('clear');
+		if (document.getElementById('modalIntermClear').checked) params.push('intermclear');
+
+		// Interim handling (overlay params)
+		const interimMaxlines = parseInt(document.getElementById('modalInterimMaxlines').value) || 0;
+		if (interimMaxlines > 0) params.push('interimmaxlines=' + interimMaxlines);
+
+		// TTS
+		if (document.getElementById('modalTTS').checked) {
+			const ttsLang = document.getElementById('modalTTSLang').value.trim();
+			params.push('tts=' + (ttsLang || '1'));
+		}
+
+		const finalUrl = base + (params.length ? '&' + params.join('&') : '');
+		document.getElementById('modalUrlPreview').textContent = finalUrl;
+
+		// Capture URL params (these go on the capture page, not overlay)
+		const captureParams = [];
+		const autofinal = parseInt(document.getElementById('modalAutofinal').value) || 0;
+		const maxwords = parseInt(document.getElementById('modalMaxwords').value) || 0;
+		const maxchars = parseInt(document.getElementById('modalMaxchars').value) || 0;
+		const autosplit = document.getElementById('modalAutosplit').checked;
+
+		if (autofinal > 0) captureParams.push('autofinal=' + autofinal);
+		if (maxwords > 0) captureParams.push('maxwords=' + maxwords);
+		if (maxchars > 0) captureParams.push('maxchars=' + maxchars);
+		if (autosplit) captureParams.push('autosplit');
+
+		const captureNoteEl = document.getElementById('captureNote');
+		if (captureParams.length > 0) {
+			captureNoteEl.style.display = 'block';
+			document.getElementById('captureParams').textContent = '&' + captureParams.join('&');
+		} else {
+			captureNoteEl.style.display = 'none';
+		}
+	}
+
+	function copyCustomizedUrl() {
+		const urlText = document.getElementById('modalUrlPreview').textContent;
+		navigator.clipboard.writeText(urlText).then(() => {
+			const btn = document.querySelector('.modal-actions .copy-btn');
+			btn.textContent = 'Copied!';
+			setTimeout(() => btn.textContent = 'Copy Overlay URL', 2000);
+		});
+	}
+
+	// Add event listeners for live URL preview
+	document.querySelectorAll('#customizeModal input, #customizeModal select').forEach(el => {
+		el.addEventListener('change', updateModalUrlPreview);
+		el.addEventListener('input', updateModalUrlPreview);
+	});
+
+	// Close modal on background click
+	document.getElementById('customizeModal').addEventListener('click', function(e) {
+		if (e.target === this) closeCustomizeModal();
+	});
+
+	// Close modal on Escape key
+	document.addEventListener('keydown', function(e) {
+		if (e.key === 'Escape' && document.getElementById('customizeModal').classList.contains('open')) {
+			closeCustomizeModal();
+		}
+	});
+	</script>
+
 	</body>
 </html>

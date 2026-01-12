@@ -300,6 +300,51 @@ Examples:
 .../overlay?room=abc123&intermclear=1          # Only show the interim/current line
 ```
 
+### Interim Text Handling
+
+Browser speech recognition sometimes produces very long "interim" (non-finalized) results without breaking them into sentences. This is common when captioning talk shows, pre-recorded audio, or streams with continuous speech. The following options help manage long interim text blocks:
+
+#### Capture Page Options (index.html)
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `&autofinal=MS` | Force finalization after MS milliseconds of silence (0=disabled, 800 recommended) | `&autofinal=800` |
+| `&maxwords=N` | Truncate interim text to last N words | `&maxwords=50` |
+| `&maxchars=N` | Truncate interim text to last N characters | `&maxchars=200` |
+| `&autosplit` | Auto-finalize on sentence boundaries (. ! ?) | `&autosplit` |
+
+#### Overlay Page Options (overlay.html)
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `&interimmaxlines=N` | Limit interim text display to approximately N lines (by sentence or word count). Defaults to `maxlines` value if set. | `&interimmaxlines=3` |
+
+Examples:
+```
+# Capture with auto-finalization after 800ms silence (recommended for talk shows)
+.../index.html?room=abc123&autofinal=800
+
+# Capture with word limit and sentence auto-split
+.../index.html?room=abc123&maxwords=50&autosplit
+
+# Overlay with interim-aware line limiting
+.../overlay?room=abc123&maxlines=3&interimmaxlines=3
+
+# Combine capture and overlay options for best results
+# On capture page: ?room=abc123&autofinal=800&autosplit
+# On overlay page: ?room=abc123&maxlines=3
+```
+
+### Customize Overlay Button
+
+The main capture page (index.html) now includes a **"Customize Overlay"** button that opens a modal dialog for easily configuring overlay URL parameters without manually editing URLs. Options include:
+
+- Translation language and dual-overlay mode
+- Display options (maxlines, showtime, clear)
+- Interim text handling settings
+- TTS configuration
+- Live URL preview with copy button
+
 ### Build Overlay Links from translate.html
 
 On the translate page, scroll to “Overlay link options” to customize your overlay URL. You can toggle “Clear on each final”, set `showtime`, and add `maxlines` and `maxage`. The share link at the top updates automatically; copy it into OBS/vMix.
