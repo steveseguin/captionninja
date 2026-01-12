@@ -1,0 +1,11 @@
+# Caption.Ninja robots.txt
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://caption.ninja/sitemap.xml
+
+# Disallow overlay pages (used in OBS, not for indexing)
+Disallow: /overlay?
+Disallow: /overlay_enhanced?
+Disallow: /overlay_roll?
