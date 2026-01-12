@@ -1454,7 +1454,6 @@ function rebuildSrtFile() {
 		const showtime = parseInt(document.getElementById('modalShowtime').value);
 		if (!isNaN(showtime) && showtime !== 5000) params.push('showtime=' + showtime);
 		if (document.getElementById('modalClear').checked) params.push('clear');
-		if (document.getElementById('modalIntermClear').checked) params.push('intermclear');
 
 		// Interim handling (overlay params)
 		const interimMaxlines = parseInt(document.getElementById('modalInterimMaxlines').value) || 0;
