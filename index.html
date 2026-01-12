@@ -243,6 +243,7 @@
 			z-index: 9999;
 			align-items: center;
 			justify-content: center;
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 		}
 		.modal-overlay.open {
 			display: flex;
@@ -251,12 +252,13 @@
 			background: #1e2430;
 			border-radius: 12px;
 			padding: 24px;
-			max-width: 600px;
+			max-width: 640px;
 			width: 90%;
-			max-height: 80vh;
+			max-height: 85vh;
 			overflow-y: auto;
 			color: #e6e9ef;
 			box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+			font-family: inherit;
 		}
 		.modal-header {
 			display: flex;
@@ -268,7 +270,8 @@
 		}
 		.modal-header h2 {
 			margin: 0;
-			font-size: 1.4em;
+			font-size: 1.3em;
+			font-weight: 600;
 		}
 		.modal-close {
 			background: none;
@@ -276,29 +279,43 @@
 			font-size: 24px;
 			color: #9aa3b2;
 			cursor: pointer;
+			font-family: inherit;
 		}
 		.modal-close:hover {
 			color: #fff;
 		}
 		.modal-section {
-			margin-bottom: 20px;
+			margin-bottom: 24px;
+			padding-bottom: 16px;
+			border-bottom: 1px solid #2d3543;
+		}
+		.modal-section:last-of-type {
+			border-bottom: none;
 		}
 		.modal-section h3 {
-			font-size: 12px;
-			color: #9aa3b2;
-			margin: 0 0 12px 0;
+			font-size: 11px;
+			font-weight: 600;
+			color: #7a8599;
+			margin: 0 0 14px 0;
 			text-transform: uppercase;
-			letter-spacing: 0.5px;
+			letter-spacing: 0.8px;
+		}
+		.modal-group {
+			margin-bottom: 16px;
+		}
+		.modal-group:last-child {
+			margin-bottom: 0;
 		}
 		.modal-row {
 			display: flex;
 			align-items: center;
 			gap: 12px;
-			margin-bottom: 10px;
+			margin-bottom: 4px;
 		}
 		.modal-row label {
-			min-width: 140px;
+			min-width: 150px;
 			font-size: 14px;
+			font-weight: 500;
 		}
 		.modal-row input, .modal-row select {
 			flex: 1;
@@ -308,6 +325,7 @@
 			border-radius: 6px;
 			color: #e6e9ef;
 			font-size: 14px;
+			font-family: inherit;
 		}
 		.modal-row input:focus, .modal-row select:focus {
 			outline: none;
@@ -317,32 +335,48 @@
 			flex: 0;
 			width: 18px;
 			height: 18px;
+			cursor: pointer;
 		}
 		.modal-row input[type="number"] {
 			max-width: 100px;
+		}
+		.modal-help {
+			font-size: 12px;
+			color: #6b7785;
+			margin: 2px 0 0 162px;
+			line-height: 1.4;
 		}
 		.url-preview {
 			background: #0f1017;
 			padding: 12px;
 			border-radius: 6px;
-			font-family: monospace;
+			font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
 			font-size: 11px;
 			word-break: break-all;
 			margin-top: 16px;
 			border: 1px solid #2d3543;
 			max-height: 80px;
 			overflow-y: auto;
+			line-height: 1.5;
 		}
 		.url-preview strong {
-			color: #9aa3b2;
+			color: #7a8599;
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+			font-size: 10px;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
 		}
 		.capture-note {
-			margin-top: 8px;
-			font-size: 11px;
-			color: #9aa3b2;
-			background: #232a36;
-			padding: 8px;
-			border-radius: 4px;
+			margin-top: 10px;
+			font-size: 12px;
+			color: #b8c0cc;
+			background: #2d3543;
+			padding: 10px 12px;
+			border-radius: 6px;
+			border-left: 3px solid var(--primary-color);
+		}
+		.capture-note strong {
+			color: #e6e9ef;
 		}
 		.modal-actions {
 			display: flex;
@@ -351,19 +385,25 @@
 		}
 		.modal-actions button {
 			flex: 1;
-			padding: 12px;
+			padding: 12px 16px;
 			border-radius: 6px;
 			font-weight: 600;
 			cursor: pointer;
 			border: none;
 			font-size: 14px;
+			font-family: inherit;
+			transition: background-color 0.2s, transform 0.1s;
+		}
+		.modal-actions button:active {
+			transform: scale(0.98);
 		}
 		.modal-actions .copy-btn {
 			background: var(--primary-color);
 			color: white;
+			flex: 2;
 		}
 		.modal-actions .copy-btn:hover {
-			background: var(--secondary-color);
+			background: #1d7acc;
 		}
 		.modal-actions .cancel-btn {
 			background: #232a36;
@@ -372,6 +412,7 @@
 		}
 		.modal-actions .cancel-btn:hover {
 			background: #2d3543;
+			color: #e6e9ef;
 		}
 		@media (max-width: 600px) {
 			.modal-content {
@@ -1240,104 +1281,142 @@ function rebuildSrtFile() {
 				<h2>Customize Overlay</h2>
 				<button class="modal-close" onclick="closeCustomizeModal()">&times;</button>
 			</div>
+			<p style="margin: 0 0 20px 0; color: #7a8599; font-size: 13px; line-height: 1.5;">
+				Configure how captions appear in OBS/vMix. The URL below updates as you change settings.
+			</p>
 
 			<div class="modal-section">
 				<h3>Translation</h3>
-				<div class="modal-row">
-					<label>Translate to:</label>
-					<select id="modalTranslate">
-						<option value="">None (disabled)</option>
-						<option value="bg">Bulgarian</option>
-						<option value="cs">Czech</option>
-						<option value="nl">Dutch</option>
-						<option value="en">English</option>
-						<option value="et">Estonian</option>
-						<option value="de">German</option>
-						<option value="fr">French</option>
-						<option value="is">Icelandic</option>
-						<option value="it">Italian</option>
-						<option value="nb">Norwegian Bokmal</option>
-						<option value="nn">Norwegian Nynorsk</option>
-						<option value="fa">Persian</option>
-						<option value="pl">Polish</option>
-						<option value="pt">Portuguese</option>
-						<option value="ru">Russian</option>
-						<option value="es">Spanish</option>
-						<option value="uk">Ukrainian</option>
-					</select>
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Translate to:</label>
+						<select id="modalTranslate">
+							<option value="">None (disabled)</option>
+							<option value="bg">Bulgarian</option>
+							<option value="cs">Czech</option>
+							<option value="nl">Dutch</option>
+							<option value="en">English</option>
+							<option value="et">Estonian</option>
+							<option value="de">German</option>
+							<option value="fr">French</option>
+							<option value="is">Icelandic</option>
+							<option value="it">Italian</option>
+							<option value="nb">Norwegian Bokmal</option>
+							<option value="nn">Norwegian Nynorsk</option>
+							<option value="fa">Persian</option>
+							<option value="pl">Polish</option>
+							<option value="pt">Portuguese</option>
+							<option value="ru">Russian</option>
+							<option value="es">Spanish</option>
+							<option value="uk">Ukrainian</option>
+						</select>
+					</div>
+					<div class="modal-help">Free local translation via Mozilla Bergamot (17 languages)</div>
 				</div>
-				<div class="modal-row">
-					<label>Show both (dual):</label>
-					<input type="checkbox" id="modalDual" />
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Dual overlay:</label>
+						<input type="checkbox" id="modalDual" />
+					</div>
+					<div class="modal-help">Show both original text and translation together</div>
 				</div>
-				<div class="modal-row">
-					<label>Google API Key:</label>
-					<input type="text" id="modalGoogleKey" placeholder="Optional - for 100+ languages" />
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Google API Key:</label>
+						<input type="text" id="modalGoogleKey" placeholder="Optional" />
+					</div>
+					<div class="modal-help">For 100+ languages via Google Cloud Translation (paid)</div>
 				</div>
 			</div>
 
 			<div class="modal-section">
 				<h3>Display Options</h3>
-				<div class="modal-row">
-					<label>Max lines:</label>
-					<input type="number" id="modalMaxlines" min="0" value="0" placeholder="0 = unlimited" />
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Max lines:</label>
+						<input type="number" id="modalMaxlines" min="0" value="0" placeholder="0" />
+					</div>
+					<div class="modal-help">Keep only the last N lines on screen (0 = unlimited)</div>
 				</div>
-				<div class="modal-row">
-					<label>Show time (ms):</label>
-					<input type="number" id="modalShowtime" min="0" value="5000" />
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Auto-hide after (ms):</label>
+						<input type="number" id="modalShowtime" min="0" value="5000" />
+					</div>
+					<div class="modal-help">Clear overlay after this many milliseconds of inactivity</div>
 				</div>
-				<div class="modal-row">
-					<label>Clear each message:</label>
-					<input type="checkbox" id="modalClear" />
-				</div>
-				<div class="modal-row">
-					<label>Clear on interim:</label>
-					<input type="checkbox" id="modalIntermClear" />
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Clear each message:</label>
+						<input type="checkbox" id="modalClear" />
+					</div>
+					<div class="modal-help">Show only the latest line (clears previous text)</div>
 				</div>
 			</div>
 
 			<div class="modal-section">
-				<h3>Interim Text Handling</h3>
-				<div class="modal-row">
-					<label>Auto-finalize (ms):</label>
-					<input type="number" id="modalAutofinal" min="0" value="0" placeholder="0=off, 800 rec." />
+				<h3>Fast Speech / Talk Shows</h3>
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Auto-finalize (ms):</label>
+						<input type="number" id="modalAutofinal" min="0" value="0" placeholder="0" />
+					</div>
+					<div class="modal-help">Force text to finalize after silence. Try 800ms for fast speech.</div>
 				</div>
-				<div class="modal-row">
-					<label>Max words:</label>
-					<input type="number" id="modalMaxwords" min="0" value="0" placeholder="0 = unlimited" />
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Auto-split sentences:</label>
+						<input type="checkbox" id="modalAutosplit" />
+					</div>
+					<div class="modal-help">Break text into lines at sentence boundaries (. ! ?)</div>
 				</div>
-				<div class="modal-row">
-					<label>Max characters:</label>
-					<input type="number" id="modalMaxchars" min="0" value="0" placeholder="0 = unlimited" />
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Interim max lines:</label>
+						<input type="number" id="modalInterimMaxlines" min="0" value="0" placeholder="0" />
+					</div>
+					<div class="modal-help">Limit in-progress text to N lines (for long unbroken speech)</div>
 				</div>
-				<div class="modal-row">
-					<label>Auto-split sentences:</label>
-					<input type="checkbox" id="modalAutosplit" />
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Max words:</label>
+						<input type="number" id="modalMaxwords" min="0" value="0" placeholder="0" />
+					</div>
+					<div class="modal-help">Truncate in-progress text to last N words (0 = off)</div>
 				</div>
-				<div class="modal-row">
-					<label>Interim max lines:</label>
-					<input type="number" id="modalInterimMaxlines" min="0" value="0" placeholder="0 = same as maxlines" />
+				<div class="modal-group" style="display:none;">
+					<div class="modal-row">
+						<label>Max characters:</label>
+						<input type="number" id="modalMaxchars" min="0" value="0" placeholder="0" />
+					</div>
+					<div class="modal-help">Truncate in-progress text to last N characters</div>
 				</div>
 			</div>
 
 			<div class="modal-section">
 				<h3>Text to Speech</h3>
-				<div class="modal-row">
-					<label>Enable TTS:</label>
-					<input type="checkbox" id="modalTTS" />
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>Enable TTS:</label>
+						<input type="checkbox" id="modalTTS" />
+					</div>
+					<div class="modal-help">Read captions aloud using browser speech synthesis</div>
 				</div>
-				<div class="modal-row">
-					<label>TTS Language:</label>
-					<input type="text" id="modalTTSLang" placeholder="e.g., en-US" />
+				<div class="modal-group">
+					<div class="modal-row">
+						<label>TTS voice:</label>
+						<input type="text" id="modalTTSLang" placeholder="e.g., en-US" />
+					</div>
+					<div class="modal-help">Language/voice code (leave blank for system default)</div>
 				</div>
 			</div>
 
 			<div class="url-preview">
-				<strong>Overlay URL:</strong><br/>
+				<strong>Overlay URL (for OBS/vMix):</strong><br/>
 				<span id="modalUrlPreview">Loading...</span>
 			</div>
 			<div id="captureNote" class="capture-note" style="display:none;">
-				<strong>Capture URL params:</strong> <span id="captureParams"></span>
+				<strong>Note:</strong> Fast speech options need to be added to this capture page's URL: <code id="captureParams" style="background:#1e2430; padding:2px 6px; border-radius:3px;"></code>
 			</div>
 
 			<div class="modal-actions">
