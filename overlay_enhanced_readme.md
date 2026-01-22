@@ -15,9 +15,17 @@ This enhanced version of overlay.html adds Google Cloud Translation API support 
 - `contextsize=N` - Number of previous messages to include for context (default: 2)
 - Improves translation accuracy for conversations
 
-### 3. Additional Parameters
+### 3. Auto-Detect Source Language (Premium)
+- Add `fromlang=auto` or `autodetect` to enable automatic language detection
+- Requires a Google API key - Google detects the source language automatically
+- Perfect for bilingual speakers who switch between languages (e.g., French/English)
+- Detected language is logged to console for debugging
+
+### 4. Additional Parameters
 - `forcelocal=1` - Force local translation even when Google API key is provided
 - `fromlang=XX` - Override source language detection (e.g., `fromlang=es`)
+- `fromlang=auto` - Enable automatic source language detection (Google API only)
+- `autodetect` - Alternative to `fromlang=auto`
 - `intermclear=1` - Clear the finished captions while interim text streams to save vertical space
 - `dual=1` (or `view=dual`) - When translating, stack the translated line above the original transcript in a single overlay
 
@@ -43,6 +51,13 @@ Open multiple browser windows/tabs with different target languages:
 ```
 overlay.html?room=abc123&translate=es&googlekey=KEY&forcelocal=1
 ```
+
+### Auto-Detect Language (Multi-Language Speakers)
+For speakers who switch between French and English, with output always in English:
+```
+overlay.html?room=abc123&translate=en&fromlang=auto&googlekey=YOUR_API_KEY
+```
+Google will automatically detect whether the speaker is using French or English and translate accordingly.
 
 ## Backward Compatibility
 

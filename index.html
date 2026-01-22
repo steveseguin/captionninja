@@ -195,6 +195,64 @@
 		  background-color: #dc3545;
 		}
 		
+		/* Language toggle control styles */
+		.lang-toggle-container {
+		  position: fixed;
+		  top: 10px;
+		  left: 10px;
+		  z-index: 1000;
+		  display: flex;
+		  align-items: center;
+		  gap: 8px;
+		  background: rgba(0, 0, 0, 0.85);
+		  padding: 8px 12px;
+		  border-radius: 6px;
+		  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		}
+		
+		.lang-toggle-container.hidden {
+		  display: none !important;
+		}
+		
+		.lang-toggle-label {
+		  color: #9aa3b2;
+		  font-size: 11px;
+		  text-transform: uppercase;
+		  letter-spacing: 0.5px;
+		}
+		
+		.lang-toggle-btn {
+		  background: var(--primary-color);
+		  color: white;
+		  border: none;
+		  padding: 8px 16px;
+		  border-radius: 4px;
+		  cursor: pointer;
+		  font-weight: 600;
+		  font-size: 14px;
+		  transition: background-color 0.2s, transform 0.1s;
+		  min-width: 60px;
+		  text-align: center;
+		}
+		
+		.lang-toggle-btn:hover {
+		  background: #1d7acc;
+		}
+		
+		.lang-toggle-btn:active {
+		  transform: scale(0.98);
+		}
+		
+		.lang-toggle-btn .lang-code {
+		  font-weight: 700;
+		}
+		
+		.lang-toggle-shortcut {
+		  color: #6b7280;
+		  font-size: 10px;
+		  margin-left: 4px;
+		}
+		
 		.output {
 		  direction: auto;
 		  unicode-bidi: bidi-override;
@@ -483,6 +541,16 @@
 	  <span id="errorMessage"></span>
 	  <button id="dismissError">Dismiss</button>
 	</div>
+	
+	<!-- Language Toggle Control (hidden by default, enabled via &togglelang=) -->
+	<div id="langToggleContainer" class="lang-toggle-container hidden">
+	  <span class="lang-toggle-label">Source:</span>
+	  <button id="langToggleBtn" class="lang-toggle-btn" title="Switch source language (Ctrl+L)">
+		<span id="langToggleCurrent" class="lang-code">EN</span>
+	  </button>
+	  <span class="lang-toggle-shortcut">Ctrl+L</span>
+	</div>
+	
 	<div id="interm" class="output">
 	<font style='font-size:60%;line-height: 1.4em;'><span>Welcome to CAPTION.Ninja - A Free Captioning Tool</span></font>
 	
@@ -515,6 +583,7 @@
 		<strong>🔬🛠️ Advanced Features:</strong>
 		<ul>
 			<li>Change input language: Add <code>&lang=fr-FR</code> to the URL (<a href="https://cloud.google.com/speech-to-text/docs/languages" target="_blank">speech recognition codes</a>)</li>
+			<li>Multi-language speakers: Add <code>&togglelang=en-US,fr-FR</code> to enable quick language switching (Ctrl+L or click toggle)</li>
 			<li>Text to Speech playback is supported. See the <a href="https://github.com/steveseguin/captionninja?tab=readme-ov-file#tts-integration" target="_blank">TTS guide in the GitHub README</a> and visit <a href="https://tts.rocks" target="_blank">tts.rocks</a> for engines and usage.</li>
 			<li>Use a <a href='https://www.vb-audio.com/Cable/'>Virtual Audio Cable</a> to caption from other audio sources</li>
 		</ul>
@@ -819,6 +888,76 @@
 		updateURL("lang="+myLang);
 	}
 	console.log("Language: "+myLang);
+
+	// Language Toggle Feature - enables quick switching between languages
+	// Usage: &togglelang=en-US,fr-FR or &togglelang=en-US,fr-FR,es-ES
+	var toggleLanguages = [];
+	var currentLangIndex = 0;
+	
+	if (urlParams.has("togglelang")) {
+		var toggleParam = urlParams.get("togglelang");
+		toggleLanguages = toggleParam.split(",").map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
+		
+		if (toggleLanguages.length >= 2) {
+			// Find current language in the toggle list, or default to first
+			currentLangIndex = toggleLanguages.indexOf(myLang);
+			if (currentLangIndex === -1) {
+				// Current lang not in list, set to first toggle language
+				currentLangIndex = 0;
+				myLang = toggleLanguages[0];
+				updateURL("lang=" + myLang, true);
+			}
+			
+			// Show the toggle UI
+			var langToggleContainer = document.getElementById("langToggleContainer");
+			var langToggleBtn = document.getElementById("langToggleBtn");
+			var langToggleCurrent = document.getElementById("langToggleCurrent");
+			
+			if (langToggleContainer && langToggleBtn && langToggleCurrent) {
+				langToggleContainer.classList.remove("hidden");
+				
+				// Display language code (e.g., "EN" from "en-US")
+				function updateToggleDisplay() {
+					var displayCode = myLang.split("-")[0].toUpperCase();
+					langToggleCurrent.textContent = displayCode;
+					langToggleBtn.title = "Current: " + myLang + " - Click or Ctrl+L to switch";
+				}
+				updateToggleDisplay();
+				
+				// Switch to next language in the list
+				function switchLanguage() {
+					currentLangIndex = (currentLangIndex + 1) % toggleLanguages.length;
+					myLang = toggleLanguages[currentLangIndex];
+					updateURL("lang=" + myLang, true);
+					updateToggleDisplay();
+					console.log("Switched language to: " + myLang);
+					
+					// Restart speech recognition with new language
+					if (recognition) {
+						recognition.lang = myLang;
+						// Stop and restart to apply new language
+						try {
+							recognition.stop();
+						} catch(e) {
+							console.log("Recognition stop error (expected):", e);
+						}
+						// Recognition will auto-restart via onend handler
+					}
+				}
+				
+				// Click handler
+				langToggleBtn.addEventListener("click", switchLanguage);
+				
+				// Keyboard shortcut: Ctrl+L
+				document.addEventListener("keydown", function(e) {
+					if (e.ctrlKey && e.key.toLowerCase() === "l") {
+						e.preventDefault();
+						switchLanguage();
+					}
+				});
+			}
+		}
+	}
 
 // Option 1: Silence-based auto-finalization (ms, 0=disabled)
 var autoFinalMs = 0;

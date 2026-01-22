@@ -122,6 +122,10 @@
 	// Google Translation settings
 	const googleApiKey = urlParams.get("googlekey") || urlParams.get("gkey") || false;
 	const forceLocal = urlParams.has("forcelocal");
+	
+	// Auto-detect source language (Google API only - premium feature)
+	// Usage: &fromlang=auto or &autodetect with a Google API key
+	const autoDetectLang = urlParams.has("autodetect") || urlParams.get("fromlang") === "auto";
 
 	// Context settings
 	const useContext = urlParams.has("context") || urlParams.has("fullcontext");
@@ -188,17 +192,25 @@
 	}
 	
 	// Google Translation function
+	// Supports auto-detection when sourceLang is "auto" or autoDetectLang is enabled
 	async function translateViaGoogle(text, sourceLang, targetLang) {
 		if (!googleApiKey || !text.trim()) return null;
 		
-		// Check cache first
-		const cacheKey = `${text}-${sourceLang}-${targetLang}`;
+		// Determine if we should use auto-detection
+		const useAutoDetect = autoDetectLang || sourceLang === "auto";
+		
+		// Check cache first (include auto-detect mode in cache key)
+		const cacheKey = useAutoDetect 
+			? `auto-${text}-${targetLang}` 
+			: `${text}-${sourceLang}-${targetLang}`;
 		const cached = translationCache.get(cacheKey);
 		if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
 			return cached.translation;
 		}
 		
-		const url = `https://www.googleapis.com/language/translate/v2/?key=${googleApiKey}&q=${encodeURIComponent(text)}&target=${targetLang}&source=${sourceLang}`;
+		// Build URL - omit source parameter for auto-detection
+		const sourceParam = useAutoDetect ? '' : `&source=${sourceLang}`;
+		const url = `https://www.googleapis.com/language/translate/v2/?key=${googleApiKey}&q=${encodeURIComponent(text)}&target=${targetLang}${sourceParam}`;
 		
 		try {
 			const response = await fetch(url, {
@@ -215,11 +227,19 @@
 			
 			const data = await response.json();
 			if (data?.data?.translations?.[0]) {
-				const translation = data.data.translations[0].translatedText;
+				const translationData = data.data.translations[0];
+				const translation = translationData.translatedText;
+				
+				// Log detected language when using auto-detection
+				if (useAutoDetect && translationData.detectedSourceLanguage) {
+					console.log(`Auto-detected language: ${translationData.detectedSourceLanguage}`);
+				}
+				
 				// Cache the translation
 				translationCache.set(cacheKey, {
 					translation: translation,
-					timestamp: Date.now()
+					timestamp: Date.now(),
+					detectedLang: translationData.detectedSourceLanguage || null
 				});
 				return translation;
 			}
@@ -621,14 +641,22 @@
 	// document.body.appendChild(tts.createUI());
 	
 	if (langTo){
-		var langFrom = urlParams.get("fromlang") || "en";
+		// Handle auto-detect: langFrom will be "auto" when auto-detection is enabled
+		var langFrom = autoDetectLang ? "auto" : (urlParams.get("fromlang") || "en");
 		
 		// Only initialize local translation if no Google API key or force local
-		if (!googleApiKey || forceLocal) {
+		// Note: Local translation (Bergamot) does NOT support auto-detect - requires Google API key
+		if ((!googleApiKey || forceLocal) && !autoDetectLang) {
 			if (window.Worker) {
 				worker = new Worker("worker.js");
 				worker.postMessage(["import"]);
 			}
+		}
+		
+		// Warn if auto-detect is enabled without Google API key
+		if (autoDetectLang && !googleApiKey) {
+			console.warn("Auto-detect language requires a Google API key. Add &googlekey=YOUR_KEY to use auto-detection.");
+			status("Auto-detect requires Google API key");
 		}
 
 		var translateCall = async (text, meta, interm=false) => { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla

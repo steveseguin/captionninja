@@ -348,6 +348,52 @@
         </div>
     </div>
 
+    <h2>Multi-Language Speakers</h2>
+    
+    <div class="method-card">
+        <h3>Handling Speakers Who Switch Between Languages</h3>
+        <p>For events where speakers alternate between languages (e.g., French and English), Caption.Ninja offers two approaches:</p>
+        
+        <h4>Option 1: Manual Language Toggle (Free)</h4>
+        <p>Add a quick-switch toggle to the capture page that lets a producer switch between languages on the fly:</p>
+        <div class="example-box">
+            index.html?room=yourRoom&lang=en-US&togglelang=en-US,fr-FR
+        </div>
+        <ul>
+            <li><code>togglelang=XX,YY</code> - Comma-separated list of languages to cycle through</li>
+            <li>Click the toggle button or press <strong>Ctrl+L</strong> to switch languages</li>
+            <li>The overlay automatically adapts when the source language changes</li>
+            <li>Works with free local translation (Bergamot)</li>
+        </ul>
+        <p><strong>Workflow:</strong></p>
+        <ol>
+            <li>Open <code>index.html?room=myroom&lang=en-US&togglelang=en-US,fr-FR</code></li>
+            <li>Open <code>overlay.html?room=myroom&translate=en</code> in OBS</li>
+            <li>When speaker switches to French, press <strong>Ctrl+L</strong> or click the toggle</li>
+            <li>French speech will be transcribed and translated to English</li>
+        </ol>
+
+        <h4>Option 2: Auto-Detect Language (Premium)</h4>
+        <p>With a Google Cloud API key, enable automatic source language detection:</p>
+        <div class="example-box">
+            overlay.html?room=yourRoom&translate=en&fromlang=auto&googlekey=YOUR_KEY
+        </div>
+        <p>Or use the dedicated parameter:</p>
+        <div class="example-box">
+            overlay.html?room=yourRoom&translate=en&autodetect&googlekey=YOUR_KEY
+        </div>
+        <ul>
+            <li><code>fromlang=auto</code> or <code>autodetect</code> - Enable automatic language detection</li>
+            <li>Requires a Google Cloud Translation API key</li>
+            <li>Google automatically detects if the speaker is using French or English</li>
+            <li>French → translated to English; English → passed through</li>
+        </ul>
+        
+        <div class="info-box">
+            <strong>Note:</strong> Auto-detect only works with Google Cloud Translation (premium). The free local translation (Bergamot) requires you to specify the source language manually using the toggle feature.
+        </div>
+    </div>
+
     <h2>Language Codes Reference</h2>
     
     <div class="info-box">
