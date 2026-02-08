@@ -280,6 +280,33 @@ https://caption.ninja/overlay?room=abc123&html
 
 ![image](https://user-images.githubusercontent.com/2575698/168219952-827734a2-75bd-45bc-9d8d-f0d7a98fe96c.png)
 
+### Custom Term Mapping (URL-only)
+
+For specialized vocabulary (acronyms, scientific terms), you can pass replacement and restricted-word rules directly in the capture URL.
+
+- `map=` supports direct mappings in `from=>to` format (comma or newline separated)
+- `restricted=` lists words/phrases to mask in output
+- `match=` controls fallback matching mode: `phonetic` (default), `word`, or `substring`
+
+Examples:
+```
+# Direct mapping list + restricted terms
+https://caption.ninja/?room=abc123&map=arrow=>ARO,error=>ARO&restricted=third reich
+
+# Translation page with direct mappings
+https://caption.ninja/translate?room=abc123&map=auricle=>auricle,pinna=>pinna
+
+# Force exact whole-word mode (disable phonetic fallback)
+https://caption.ninja/?room=abc123&map=arrow=>ARO&match=word
+```
+
+Matching behavior:
+- Direct mappings are always applied first.
+- Phonetic/fuzzy matching is fallback-only and runs only when no direct mapping matched that word.
+- Restricted words are masked after replacements.
+
+Tip: URL-encode special characters (`>`, spaces, commas) when generating links programmatically.
+
 ### Overlay Display Control
 
 Control how long text remains visible and how much history is kept on the overlay:
@@ -403,6 +430,12 @@ The Mozilla-powered translation component can be deployed from https://github.co
 Free support is available at https://discord.vdo.ninja
 
 Ask for @steve for help in the #miscellaneous or #vdo-ninja-support channels.
+
+For websocket delivery issues (for example: captions appear locally but not in room), open browser dev tools and run:
+```
+copyWsDebugInfo()
+```
+Then share that output with your bug report. It includes connection state, retry count, queued/dropped message counts, and last websocket error.
 
 For email support: steve@seguin.email (support is limited and not guaranteed)
 

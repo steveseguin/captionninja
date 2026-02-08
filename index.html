@@ -194,7 +194,7 @@
 		.control-button.paused {
 		  background-color: #dc3545;
 		}
-		
+
 		/* Language toggle control styles */
 		.lang-toggle-container {
 		  position: fixed;
@@ -209,7 +209,7 @@
 		  border-radius: 6px;
 		  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 		}
-		
+
 		.lang-toggle-container.hidden {
 		  display: none !important;
 		}
@@ -541,7 +541,7 @@
 	  <span id="errorMessage"></span>
 	  <button id="dismissError">Dismiss</button>
 	</div>
-	
+
 	<!-- Language Toggle Control (hidden by default, enabled via &togglelang=) -->
 	<div id="langToggleContainer" class="lang-toggle-container hidden">
 	  <span class="lang-toggle-label">Source:</span>
@@ -550,7 +550,7 @@
 	  </button>
 	  <span class="lang-toggle-shortcut">Ctrl+L</span>
 	</div>
-	
+
 	<div id="interm" class="output">
 	<font style='font-size:60%;line-height: 1.4em;'><span>Welcome to CAPTION.Ninja - A Free Captioning Tool</span></font>
 	
@@ -604,6 +604,8 @@
 
 	<script src="security-utils.js"></script>
 	<script src="tts-integration.js"></script>
+	<script src="ws-publisher.js"></script>
+	<script src="text-rules.js"></script>
 	<script>
 	
 	function detectTextDirection(text) {
@@ -718,7 +720,22 @@
 		};
 	})(window);
 	var urlParams = new URLSearchParams(window.location.search);
-	
+	var textRulesConfig = (window.CaptionTextRules && window.CaptionTextRules.parseRulesFromUrlParams)
+		? window.CaptionTextRules.parseRulesFromUrlParams(urlParams)
+		: { replacements: [], restricted: [], matchMode: 'phonetic' };
+	var textRulesEngine = (window.CaptionTextRules && window.CaptionTextRules.createEngine)
+		? window.CaptionTextRules.createEngine(textRulesConfig)
+		: null;
+
+	function applyTextRules(text) {
+		if (!textRulesEngine || typeof text !== 'string') return text;
+		try {
+			return textRulesEngine.apply(text);
+		} catch (e) {
+			console.warn('Text rules failed:', e);
+			return text;
+		}
+	}
 	function isEdge() {
 	  return navigator.userAgent.indexOf("Edg/") !== -1;
 	}
@@ -737,7 +754,16 @@
 		}
 		//}
 
-		return text;
+		return applyTextRules(text);
+	}
+
+	function escapeHTML(text) {
+		return String(text)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;');
 	}
 
 	// Option 2: Truncate interim text to keep only most recent words/chars
@@ -787,13 +813,13 @@
 
 		counter += 1;
 		const direction = detectTextDirection(pendingInterim);
-		document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${pendingInterim}</span><br />`;
+		document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${escapeHTML(pendingInterim)}</span><br />`;
 		document.getElementById("interm").innerHTML = "";
 
 		try {
 			var msgObj = {"msg":true, "final":pendingInterim, "id":counter, "ln": myLang};
 			if (label) msgObj.label = label;
-			socket.send(JSON.stringify(msgObj));
+			publishCaption(msgObj);
 
 			// Optional: speak final results locally if TTS is enabled
 			if (window.CAPTION_TTS && typeof window.CAPTION_TTS.speak === 'function') {
@@ -1059,58 +1085,47 @@ function rebuildSrtFile() {
     }, () => {
     });
 	var apiKey = false;
-	
-	var socket;
-	let retryCount = 0;
-	const maxRetryDelay = 30000; // Maximum delay of 30 seconds
-	const baseDelay = 1000; // Start with 1 second delay after first immediate retry
-
-	function getRetryDelay() {
-		if (retryCount === 0) {
-			return 0; // First retry is immediate
-		}
-		// Exponential backoff: baseDelay * 2^(retryCount-1)
-		const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), maxRetryDelay);
-		return delay;
+	var wsPublisher = null;
+	function publishCaption(payload) {
+		if (!wsPublisher || !payload) return;
+		wsPublisher.publish(payload);
 	}
 
 	function connectWebSocket() {
-		if (socket) {
-			socket.close();
-			socket = null;
-		}
-
-		socket = new WebSocket("wss://api.caption.ninja:443");
-
-		socket.onclose = function() {
-			console.log("WebSocket connection closed. Attempting to reconnect...");
-			const delay = getRetryDelay();
-			console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
-			setTimeout(connectWebSocket, delay);
-			retryCount++;
-		};
-
-		socket.onopen = function() {
-			console.log("WebSocket connected. Joining room...");
-			// Reset retry count on successful connection
-			retryCount = 0;
-			socket.send(JSON.stringify({"join":roomID}));
-		};
-
-		socket.onerror = function(error) {
-			console.error("WebSocket error:", error);
-			if (socket) {
-				socket.close();
-				socket = null;
+		wsPublisher = createWSPublisher({
+			url: "wss://api.caption.ninja:443",
+			room: roomID,
+			onStateChange: function(nextState, snapshot) {
+				if (nextState === "error") {
+					console.error("WebSocket error state:", snapshot && snapshot.lastError);
+				}
+				if (snapshot && snapshot.blockedSuspected) {
+					showErrorBanner("WebSocket may be blocked by network/firewall/VPN. Try disabling VPN or checking browser console.");
+				}
+			},
+			onError: function(error) {
+				console.error("WebSocket error:", error);
 			}
-			const delay = getRetryDelay();
-			console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
-			setTimeout(connectWebSocket, delay);
-			retryCount++;
-		};
+		});
+		wsPublisher.connect();
 	}
 
 	connectWebSocket();
+
+	window.copyWsDebugInfo = function () {
+		if (!wsPublisher) return;
+		var snapshot = wsPublisher.getSnapshot();
+		var text = "[Caption.Ninja WS Debug]\\n" +
+			"room=" + roomID + "\\n" +
+			"state=" + snapshot.state + "\\n" +
+			"retries=" + snapshot.retryCount + "\\n" +
+			"queue=" + snapshot.queueLength + "\\n" +
+			"dropped=" + snapshot.droppedCount + "\\n" +
+			"blocked=" + snapshot.blockedSuspected + "\\n" +
+			"lastError=" + (snapshot.lastError || "") + "\\n" +
+			"userAgent=" + navigator.userAgent;
+		navigator.clipboard.writeText(text).catch(function(){});
+	};
 	
 	
 	function handleNetworkError() {
@@ -1183,19 +1198,19 @@ function rebuildSrtFile() {
 		  console.log(e);
 		  console.log("Stopped transcription");
 		  
-		  if (startd) {
-			let currentInterim = document.getElementById("interm").innerText.trim();
-			if (currentInterim) {
-			  counter += 1;
-			  const direction = detectTextDirection(currentInterim);
-			  document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${currentInterim}</span><br />`;
-			  document.getElementById("interm").innerHTML = "";
+			  if (startd) {
+				let currentInterim = document.getElementById("interm").innerText.trim();
+				if (currentInterim) {
+				  counter += 1;
+				  const direction = detectTextDirection(currentInterim);
+				  document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${escapeHTML(currentInterim)}</span><br />`;
+				  document.getElementById("interm").innerHTML = "";
 			  
 			  try {
 				if (label) {
-				  socket.send(JSON.stringify({"msg":true, "final":currentInterim, "id":counter, "label":label, "ln": myLang}));
+				  publishCaption({"msg":true, "final":currentInterim, "id":counter, "label":label, "ln": myLang});
 				} else {
-				  socket.send(JSON.stringify({"msg":true, "final":currentInterim, "id":counter, "ln": myLang}));
+				  publishCaption({"msg":true, "final":currentInterim, "id":counter, "ln": myLang});
 				}
 			  } catch(e) {
 				console.error(e);
@@ -1236,17 +1251,16 @@ function rebuildSrtFile() {
 		        clearTimeout(silenceTimer);
 		        silenceTimer = null;
 		      }
-		      pendingInterim = "";
+				      pendingInterim = "";
 
-		      new_final_transcript += ' ' + transcript;
-		      document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${transcript}</span><br />`;
-		      document.getElementById("interm").innerHTML = "";
-
-		      try {
-		        if (label) {
-		          socket.send(JSON.stringify({"msg":true, "final":transcript, "id":counter, "label":label, "ln": myLang}));
-		        } else {
-		          socket.send(JSON.stringify({"msg":true, "final":transcript, "id":counter, "ln": myLang}));
+				      new_final_transcript += ' ' + transcript;
+				      document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${direction}'>${escapeHTML(transcript)}</span><br />`;
+				      document.getElementById("interm").innerHTML = "";
+			      try {
+			        if (label) {
+			          publishCaption({"msg":true, "final":transcript, "id":counter, "label":label, "ln": myLang});
+			        } else {
+		          publishCaption({"msg":true, "final":transcript, "id":counter, "ln": myLang});
 		        }
 		        // Optional: speak final results locally if TTS is enabled
 		        if (window.CAPTION_TTS && typeof window.CAPTION_TTS.speak === 'function') {
@@ -1273,15 +1287,14 @@ function rebuildSrtFile() {
       const { complete, remaining } = extractCompleteSentences(textToProcess);
 
       // Send each complete sentence as final
-      for (const sentence of complete) {
-        counter += 1;
-        const dir = detectTextDirection(sentence);
-        document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${dir}'>${sentence}</span><br />`;
-
-        try {
-          var msgObj = {"msg":true, "final": sentence, "id":counter, "ln": myLang};
-          if (label) msgObj.label = label;
-          socket.send(JSON.stringify(msgObj));
+		      for (const sentence of complete) {
+		        counter += 1;
+		        const dir = detectTextDirection(sentence);
+		        document.getElementById("output").innerHTML += `<span id='final_${counter}' dir='${dir}'>${escapeHTML(sentence)}</span><br />`;
+	        try {
+	          var msgObj = {"msg":true, "final": sentence, "id":counter, "ln": myLang};
+	          if (label) msgObj.label = label;
+	          publishCaption(msgObj);
         } catch(e) {
           console.error(e);
         }
@@ -1302,13 +1315,13 @@ function rebuildSrtFile() {
         silenceTimer = setTimeout(forceFinalization, autoFinalMs);
       }
 
-      const direction = detectTextDirection(textToProcess);
-      document.getElementById("interm").innerHTML = `<span dir='${direction}'>${textToProcess}</span><br />`;
+	      const direction = detectTextDirection(textToProcess);
+	      document.getElementById("interm").innerHTML = `<span dir='${direction}'>${escapeHTML(textToProcess)}</span><br />`;
 
       try {
         var msgObj = {"msg":true, "interm":textToProcess, "id":counter, "ln": myLang};
         if (label) msgObj.label = label;
-        socket.send(JSON.stringify(msgObj));
+        publishCaption(msgObj);
 
         // Optional: streaming TTS for interim when explicitly requested
         if (window.CAPTION_TTS && window.CAPTION_TTS.stream && typeof window.CAPTION_TTS.speak === 'function') {
@@ -1448,7 +1461,7 @@ function rebuildSrtFile() {
 	if (urlParams.has("test")){
 		setInterval(function(){
 			counter += 1;
-			socket.send(JSON.stringify({"msg":true, "final":counter, "id":counter}));
+			publishCaption({"msg":true, "final":counter, "id":counter});
 		},500);
 	}
 	

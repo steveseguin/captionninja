@@ -450,6 +450,8 @@
 	
 	
 <script src="security-utils.js"></script>
+<script src="ws-publisher.js"></script>
+<script src="text-rules.js"></script>
 <script>
 (function (w) {
 	w.URLSearchParams = w.URLSearchParams || function (searchString) {
@@ -468,6 +470,22 @@
 })(window);
 
 var urlParams = new URLSearchParams(window.location.search);
+var textRulesConfig = (window.CaptionTextRules && window.CaptionTextRules.parseRulesFromUrlParams)
+	? window.CaptionTextRules.parseRulesFromUrlParams(urlParams)
+	: { replacements: [], restricted: [], matchMode: 'phonetic' };
+var textRulesEngine = (window.CaptionTextRules && window.CaptionTextRules.createEngine)
+	? window.CaptionTextRules.createEngine(textRulesConfig)
+	: null;
+
+function applyTextRules(text) {
+	if (!textRulesEngine || typeof text !== 'string') return text;
+	try {
+		return textRulesEngine.apply(text);
+	} catch (e) {
+		console.warn("Text rules failed:", e);
+		return text;
+	}
+}
 let currentTranslationId = 0;
 let worker;
 let modelRegistry;
@@ -586,48 +604,49 @@ var counter = 0;
 
 worker.onmessage = function(e) {
 	if (e.data[0] === "translate_reply" && e.data[1]) {
-		document.getElementById("output").innerText = e.data[1].join("<br /><br />");
+		const translatedJoined = e.data[1].join("\n\n");
+		document.getElementById("output").innerText = translatedJoined;
 
 		// Get the pending translation info
 		const pendingTranslation = pendingTranslations.get(currentTranslationId);
 		if (pendingTranslation) {
 			if (pendingTranslation.interm || e.data[3]) {
 				if (label) {
-					socket.send(JSON.stringify({
+					wsPublisher.publish({
 						"msg": true,
-						"interm": e.data[1].join("\n\n"),
+						"interm": translatedJoined,
 						"id": currentTranslationId,
 						"label": label,
 						"c": document.getElementById("fullContext").checked,
 						"ln": langTo.value
-					}));
+					});
 				} else {
-					socket.send(JSON.stringify({
+					wsPublisher.publish({
 						"msg": true,
-						"interm": e.data[1].join("\n\n"),
+						"interm": translatedJoined,
 						"id": currentTranslationId,
 						"c": document.getElementById("fullContext").checked,
 						"ln": langTo.value
-					}));
+					});
 				}
 			} else {
 				if (label) {
-					socket.send(JSON.stringify({
+					wsPublisher.publish({
 						"msg": true,
-						"final": e.data[1].join("\n\n"),
+						"final": translatedJoined,
 						"id": currentTranslationId,
 						"label": label,
 						"c": document.getElementById("fullContext").checked,
 						"ln": langTo.value
-					}));
+					});
 				} else {
-					socket.send(JSON.stringify({
+					wsPublisher.publish({
 						"msg": true,
-						"final": e.data[1].join("\n\n"),
+						"final": translatedJoined,
 						"id": currentTranslationId,
 						"c": document.getElementById("fullContext").checked,
 						"ln": langTo.value
-					}));
+					});
 				}
 
 				// Clean up old pending translations
@@ -955,56 +974,25 @@ function extractCompleteSentences(text) {
 	};
 }
 
-var socket;
-let retryCount = 0;
-const maxRetryDelay = 30000; // Maximum delay of 30 seconds
-const baseDelay = 1000; // Start with 1 second delay after first immediate retry
-
-function getRetryDelay() {
-	if (retryCount === 0) {
-		return 0; // First retry is immediate
-	}
-	// Exponential backoff: baseDelay * 2^(retryCount-1)
-	const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), maxRetryDelay);
-	return delay;
-}
+var wsPublisher = null;
 
 function connectWebSocket() {
-	if (socket) {
-		socket.close();
-		socket = null;
-	}
-
-	socket = new WebSocket("wss://api.caption.ninja:443");
-
-	socket.onclose = function() {
-		console.log("WebSocket connection closed. Attempting to reconnect...");
-		const delay = getRetryDelay();
-		console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
-		setTimeout(connectWebSocket, delay);
-		retryCount++;
-	};
-
-	socket.onopen = function() {
-		console.log("WebSocket connected. Joining room...");
-		// Reset retry count on successful connection
-		retryCount = 0;
-		socket.send(JSON.stringify({
-			"join": roomID
-		}));
-	};
-
-	socket.onerror = function(error) {
-		console.error("WebSocket error:", error);
-		if (socket) {
-			socket.close();
-			socket = null;
+	wsPublisher = createWSPublisher({
+		url: "wss://api.caption.ninja:443",
+		room: roomID,
+		onStateChange: function(nextState, snapshot) {
+			if (nextState === "error") {
+				console.error("WebSocket error state:", snapshot && snapshot.lastError);
+			}
+			if (snapshot && snapshot.blockedSuspected) {
+				console.warn("WebSocket may be blocked by VPN/firewall/region filters.");
+			}
+		},
+		onError: function(error) {
+			console.error("WebSocket error:", error);
 		}
-		const delay = getRetryDelay();
-		console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
-		setTimeout(connectWebSocket, delay);
-		retryCount++;
-	};
+	});
+	wsPublisher.connect();
 }
 
 const ttsMenu = {
@@ -1214,6 +1202,21 @@ const ttsMenu = {
 
 connectWebSocket();
 
+window.copyWsDebugInfo = function () {
+	if (!wsPublisher) return;
+	var snapshot = wsPublisher.getSnapshot();
+	var text = "[Caption.Ninja WS Debug]\\n" +
+		"room=" + roomID + "\\n" +
+		"state=" + snapshot.state + "\\n" +
+		"retries=" + snapshot.retryCount + "\\n" +
+		"queue=" + snapshot.queueLength + "\\n" +
+		"dropped=" + snapshot.droppedCount + "\\n" +
+		"blocked=" + snapshot.blockedSuspected + "\\n" +
+		"lastError=" + (snapshot.lastError || "") + "\\n" +
+		"userAgent=" + navigator.userAgent;
+	navigator.clipboard.writeText(text).catch(function(){});
+};
+
 
 var transcript = '';
 var last_transcription = "";
@@ -1225,9 +1228,9 @@ var ends = 0;
 var sanitize = function(string) {
 	var temp = document.createElement('div');
 	temp.textContent = string;
-	return temp.textContent
+	return applyTextRules(temp.textContent
 		.substring(0, Math.min(temp.textContent.length, 500))
-		.trim();
+		.trim());
 };
 
 function setup() {

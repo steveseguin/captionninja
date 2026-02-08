@@ -130,6 +130,8 @@
     <span>Shortcuts: Space = Pause/Resume, Ctrl+S = Download SRT, Ctrl+L = Copy overlay link, M = Mark chapter</span>
   </div>
 
+  <script src="ws-publisher.js"></script>
+  <script src="text-rules.js"></script>
   <script>
   // URL helpers
   (function (w) {
@@ -157,7 +159,7 @@
   var recognition = null;
   var isRunning = false;
   var isPaused = false;
-  var socket = null;
+  var wsPublisher = null;
   var startEpoch = null; // absolute ms when session started
   var lastStopMs = 0;    // last cue end relative to startEpoch
   var recBackoff = 500;  // ms
@@ -206,6 +208,13 @@
     elWs.className = 'pill ' + (type||''); elWs.textContent = text;
   }
 
+  var textRulesConfig = (window.CaptionTextRules && window.CaptionTextRules.parseRulesFromUrlParams)
+    ? window.CaptionTextRules.parseRulesFromUrlParams(urlParams)
+    : { replacements: [], restricted: [], matchMode: 'phonetic' };
+  var textRulesEngine = (window.CaptionTextRules && window.CaptionTextRules.createEngine)
+    ? window.CaptionTextRules.createEngine(textRulesConfig)
+    : null;
+
   // Profanity filter (simple)
   var bads = ['fuck','shit','bitch'];
   function maskProfanity(s) {
@@ -214,11 +223,35 @@
     return r;
   }
 
+  function applyTextRules(text) {
+    if (!textRulesEngine || typeof text !== 'string') return text;
+    try {
+      return textRulesEngine.apply(text);
+    } catch (e) {
+      console.warn('Text rules failed:', e);
+      return text;
+    }
+  }
+
   function sanitize(string) {
     var temp = document.createElement('div'); temp.textContent = string; var text = temp.textContent.substring(0, 500).trim();
     var isRTL = /[\u0591-\u07FF\u200F\u202B\u202E\uFB1D-\uFDFD\uFE70-\uFEFC]/.test(text);
     if (isRTL) { text = text.replaceAll(/[.,!?،؟؛]/g, ' '); }
+    text = applyTextRules(text);
     return maskProfanity(text);
+  }
+
+  function escapeHTML(text) {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function renderCaptionHtml(text, maxLen) {
+    return escapeHTML(wrapLines(text, maxLen)).replace(/\n/g, '<br />');
   }
 
   function formatSrtTime(ms) {
@@ -276,7 +309,13 @@
         }
       }
       // Show interim
-      if (interim.trim()) { elInterm.textContent = interim.trim(); try { socket && socket.send(JSON.stringify({ msg:true, interm:interim.trim(), id: cues.length+1, ln: myLang })); } catch(e){} }
+      if (interim.trim()) {
+        var interimOut = interim.trim();
+        elInterm.textContent = interimOut;
+        if (wsPublisher) {
+          wsPublisher.publish({ msg:true, interm:interimOut, id: cues.length+1, ln: myLang });
+        }
+      }
     };
     try { recognition.start(); isRunning = true; isPaused = false; } catch(e) { setRecStatus('err','failed'); }
   }
@@ -288,10 +327,12 @@
     var text = agg.text.trim();
     cues.push({ startMs: startMs, endMs: endMs, text: text });
     lastStopMs = endMs;
-    elFinal.innerHTML += (elSpeaker.checked? '&gt;&gt; ' : '') + wrapLines(text, parseInt(elLineLen.value||'42')).replace(/\n/g,'<br />') + '<br /><br />';
+    elFinal.innerHTML += (elSpeaker.checked? '&gt;&gt; ' : '') + renderCaptionHtml(text, parseInt(elLineLen.value||'42')) + '<br /><br />';
     elInterm.textContent = '';
     // Send final to overlay (simple)
-    try { socket && socket.send(JSON.stringify({ msg:true, final: text, id: cues.length, ln: myLang })); } catch(e){}
+    if (wsPublisher) {
+      wsPublisher.publish({ msg:true, final: text, id: cues.length, ln: myLang });
+    }
     // Persist snapshot
     saveSnapshot();
     // Reset aggregator
@@ -300,15 +341,42 @@
 
   // WebSocket
   function connectWS(){
-    try { socket && socket.close(); } catch(e){}
-    try {
-      socket = new WebSocket('wss://api.caption.ninja:443');
-      socket.onopen = function(){ setWsStatus('ok','ws: connected'); try { socket.send(JSON.stringify({ join: roomID })); } catch(e){} };
-      socket.onclose = function(){ setWsStatus('warn','ws: reconnecting…'); setTimeout(connectWS, 1000); };
-      socket.onerror = function(){ setWsStatus('err','ws: error'); };
-    } catch(e) { setWsStatus('err','ws: failed'); }
+    wsPublisher = createWSPublisher({
+      url: 'wss://api.caption.ninja:443',
+      room: roomID,
+      onStateChange: function(nextState, snapshot){
+        if (nextState === 'connected') setWsStatus('ok', 'ws: connected');
+        else if (nextState === 'connecting') setWsStatus('warn', 'ws: connecting…');
+        else if (nextState === 'reconnecting') setWsStatus('warn', 'ws: reconnecting…');
+        else if (nextState === 'error') setWsStatus('err', 'ws: error');
+        else if (nextState === 'closed') setWsStatus('warn', 'ws: closed');
+
+        if (snapshot && snapshot.blockedSuspected) {
+          setWsStatus('err', 'ws: blocked?');
+        }
+      },
+      onError: function(err){
+        console.error('WebSocket publish error:', err);
+      }
+    });
+    wsPublisher.connect();
   }
   connectWS();
+
+  window.copyWsDebugInfo = function () {
+    if (!wsPublisher) return;
+    var snapshot = wsPublisher.getSnapshot();
+    var text = '[Caption.Ninja WS Debug]\\n' +
+      'room=' + roomID + '\\n' +
+      'state=' + snapshot.state + '\\n' +
+      'retries=' + snapshot.retryCount + '\\n' +
+      'queue=' + snapshot.queueLength + '\\n' +
+      'dropped=' + snapshot.droppedCount + '\\n' +
+      'blocked=' + snapshot.blockedSuspected + '\\n' +
+      'lastError=' + (snapshot.lastError || '') + '\\n' +
+      'userAgent=' + navigator.userAgent;
+    navigator.clipboard.writeText(text).catch(function(){});
+  };
 
   // Controls
   document.getElementById('btnToggle').addEventListener('click', function(){
@@ -347,7 +415,7 @@
     if (!keys.length) return;
     var k = keys.sort().pop();
     var btn = document.createElement('button'); btn.textContent = 'Recover last session';
-    btn.addEventListener('click', function(){ try { var data = JSON.parse(localStorage.getItem(k)); if (data && data.cues) { cues = data.cues; startEpoch = Date.now(); saveKey = k; lastStopMs = cues.length? cues[cues.length-1].endMs : 0; elFinal.innerHTML=''; for (var i=0;i<cues.length;i++){ elFinal.innerHTML += (elSpeaker.checked? '&gt;&gt; ' : '') + wrapLines(cues[i].text, parseInt(elLineLen.value||'42')).replace(/\n/g,'<br />') + '<br /><br />'; } } } catch(e){} this.remove(); });
+    btn.addEventListener('click', function(){ try { var data = JSON.parse(localStorage.getItem(k)); if (data && data.cues) { cues = data.cues; startEpoch = Date.now(); saveKey = k; lastStopMs = cues.length? cues[cues.length-1].endMs : 0; elFinal.innerHTML=''; for (var i=0;i<cues.length;i++){ elFinal.innerHTML += (elSpeaker.checked? '&gt;&gt; ' : '') + renderCaptionHtml(cues[i].text, parseInt(elLineLen.value||'42')) + '<br /><br />'; } } } catch(e){} this.remove(); });
     document.querySelector('.toolbar').appendChild(btn);
   })();
 
