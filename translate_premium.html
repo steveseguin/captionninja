@@ -580,21 +580,29 @@
 	                    this.elements.providerModelInput.placeholder = defaults.model || 'Optional model id';
 	                }
 	            },
-	            initTranslationProvider: function() {
-	                const urlParams = new URLSearchParams(window.location.search);
-	                const requestedProvider = (
-	                    urlParams.get('tprovider') ||
-						urlParams.get('provider') ||
-						urlParams.get('translateprovider') ||
-	                    this.getStorage('translationProvider') ||
-	                    ''
-	                ).trim();
-	                if (window.CaptionTranslationProviders && window.CaptionTranslationProviders.resolveConfig) {
-	                    this.state.translationConfig = window.CaptionTranslationProviders.resolveConfig(
-                        urlParams,
-                        requestedProvider ? {} : { provider: 'google' }
-                    );
-                } else {
+		            initTranslationProvider: function() {
+		                const urlParams = new URLSearchParams(window.location.search);
+		                const requestedProvider = (
+		                    urlParams.get('tprovider') ||
+							urlParams.get('provider') ||
+							urlParams.get('translateprovider') ||
+		                    this.getStorage('translationProvider') ||
+		                    ''
+		                ).trim();
+		                const hasProviderEndpointOrModelHint = (
+		                    urlParams.has('turl') ||
+		                    urlParams.has('translateurl') ||
+		                    urlParams.has('tmodel') ||
+		                    urlParams.has('translatemodel')
+		                );
+		                if (window.CaptionTranslationProviders && window.CaptionTranslationProviders.resolveConfig) {
+		                    this.state.translationConfig = window.CaptionTranslationProviders.resolveConfig(
+		                        urlParams,
+	                        requestedProvider
+	                            ? { provider: requestedProvider }
+	                            : (hasProviderEndpointOrModelHint ? {} : { provider: 'google' })
+		                    );
+		                } else {
                     const googleKey = urlParams.get('googlekey') || urlParams.get('gkey') || '';
                     this.state.translationConfig = {
                         provider: 'google',
@@ -704,16 +712,22 @@
                     .replace(/"/g, '&quot;')
                     .replace(/'/g, '&#39;');
             },
-            loadApiKey: function() {
-                const urlParams = new URLSearchParams(window.location.search);
-                const provider = this.getActiveProvider();
-                const keyFromUrl = this.getProviderKeyFromUrl(urlParams, provider);
-                const providerStorageKey = this.getProviderStorageKey(provider);
-                const savedKey = this.getStorage(providerStorageKey);
-                const activeKey = keyFromUrl || savedKey || '';
+	            loadApiKey: function() {
+	                const urlParams = new URLSearchParams(window.location.search);
+	                const provider = this.getActiveProvider();
+	                const keyFromUrl = this.getProviderKeyFromUrl(urlParams, provider);
+	                const providerStorageKey = this.getProviderStorageKey(provider);
+	                const savedKey = this.getStorage(providerStorageKey);
+	                const legacyGoogleKey = (provider === 'google') ? (this.getStorage('apiKey') || '') : '';
+	                const activeKey = keyFromUrl || savedKey || legacyGoogleKey || '';
+	                if (provider === 'google' && legacyGoogleKey && !keyFromUrl && !savedKey) {
+	                    this.setStorage(providerStorageKey, legacyGoogleKey, 999999);
+	                } else if (provider === 'google' && savedKey && !legacyGoogleKey) {
+	                    this.setStorage('apiKey', savedKey, 999999);
+	                }
 
-                if (activeKey) {
-                    this.state.apiKey = activeKey;
+	                if (activeKey) {
+	                    this.state.apiKey = activeKey;
                     this.elements.apiKeyInput.value = activeKey;
                     this.updateApiKeyStatus(true);
                 } else {
@@ -794,7 +808,7 @@
 	                        );
 	                        this.cacheProviderFields(previousProvider);
 	                        const selectedProvider = this.getActiveProvider();
-	                        this.updateURL('tprovider=' + selectedProvider, true);
+	                        this.updateProviderSelectionURL(selectedProvider);
 	                        this.setStorage('translationProvider', selectedProvider, 999999);
 	                        this.applySelectedProviderToState(selectedProvider);
 	                        this.loadProviderFields(selectedProvider);
@@ -831,10 +845,13 @@
                                 } else {
                                     this.state.translationConfig.googleApiKey = '';
                                 }
-                            }
-                            this.setStorage(providerStorageKey, newKey, 999999);
-                            this.updateApiKeyStatus(true);
-                            this.fetchLanguages();
+	                            }
+	                            this.setStorage(providerStorageKey, newKey, 999999);
+	                            if (provider === 'google') {
+	                                this.setStorage('apiKey', newKey, 999999);
+	                            }
+	                            this.updateApiKeyStatus(true);
+	                            this.fetchLanguages();
                         } else {
                             const originalText = this.elements.saveApiKeyBtn.textContent;
                             this.elements.saveApiKeyBtn.textContent = 'Key Already Active';
@@ -1538,22 +1555,41 @@
                     return null;
                 }
             },
-            setStorage: function(key, value, hours = 24) {
-                try {
-                    const now = new Date();
-                    const item = {
-                        value: value,
-                        expiry: now.getTime() + (hours * 60 * 60 * 1000)
-                    };
-                    localStorage.setItem(key, JSON.stringify(item));
-                } catch (e) {
-                    console.error('Storage save error:', e);
-                }
-            },
-            updateURL: function(param, replace = false) {
-                const urlParams = new URLSearchParams(window.location.search);
-                const paramParts = param.split('=');
-                const paramName = paramParts[0];
+	            setStorage: function(key, value, hours = 24) {
+	                try {
+	                    const now = new Date();
+	                    const item = {
+	                        value: value,
+	                        expiry: now.getTime() + (hours * 60 * 60 * 1000)
+	                    };
+	                    localStorage.setItem(key, JSON.stringify(item));
+	                } catch (e) {
+	                    console.error('Storage save error:', e);
+	                }
+	            },
+	            updateProviderSelectionURL: function(provider) {
+	                const urlParams = new URLSearchParams(window.location.search);
+	                urlParams.set('tprovider', provider);
+	                [
+	                    'provider',
+	                    'translateprovider',
+	                    'turl',
+	                    'translateurl',
+	                    'tmodel',
+	                    'translatemodel',
+	                    'tkey',
+	                    'translatekey',
+	                    'googlekey',
+	                    'gkey'
+	                ].forEach(param => urlParams.delete(param));
+	                const query = urlParams.toString();
+	                const newUrl = window.location.pathname + (query ? '?' + query : '');
+	                window.history.pushState({ path: newUrl }, '', newUrl);
+	            },
+	            updateURL: function(param, replace = false) {
+	                const urlParams = new URLSearchParams(window.location.search);
+	                const paramParts = param.split('=');
+	                const paramName = paramParts[0];
                 const paramValue = paramParts.length > 1 ? paramParts[1] : '';
                 if (replace || !urlParams.has(paramName)) {
                     urlParams.set(paramName, paramValue);
