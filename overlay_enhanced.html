@@ -813,7 +813,6 @@
 	var idle = null;
 
 	var socket;
-	var reconnectTimer = null;
 	let retryCount = 0;
 	const maxRetryDelay = 30000; // Maximum delay of 30 seconds
 	const baseDelay = 1000; // Start with 1 second delay after first immediate retry
@@ -826,37 +825,48 @@
 		const delay = Math.min(baseDelay * Math.pow(2, retryCount - 1), maxRetryDelay);
 		return delay;
 	}
-	
-	function clearReconnectTimer() {
-		if (reconnectTimer) {
-			clearTimeout(reconnectTimer);
-			reconnectTimer = null;
+
+	function connectWebSocket() {
+		if (socket) {
+			socket.close();
+			socket = null;
 		}
-	}
-	
-	function scheduleReconnect() {
-		if (reconnectTimer) {
-			return;
-		}
-		const delay = getRetryDelay();
-		console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
-		reconnectTimer = setTimeout(function() {
-			reconnectTimer = null;
+
+		socket = new WebSocket("wss://api.caption.ninja:443");
+
+		socket.onclose = function() {
+			console.log("WebSocket connection closed. Attempting to reconnect...");
+			const delay = getRetryDelay();
+			console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
+			setTimeout(connectWebSocket, delay);
 			retryCount++;
-			connectWebSocket();
-		}, delay);
+		};
+
+		socket.onopen = function() {
+			console.log("WebSocket connected. Joining room...");
+			// Reset retry count on successful connection
+			retryCount = 0;
+			socket.send(JSON.stringify({"join":roomID}));
+		};
+
+		socket.onerror = function(error) {
+			console.error("WebSocket error:", error);
+			if (socket) {
+				socket.close();
+				socket = null;
+			}
+			const delay = getRetryDelay();
+			console.log(`Reconnecting in ${delay}ms (attempt ${retryCount + 1})...`);
+			setTimeout(connectWebSocket, delay);
+			retryCount++;
+		};
 	}
+
+	connectWebSocket();
 	
-	function handleSocketMessage(event) {
-	  if (!event.data) {
-		return;
-	  }
-		let data;
-		try {
-			data = JSON.parse(event.data);
-		} catch (e) {
-			return;
-		}
+	socket.addEventListener('message', function (event) {
+	  if (event.data) {
+		const data = JSON.parse(event.data);
 		if (data.ln) {
 		  // Update current language from socket unless translating
 		  if (!langTo) {
@@ -894,64 +904,7 @@
 		} else {
 			processReply(data);
 		}
-	}
-
-	function connectWebSocket() {
-		if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-			return;
-		}
-
-		const ws = new WebSocket("wss://api.caption.ninja:443");
-		socket = ws;
-		ws.onmessage = function(event) {
-			if (socket !== ws) {
-				return;
-			}
-			handleSocketMessage(event);
-		};
-
-		ws.onclose = function() {
-			if (socket !== ws) {
-				return;
-			}
-			socket = null;
-			console.log("WebSocket connection closed. Attempting to reconnect...");
-			scheduleReconnect();
-		};
-
-		ws.onopen = function() {
-			if (socket !== ws) {
-				return;
-			}
-			console.log("WebSocket connected. Joining room...");
-			// Reset retry count on successful connection
-			retryCount = 0;
-			clearReconnectTimer();
-			ws.send(JSON.stringify({"join":roomID}));
-		};
-
-		ws.onerror = function(error) {
-			if (socket !== ws) {
-				return;
-			}
-			console.error("WebSocket error:", error);
-			if (ws.readyState !== WebSocket.CLOSED) {
-				ws.close();
-			}
-		};
-	}
-
-	connectWebSocket();
-	
-	window.addEventListener('beforeunload', function() {
-		clearReconnectTimer();
-		if (socket) {
-			socket.onclose = null;
-			try {
-				socket.close();
-			} catch (e) {}
-			socket = null;
-		}
+	  }
 	});
 	
 	var lastLabel = "";

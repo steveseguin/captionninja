@@ -890,7 +890,6 @@ function generateStreamID() {
 	}
 	return text;
 };
-
 var roomID = "test";
 if (urlParams.has("room")) {
 	roomID = urlParams.get("room");
@@ -911,10 +910,9 @@ if (isInsecureStreamId(roomID)) {
 }
 
 var url = document.URL.substr(0, document.URL.lastIndexOf('/'));
-const overlayShareLink = url + "/overlay?room=" + encodeURIComponent(roomID);
-document.getElementById("shareLink").href = overlayShareLink;
-document.getElementById("shareLink").textContent = overlayShareLink;
-navigator.clipboard.writeText(overlayShareLink).then(() => {}, () => {});
+document.getElementById("shareLink").href = url + "/overlay?room=" + roomID;
+document.getElementById("shareLink").innerHTML = url + "/overlay?room=" + roomID;
+navigator.clipboard.writeText(url + "/overlay?room=" + roomID).then(() => {}, () => {});
 
 // Interim text handling options
 var autoFinalMs = 0;
