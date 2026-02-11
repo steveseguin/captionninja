@@ -1501,11 +1501,11 @@ function rebuildSrtFile() {
 				Configure how captions appear in OBS/vMix. The URL below updates as you change settings.
 			</p>
 
-			<div class="modal-section">
-				<h3>Translation</h3>
-				<div class="modal-group">
-					<div class="modal-row">
-						<label>Translate to:</label>
+				<div class="modal-section">
+					<h3>Translation</h3>
+					<div class="modal-group">
+						<div class="modal-row">
+							<label>Translate to:</label>
 						<select id="modalTranslate">
 							<option value="">None (disabled)</option>
 							<option value="bg">Bulgarian</option>
@@ -1526,24 +1526,52 @@ function rebuildSrtFile() {
 							<option value="es">Spanish</option>
 							<option value="uk">Ukrainian</option>
 						</select>
+						</div>
+						<div class="modal-help">Free local translation via Mozilla Bergamot (17 languages)</div>
 					</div>
-					<div class="modal-help">Free local translation via Mozilla Bergamot (17 languages)</div>
-				</div>
-				<div class="modal-group">
-					<div class="modal-row">
-						<label>Dual overlay:</label>
-						<input type="checkbox" id="modalDual" />
+					<div class="modal-group">
+						<div class="modal-row">
+							<label>Provider:</label>
+							<select id="modalTranslateProvider">
+								<option value="auto">Auto (recommended)</option>
+								<option value="local">Local (Bergamot)</option>
+								<option value="google">Google Cloud</option>
+								<option value="openai">OpenAI-compatible</option>
+								<option value="anthropic">Anthropic</option>
+								<option value="ollama">Ollama</option>
+							</select>
+						</div>
+						<div class="modal-help">Choose translation backend. Auto keeps existing behavior.</div>
 					</div>
-					<div class="modal-help">Show both original text and translation together</div>
-				</div>
-				<div class="modal-group">
-					<div class="modal-row">
-						<label>Google API Key:</label>
-						<input type="text" id="modalGoogleKey" placeholder="Optional" />
+					<div class="modal-group">
+						<div class="modal-row">
+							<label>Dual overlay:</label>
+							<input type="checkbox" id="modalDual" />
+						</div>
+						<div class="modal-help">Show both original text and translation together</div>
 					</div>
-					<div class="modal-help">For 100+ languages via Google Cloud Translation (paid)</div>
+					<div class="modal-group" id="modalProviderKeyGroup">
+						<div class="modal-row">
+							<label id="modalProviderKeyLabel">Google API Key:</label>
+							<input type="text" id="modalGoogleKey" placeholder="Optional" />
+						</div>
+						<div class="modal-help" id="modalProviderKeyHelp">For 100+ languages via Google Cloud Translation (paid)</div>
+					</div>
+					<div class="modal-group" id="modalProviderUrlGroup" style="display:none;">
+						<div class="modal-row">
+							<label id="modalProviderUrlLabel">Endpoint URL:</label>
+							<input type="text" id="modalProviderUrl" placeholder="Optional custom API base URL" />
+						</div>
+						<div class="modal-help">Use for self-hosted/proxy translation endpoints.</div>
+					</div>
+					<div class="modal-group" id="modalProviderModelGroup" style="display:none;">
+						<div class="modal-row">
+							<label id="modalProviderModelLabel">Model:</label>
+							<input type="text" id="modalProviderModel" placeholder="Optional model id" />
+						</div>
+						<div class="modal-help">Optional model override for remote providers.</div>
+					</div>
 				</div>
-			</div>
 
 			<div class="modal-section">
 				<h3>Display Options</h3>
@@ -1649,20 +1677,98 @@ function rebuildSrtFile() {
 		updateModalUrlPreview();
 	}
 
-	function closeCustomizeModal() {
-		document.getElementById('customizeModal').classList.remove('open');
-	}
+		function closeCustomizeModal() {
+			document.getElementById('customizeModal').classList.remove('open');
+		}
 
-	function updateModalUrlPreview() {
-		const base = url + "/overlay?room=" + roomID;
-		const params = [];
+		function updateModalTranslationProviderUI() {
+			const provider = (document.getElementById('modalTranslateProvider').value || 'auto').toLowerCase();
+			const keyGroup = document.getElementById('modalProviderKeyGroup');
+			const keyLabel = document.getElementById('modalProviderKeyLabel');
+			const keyHelp = document.getElementById('modalProviderKeyHelp');
+			const keyInput = document.getElementById('modalGoogleKey');
+			const urlGroup = document.getElementById('modalProviderUrlGroup');
+			const urlLabel = document.getElementById('modalProviderUrlLabel');
+			const urlInput = document.getElementById('modalProviderUrl');
+			const modelGroup = document.getElementById('modalProviderModelGroup');
+			const modelLabel = document.getElementById('modalProviderModelLabel');
+			const modelInput = document.getElementById('modalProviderModel');
 
-		// Translation
-		const translate = document.getElementById('modalTranslate').value;
-		if (translate) params.push('translate=' + translate);
-		if (document.getElementById('modalDual').checked) params.push('dual=1');
-		const googleKey = document.getElementById('modalGoogleKey').value.trim();
-		if (googleKey) params.push('googlekey=' + encodeURIComponent(googleKey));
+			let showKey = true;
+			let showAdvanced = false;
+
+			if (provider === 'local') {
+				showKey = false;
+			} else if (provider === 'google') {
+				keyLabel.textContent = 'Google API Key:';
+				keyHelp.textContent = 'For 100+ languages via Google Cloud Translation (paid)';
+				keyInput.placeholder = 'Required for Google Cloud';
+			} else if (provider === 'openai') {
+				showAdvanced = true;
+				keyLabel.textContent = 'API Key:';
+				keyHelp.textContent = 'Used as tkey for OpenAI-compatible endpoints.';
+				keyInput.placeholder = 'Bearer token (if required)';
+				urlLabel.textContent = 'Endpoint URL:';
+				urlInput.placeholder = 'https://api.openai.com/v1';
+				modelLabel.textContent = 'Model:';
+				modelInput.placeholder = 'gpt-4o-mini';
+			} else if (provider === 'anthropic') {
+				showAdvanced = true;
+				keyLabel.textContent = 'API Key:';
+				keyHelp.textContent = 'Used as tkey/translatekey for Anthropic.';
+				keyInput.placeholder = 'Anthropic API key';
+				urlLabel.textContent = 'Endpoint URL:';
+				urlInput.placeholder = 'https://api.anthropic.com/v1/messages';
+				modelLabel.textContent = 'Model:';
+				modelInput.placeholder = 'claude-3-5-haiku-latest';
+			} else if (provider === 'ollama') {
+				showAdvanced = true;
+				keyLabel.textContent = 'API Key (optional):';
+				keyHelp.textContent = 'Usually optional for local Ollama servers.';
+				keyInput.placeholder = 'Optional';
+				urlLabel.textContent = 'Endpoint URL:';
+				urlInput.placeholder = 'http://127.0.0.1:11434/v1';
+				modelLabel.textContent = 'Model:';
+				modelInput.placeholder = 'llama3.1';
+			} else {
+				keyLabel.textContent = 'Google API Key (optional):';
+				keyHelp.textContent = 'Auto mode uses local translation unless a Google key is provided.';
+				keyInput.placeholder = 'Optional';
+			}
+
+			keyGroup.style.display = showKey ? '' : 'none';
+			urlGroup.style.display = showAdvanced ? '' : 'none';
+			modelGroup.style.display = showAdvanced ? '' : 'none';
+		}
+
+		function updateModalUrlPreview() {
+			updateModalTranslationProviderUI();
+			const base = url + "/overlay?room=" + roomID;
+			const params = [];
+
+			// Translation
+			const translate = document.getElementById('modalTranslate').value;
+			if (translate) params.push('translate=' + translate);
+			if (document.getElementById('modalDual').checked) params.push('dual=1');
+			const provider = (document.getElementById('modalTranslateProvider').value || 'auto').toLowerCase();
+			const googleKey = document.getElementById('modalGoogleKey').value.trim();
+			const providerUrl = document.getElementById('modalProviderUrl').value.trim();
+			const providerModel = document.getElementById('modalProviderModel').value.trim();
+			if (translate) {
+				if (provider === 'local') {
+					params.push('forcelocal=1');
+				} else if (provider === 'google') {
+					params.push('tprovider=google');
+					if (googleKey) params.push('googlekey=' + encodeURIComponent(googleKey));
+				} else if (provider === 'openai' || provider === 'anthropic' || provider === 'ollama') {
+					params.push('tprovider=' + provider);
+					if (googleKey) params.push('tkey=' + encodeURIComponent(googleKey));
+					if (providerUrl) params.push('turl=' + encodeURIComponent(providerUrl));
+					if (providerModel) params.push('tmodel=' + encodeURIComponent(providerModel));
+				} else if (googleKey) {
+					params.push('googlekey=' + encodeURIComponent(googleKey));
+				}
+			}
 
 		// Display options
 		const maxlines = parseInt(document.getElementById('modalMaxlines').value) || 0;
@@ -1714,11 +1820,11 @@ function rebuildSrtFile() {
 		});
 	}
 
-	// Add event listeners for live URL preview
-	document.querySelectorAll('#customizeModal input, #customizeModal select').forEach(el => {
-		el.addEventListener('change', updateModalUrlPreview);
-		el.addEventListener('input', updateModalUrlPreview);
-	});
+		// Add event listeners for live URL preview
+		document.querySelectorAll('#customizeModal input, #customizeModal select').forEach(el => {
+			el.addEventListener('change', updateModalUrlPreview);
+			el.addEventListener('input', updateModalUrlPreview);
+		});
 
 	// Close modal on background click
 	document.getElementById('customizeModal').addEventListener('click', function(e) {

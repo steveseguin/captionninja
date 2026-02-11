@@ -33,9 +33,9 @@
             padding: 0
         }
 		
-		#apiKey {
-			font-size: 20px;
-		}
+			#apiKey, #providerEndpoint, #providerModel {
+				font-size: 20px;
+			}
 
         h2 {
             color: var(--secondary-color);
@@ -126,12 +126,39 @@
             color: var(--secondary-color);
         }
 
-        .api-key-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin: 10px 0;
-        }
+	        .api-key-container {
+	            display: flex;
+	            align-items: center;
+	            flex-wrap: wrap;
+	            gap: 10px;
+	            margin: 10px 0;
+	        }
+
+	        .api-provider-advanced {
+	            display: flex;
+	            align-items: center;
+	            flex-wrap: wrap;
+	            gap: 10px;
+	            margin: 5px 0 10px 0;
+	        }
+
+	        #providerSelect {
+	            min-width: 200px;
+	        }
+
+	        #providerEndpoint {
+	            width: 360px;
+	        }
+
+	        #providerModel {
+	            width: 220px;
+	        }
+
+	        .provider-help {
+	            font-size: 12px;
+	            color: #6c757d;
+	            margin: 0 0 10px 0;
+	        }
 
         .api-key-status {
             display: inline-block;
@@ -197,10 +224,10 @@
                 align-items: flex-start;
             }
             
-            input[type="text"] {
-                width: 100%;
-            }
-        }
+	            input[type="text"] {
+	                width: 100%;
+	            }
+	        }
 		
 		#customization-info {
 			margin: 20px 0;
@@ -247,12 +274,26 @@
 		<p>This app uses speech recognition to transcribe your voice and translate it in real-time.</p>
 		<p>Default translation uses Google Cloud Translation (API key optional). It also supports OpenAI-compatible and Anthropic endpoints via URL params <code>tprovider</code>, <code>turl</code>, <code>tmodel</code>, and <code>tkey</code>. <br /> <a href='./translate'>There is non-premium version for free of course also, but it's quite a bit more limited.</a> Check out more options and details on <a href='https://github.com/steveseguin/captionninja'>GitHub</a>.</p>
 		<p>To use this app, accept microphone permissions on page load and start speaking. Then enable Translation Output. The overlay link mirrors translated output.</p>
-		<div class="api-key-container">
-			<label for="apiKey">Translation API Key:</label>
-			<input type="password" id="apiKey" placeholder="Enter your API key here">
-			<button id="saveApiKey" class="button">Save Key</button>
-			<span id="apiKeyStatus" class="api-key-status status-inactive">No API Key</span>
-		</div>
+			<div class="api-key-container">
+				<label for="providerSelect">Provider:</label>
+				<select id="providerSelect">
+					<option value="google">Google Cloud</option>
+					<option value="openai">OpenAI-compatible</option>
+					<option value="anthropic">Anthropic</option>
+					<option value="ollama">Ollama</option>
+				</select>
+				<label for="apiKey" id="apiKeyLabel">Translation API Key:</label>
+				<input type="password" id="apiKey" placeholder="Enter your API key here">
+				<button id="saveApiKey" class="button">Save Key</button>
+				<span id="apiKeyStatus" class="api-key-status status-inactive">No API Key</span>
+			</div>
+			<div id="providerAdvanced" class="api-provider-advanced hidden">
+				<label for="providerEndpoint" id="providerEndpointLabel">Endpoint URL:</label>
+				<input type="text" id="providerEndpoint" placeholder="Optional custom API base URL">
+				<label for="providerModel" id="providerModelLabel">Model:</label>
+				<input type="text" id="providerModel" placeholder="Optional model id">
+			</div>
+			<div id="providerHelp" class="provider-help"></div>
 		
 		<p><strong>Important:</strong> Only open one instance of this tool at a time to avoid microphone access conflicts.</p>
 		
@@ -360,12 +401,13 @@
 	};
 	
 	
-	const app = {
-            state: {
-                apiKey: '',
-                translationConfig: null,
-                roomId: '',
-                myLang: navigator.language || 'en-US',
+		const app = {
+	            state: {
+	                apiKey: '',
+	                translationConfig: null,
+	                providerFieldCache: {},
+	                roomId: '',
+	                myLang: navigator.language || 'en-US',
                 targetLang: 'en',
                 isPaused: false,
                 isTranscribing: false,
@@ -378,12 +420,17 @@
                 lastRequestTime: 0,
                 languageMap: {}
             },
-            elements: {
-                apiKeyInput: document.getElementById('apiKey'),
-                apiKeyLabel: document.querySelector('label[for="apiKey"]'),
-                apiKeyStatus: document.getElementById('apiKeyStatus'),
-                saveApiKeyBtn: document.getElementById('saveApiKey'),
-                langFromSelect: document.getElementById('langFrom'),
+	            elements: {
+	                apiKeyInput: document.getElementById('apiKey'),
+	                apiKeyLabel: document.getElementById('apiKeyLabel'),
+	                apiKeyStatus: document.getElementById('apiKeyStatus'),
+	                saveApiKeyBtn: document.getElementById('saveApiKey'),
+	                providerSelect: document.getElementById('providerSelect'),
+	                providerAdvanced: document.getElementById('providerAdvanced'),
+	                providerHelp: document.getElementById('providerHelp'),
+	                providerEndpointInput: document.getElementById('providerEndpoint'),
+	                providerModelInput: document.getElementById('providerModel'),
+	                langFromSelect: document.getElementById('langFrom'),
                 langToSelect: document.getElementById('langTo'),
                 fullContextCheckbox: document.getElementById('fullContext'),
                 enabledTranscriptionCheckbox: document.getElementById('enabledTranscription'),
@@ -411,25 +458,139 @@
                 this.connectWebSocket();
                 this.updateShareLink();
             },
-            initTextRules: function() {
-                const urlParams = new URLSearchParams(window.location.search);
-                const cfg = (window.CaptionTextRules && window.CaptionTextRules.parseRulesFromUrlParams)
-                    ? window.CaptionTextRules.parseRulesFromUrlParams(urlParams)
-                    : { replacements: [], restricted: [], matchMode: 'phonetic' };
-                this.textRulesEngine = (window.CaptionTextRules && window.CaptionTextRules.createEngine)
-                    ? window.CaptionTextRules.createEngine(cfg)
-                    : null;
-            },
-            initTranslationProvider: function() {
-                const urlParams = new URLSearchParams(window.location.search);
-                const requestedProvider = (
-                    urlParams.get('tprovider') ||
-                    urlParams.get('provider') ||
-                    urlParams.get('translateprovider') ||
-                    ''
-                ).trim();
-                if (window.CaptionTranslationProviders && window.CaptionTranslationProviders.resolveConfig) {
-                    this.state.translationConfig = window.CaptionTranslationProviders.resolveConfig(
+	            initTextRules: function() {
+	                const urlParams = new URLSearchParams(window.location.search);
+	                const cfg = (window.CaptionTextRules && window.CaptionTextRules.parseRulesFromUrlParams)
+	                    ? window.CaptionTextRules.parseRulesFromUrlParams(urlParams)
+	                    : { replacements: [], restricted: [], matchMode: 'phonetic' };
+	                this.textRulesEngine = (window.CaptionTextRules && window.CaptionTextRules.createEngine)
+	                    ? window.CaptionTextRules.createEngine(cfg)
+	                    : null;
+	            },
+	            normalizeProviderForSelect: function(provider, providerHint) {
+	                const normalizedProvider = (provider || '').toLowerCase();
+	                const normalizedHint = (providerHint || '').toLowerCase();
+	                if (normalizedProvider === 'openai_compat') {
+	                    return normalizedHint === 'ollama' ? 'ollama' : 'openai';
+	                }
+	                if (normalizedProvider === 'anthropic') {
+	                    return 'anthropic';
+	                }
+	                return 'google';
+	            },
+	            getProviderDefaults: function(provider) {
+	                const defaults = (window.CaptionTranslationProviders && window.CaptionTranslationProviders.defaults) || {};
+	                if (provider === 'openai') {
+	                    return {
+	                        endpoint: defaults.openAIBase || 'https://api.openai.com/v1',
+	                        model: defaults.openAIModel || 'gpt-4o-mini'
+	                    };
+	                }
+	                if (provider === 'ollama') {
+	                    return {
+	                        endpoint: defaults.ollamaBase || 'http://127.0.0.1:11434/v1',
+	                        model: defaults.ollamaModel || 'llama3.1'
+	                    };
+	                }
+	                if (provider === 'anthropic') {
+	                    return {
+	                        endpoint: defaults.anthropicMessages || 'https://api.anthropic.com/v1/messages',
+	                        model: defaults.anthropicModel || 'claude-3-5-haiku-latest'
+	                    };
+	                }
+	                return { endpoint: '', model: '' };
+	            },
+	            cacheProviderFields: function(provider) {
+	                if (!provider || provider === 'google') {
+	                    return;
+	                }
+	                if (!this.elements.providerEndpointInput || !this.elements.providerModelInput) {
+	                    return;
+	                }
+	                this.state.providerFieldCache[provider] = {
+	                    endpoint: this.elements.providerEndpointInput.value.trim(),
+	                    model: this.elements.providerModelInput.value.trim()
+	                };
+	            },
+	            loadProviderFields: function(provider, seedConfig) {
+	                if (!this.elements.providerEndpointInput || !this.elements.providerModelInput) {
+	                    return;
+	                }
+	                if (provider === 'google') {
+	                    this.elements.providerEndpointInput.value = '';
+	                    this.elements.providerModelInput.value = '';
+	                    return;
+	                }
+	                const defaults = this.getProviderDefaults(provider);
+	                const cached = this.state.providerFieldCache[provider] || {};
+	                const endpoint = (seedConfig && seedConfig.endpoint) || cached.endpoint || defaults.endpoint || '';
+	                const model = (seedConfig && seedConfig.model) || cached.model || defaults.model || '';
+	                this.elements.providerEndpointInput.value = endpoint;
+	                this.elements.providerModelInput.value = model;
+	            },
+	            applySelectedProviderToState: function(provider) {
+	                const selected = (provider || 'google').toLowerCase();
+	                if (!this.state.translationConfig) {
+	                    this.state.translationConfig = {};
+	                }
+	                if (selected === 'openai' || selected === 'ollama') {
+	                    this.state.translationConfig.provider = 'openai_compat';
+	                    this.state.translationConfig.providerHint = selected;
+	                } else if (selected === 'anthropic') {
+	                    this.state.translationConfig.provider = 'anthropic';
+	                    this.state.translationConfig.providerHint = 'anthropic';
+	                } else {
+	                    this.state.translationConfig.provider = 'google';
+	                    this.state.translationConfig.providerHint = 'google';
+	                }
+	                this.state.translationConfig.forceLocal = false;
+	            },
+	            updateProviderUI: function() {
+	                const provider = this.getActiveProvider();
+	                const defaults = this.getProviderDefaults(provider);
+	                const showAdvanced = provider !== 'google';
+	                if (this.elements.providerAdvanced) {
+	                    this.elements.providerAdvanced.classList.toggle('hidden', !showAdvanced);
+	                }
+	                if (provider === 'google') {
+	                    this.elements.apiKeyLabel.textContent = 'Google API Key:';
+	                    this.elements.apiKeyInput.placeholder = 'Optional (leave blank to use built-in proxy)';
+	                    this.elements.providerHelp.textContent = 'Google is the default provider. Leaving key empty uses the Caption.Ninja proxy.';
+	                    this.elements.saveApiKeyBtn.title = 'Stored locally for Google translation.';
+	                } else if (provider === 'openai') {
+	                    this.elements.apiKeyLabel.textContent = 'API Key:';
+	                    this.elements.apiKeyInput.placeholder = 'OpenAI-compatible key (if required)';
+	                    this.elements.providerHelp.textContent = 'OpenAI-compatible mode supports self-hosted/proxy endpoints.';
+	                    this.elements.saveApiKeyBtn.title = 'Stored locally as tkey for OpenAI-compatible translation.';
+	                } else if (provider === 'anthropic') {
+	                    this.elements.apiKeyLabel.textContent = 'API Key:';
+	                    this.elements.apiKeyInput.placeholder = 'Anthropic API key';
+	                    this.elements.providerHelp.textContent = 'Anthropic mode uses tkey plus optional endpoint/model overrides.';
+	                    this.elements.saveApiKeyBtn.title = 'Stored locally as tkey for Anthropic translation.';
+	                } else if (provider === 'ollama') {
+	                    this.elements.apiKeyLabel.textContent = 'API Key (optional):';
+	                    this.elements.apiKeyInput.placeholder = 'Usually optional for local Ollama';
+	                    this.elements.providerHelp.textContent = 'Ollama mode defaults to a local endpoint. Key is optional in most setups.';
+	                    this.elements.saveApiKeyBtn.title = 'Stored locally as tkey for Ollama translation.';
+	                }
+	                if (this.elements.providerEndpointInput && !this.elements.providerEndpointInput.value.trim()) {
+	                    this.elements.providerEndpointInput.placeholder = defaults.endpoint || 'Optional custom API base URL';
+	                }
+	                if (this.elements.providerModelInput && !this.elements.providerModelInput.value.trim()) {
+	                    this.elements.providerModelInput.placeholder = defaults.model || 'Optional model id';
+	                }
+	            },
+	            initTranslationProvider: function() {
+	                const urlParams = new URLSearchParams(window.location.search);
+	                const requestedProvider = (
+	                    urlParams.get('tprovider') ||
+						urlParams.get('provider') ||
+						urlParams.get('translateprovider') ||
+	                    this.getStorage('translationProvider') ||
+	                    ''
+	                ).trim();
+	                if (window.CaptionTranslationProviders && window.CaptionTranslationProviders.resolveConfig) {
+	                    this.state.translationConfig = window.CaptionTranslationProviders.resolveConfig(
                         urlParams,
                         requestedProvider ? {} : { provider: 'google' }
                     );
@@ -443,45 +604,73 @@
                         endpoint: '',
                         model: '',
                         forceLocal: false,
-                        autoDetect: false
-                    };
-                }
-
-                const provider = this.state.translationConfig.provider || 'google';
-                if (this.elements.apiKeyLabel) {
-                    this.elements.apiKeyLabel.textContent = 'Translation API Key:';
-                }
-                if (provider !== 'google') {
-                    this.elements.saveApiKeyBtn.title = 'Used as tkey for non-Google providers.';
-                }
-            },
-            getTranslationConfig: function() {
-                const base = Object.assign({}, this.state.translationConfig || {});
-                if (!base.provider || base.provider === 'local') {
-                    base.provider = 'google';
-                }
-                // Premium translation is remote-only; ignore forcelocal on this page.
-                base.forceLocal = false;
-                base.apiKey = this.state.apiKey || base.apiKey || '';
-                if (base.provider === 'google') {
-                    base.googleApiKey = base.apiKey;
-                } else {
-                    base.googleApiKey = '';
-                }
-                return base;
-            },
-            getActiveProvider: function() {
-                const configured = (
-                    this.state.translationConfig &&
-                    this.state.translationConfig.provider
-                ) || 'google';
-                return (configured === 'local') ? 'google' : configured;
-            },
-            getProviderStorageKey: function(provider) {
-                return 'apiKey_' + provider;
-            },
-            getProviderKeyFromUrl: function(urlParams, provider) {
-                if (provider === 'google') {
+	                        autoDetect: false
+	                    };
+	                }
+	                const selectedProvider = this.normalizeProviderForSelect(
+	                    this.state.translationConfig.provider,
+	                    this.state.translationConfig.providerHint
+	                );
+	                if (this.elements.providerSelect) {
+	                    this.elements.providerSelect.value = selectedProvider;
+	                }
+	                this.setStorage('translationProvider', selectedProvider, 999999);
+	                this.applySelectedProviderToState(selectedProvider);
+	                this.loadProviderFields(selectedProvider, this.state.translationConfig);
+	                this.cacheProviderFields(selectedProvider);
+	                this.updateProviderUI();
+	            },
+	            getTranslationConfig: function() {
+	                const selectedProvider = this.getActiveProvider();
+	                this.cacheProviderFields(selectedProvider);
+	                const endpoint = (selectedProvider === 'google')
+	                    ? ''
+	                    : (this.elements.providerEndpointInput.value || '').trim();
+	                const model = (selectedProvider === 'google')
+	                    ? ''
+	                    : (this.elements.providerModelInput.value || '').trim();
+	                const urlParams = new URLSearchParams(window.location.search);
+	                if (window.CaptionTranslationProviders && window.CaptionTranslationProviders.resolveConfig) {
+	                    const resolved = window.CaptionTranslationProviders.resolveConfig(urlParams, {
+	                        provider: selectedProvider,
+	                        endpoint: endpoint,
+	                        model: model,
+	                        apiKey: this.state.apiKey || '',
+	                        googleApiKey: (selectedProvider === 'google') ? (this.state.apiKey || '') : '',
+	                        forceLocal: false
+	                    });
+	                    if (!resolved.provider || resolved.provider === 'local') {
+	                        resolved.provider = 'google';
+	                        resolved.providerHint = 'google';
+	                    }
+	                    resolved.forceLocal = false;
+	                    return resolved;
+	                }
+	                return {
+	                    provider: (selectedProvider === 'openai' || selectedProvider === 'ollama') ? 'openai_compat' : selectedProvider,
+	                    providerHint: selectedProvider,
+	                    endpoint: endpoint,
+	                    model: model,
+	                    apiKey: this.state.apiKey || '',
+	                    googleApiKey: (selectedProvider === 'google') ? (this.state.apiKey || '') : '',
+	                    forceLocal: false,
+	                    autoDetect: false
+	                };
+	            },
+	            getActiveProvider: function() {
+	                if (this.elements.providerSelect && this.elements.providerSelect.value) {
+	                    return this.elements.providerSelect.value;
+	                }
+	                return this.normalizeProviderForSelect(
+	                    this.state.translationConfig && this.state.translationConfig.provider,
+	                    this.state.translationConfig && this.state.translationConfig.providerHint
+	                );
+	            },
+	            getProviderStorageKey: function(provider) {
+	                return 'apiKey_' + (provider || 'google');
+	            },
+	            getProviderKeyFromUrl: function(urlParams, provider) {
+	                if (provider === 'google') {
                     return (
                         urlParams.get('googlekey') ||
                         urlParams.get('gkey') ||
@@ -596,10 +785,41 @@
                 this.setStorage('targetLang', this.state.targetLang, 999999);
                 this.setStorage('myLang', this.state.myLang, 999999);
             },
-            setupEventListeners: function() {
-                this.elements.saveApiKeyBtn.addEventListener('click', () => {
-                    const newKey = this.elements.apiKeyInput.value.trim();
-                    if (newKey) {
+	            setupEventListeners: function() {
+	                if (this.elements.providerSelect) {
+	                    this.elements.providerSelect.addEventListener('change', () => {
+	                        const previousProvider = this.normalizeProviderForSelect(
+	                            this.state.translationConfig && this.state.translationConfig.provider,
+	                            this.state.translationConfig && this.state.translationConfig.providerHint
+	                        );
+	                        this.cacheProviderFields(previousProvider);
+	                        const selectedProvider = this.getActiveProvider();
+	                        this.updateURL('tprovider=' + selectedProvider, true);
+	                        this.setStorage('translationProvider', selectedProvider, 999999);
+	                        this.applySelectedProviderToState(selectedProvider);
+	                        this.loadProviderFields(selectedProvider);
+	                        this.updateProviderUI();
+	                        this.loadApiKey();
+	                        this.fetchLanguages();
+	                        const currentText = this.elements.inputTextarea.value.trim();
+	                        if (currentText && this.elements.enabledTranscriptionCheckbox.checked) {
+	                            this.translateText(currentText);
+	                        }
+	                    });
+	                }
+	                const providerFieldHandler = () => {
+	                    const selectedProvider = this.getActiveProvider();
+	                    this.cacheProviderFields(selectedProvider);
+	                };
+	                if (this.elements.providerEndpointInput) {
+	                    this.elements.providerEndpointInput.addEventListener('change', providerFieldHandler);
+	                }
+	                if (this.elements.providerModelInput) {
+	                    this.elements.providerModelInput.addEventListener('change', providerFieldHandler);
+	                }
+	                this.elements.saveApiKeyBtn.addEventListener('click', () => {
+	                    const newKey = this.elements.apiKeyInput.value.trim();
+	                    if (newKey) {
                         if (newKey !== this.state.apiKey) {
                             const provider = this.getActiveProvider();
                             const providerStorageKey = this.getProviderStorageKey(provider);

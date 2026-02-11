@@ -120,9 +120,9 @@ https://caption.ninja/overlay?room=abc123&translate=ja&googlekey=YOUR_API_KEY&du
 
 `&clear`, `&showtime`, `&maxlines`, and other history flags still apply to the combined block, and TTS continues speaking the translated text while the original is just displayed.
 
-### Method 3: Premium Google Translation in Overlay
+### Method 3: Premium/Remote Translation in Overlay
 
-For professional-quality translation with 100+ language support, use Google Cloud Translation API directly in the overlay:
+For professional-quality translation with 100+ language support, you can use Google Cloud or other remote providers directly in the overlay:
 
 ```
 https://caption.ninja/overlay?room=abc123&translate=ja&googlekey=YOUR_API_KEY
@@ -141,6 +141,11 @@ https://caption.ninja/overlay?room=abc123&translate=ko&googlekey=KEY&context=1&c
 
 This provides professional-grade translation quality while maintaining the simple overlay system.
 
+Example (OpenAI-compatible provider):
+```
+https://caption.ninja/overlay?room=abc123&translate=ja&tprovider=openai&tmodel=gpt-4o-mini&tkey=YOUR_API_KEY
+```
+
 ### Translation Parameters Reference
 
 | Parameter | Description | Example |
@@ -148,6 +153,10 @@ This provides professional-grade translation quality while maintaining the simpl
 | `translate=XX` or `lang=XX` or `ln=XX` | Target translation language | `&translate=es` |
 | `fromlang=XX` | Override source language detection | `&fromlang=en` |
 | `googlekey=KEY` or `gkey=KEY` | Google Cloud Translation API key | `&googlekey=YOUR_KEY` |
+| `tprovider=google|openai|anthropic|ollama|local` | Select remote/local translation provider | `&tprovider=openai` |
+| `tkey=KEY` or `translatekey=KEY` | API key for non-Google remote providers | `&tkey=YOUR_KEY` |
+| `turl=URL` | Custom API base URL for proxy/self-hosted providers | `&turl=http://127.0.0.1:11434/v1` |
+| `tmodel=MODEL` | Model id for OpenAI-compatible/Anthropic/Ollama | `&tmodel=gpt-4o-mini` |
 | `context=1` | Enable context-aware translation | `&context=1` |
 | `contextsize=N` | Number of previous messages for context (default: 2) | `&contextsize=5` |
 | `forcelocal=1` | Force Mozilla translation even with API key | `&forcelocal=1` |
@@ -369,9 +378,10 @@ Examples:
 
 ### Customize Overlay Button
 
-The main capture page (index.html) now includes a **"Customize Overlay"** button that opens a modal dialog for easily configuring overlay URL parameters without manually editing URLs. Options include:
+The main capture page (`index.html`) includes a **"Customize Overlay"** button that opens a modal dialog for building overlay URLs without manually editing query parameters. Options include:
 
-- Translation language and dual-overlay mode
+- Translation language, dual-overlay mode, and provider selection (`Auto`, `Local`, `Google`, `OpenAI-compatible`, `Anthropic`, `Ollama`)
+- Provider-specific translation fields (API key, optional endpoint URL, optional model)
 - Display options (maxlines, showtime, clear)
 - Interim text handling settings
 - TTS configuration

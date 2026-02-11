@@ -287,6 +287,10 @@
             <li><code>tmodel=MODEL</code> - Model id (for OpenAI-compatible/Anthropic providers)</li>
             <li><code>tkey=KEY</code> or <code>translatekey=KEY</code> - API key for remote provider</li>
         </ul>
+
+        <div class="info-box">
+            <strong>UI Shortcut:</strong> On <code>index.html</code>, click <strong>Customize Overlay</strong> and use the <strong>Provider</strong> dropdown to build these URLs without manual query editing.
+        </div>
     </div>
 
     <h2>Method 2: Premium Translation Page</h2>
@@ -297,7 +301,7 @@
         <h4>Features:</h4>
         <ul>
             <li>Speech recognition with language selection</li>
-            <li>Real-time translation with Google Cloud API</li>
+            <li>Real-time translation with provider selection (Google/OpenAI-compatible/Anthropic/Ollama)</li>
             <li>Context-aware translation option</li>
             <li>Incremental updates for faster response</li>
             <li>Generates overlay URL automatically</li>
@@ -306,7 +310,8 @@
         <h4>Workflow:</h4>
         <ol>
             <li>Open <code>translate_premium.html</code></li>
-            <li>Enter your Google API key</li>
+            <li>Select your translation provider</li>
+            <li>Enter API key (if required) and optional endpoint/model for advanced providers</li>
             <li>Select source and target languages</li>
             <li>Enable microphone and start speaking</li>
             <li>Use the generated overlay URL in OBS</li>
