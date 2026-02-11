@@ -180,7 +180,7 @@
     </div>
 
     <div class="info-box">
-        <strong>Quick Start:</strong> Caption.Ninja offers multiple ways to translate captions in real-time. Choose between free local translation (17 languages) or premium Google Cloud Translation (100+ languages).
+        <strong>Quick Start:</strong> Caption.Ninja offers multiple ways to translate captions in real-time. Choose between free local translation (17 languages) or premium remote APIs (Google/OpenAI-compatible/Anthropic).
     </div>
 
     <h2>Translation Methods Overview</h2>
@@ -263,6 +263,30 @@
         <div class="info-box">
             <strong>Get Google API Key:</strong> <a href="https://console.cloud.google.com/apis/api/translate.googleapis.com/credentials" target="_blank">Google Cloud Console</a>
         </div>
+    </div>
+
+    <div class="method-card">
+        <h3>OpenAI-Compatible / Anthropic Providers</h3>
+        <p>You can also use OpenAI-compatible APIs (including Ollama-compatible endpoints) or Anthropic via URL parameters.</p>
+
+        <h4>Example URLs:</h4>
+        <div class="example-box">
+            overlay.html?room=yourRoomID&translate=es&tprovider=openai&tmodel=gpt-4o-mini&tkey=YOUR_KEY
+        </div>
+        <div class="example-box">
+            overlay.html?room=yourRoomID&translate=es&tprovider=ollama&turl=http://127.0.0.1:11434/v1&tmodel=llama3.1
+        </div>
+        <div class="example-box">
+            overlay.html?room=yourRoomID&translate=es&tprovider=anthropic&tmodel=claude-3-5-haiku-latest&tkey=YOUR_KEY
+        </div>
+
+        <h4>Additional Parameters:</h4>
+        <ul>
+            <li><code>tprovider=google|openai|anthropic|ollama|local</code> - Select translation provider</li>
+            <li><code>turl=URL</code> - Custom API base URL (for proxy/self-hosted endpoints)</li>
+            <li><code>tmodel=MODEL</code> - Model id (for OpenAI-compatible/Anthropic providers)</li>
+            <li><code>tkey=KEY</code> or <code>translatekey=KEY</code> - API key for remote provider</li>
+        </ul>
     </div>
 
     <h2>Method 2: Premium Translation Page</h2>
@@ -374,9 +398,13 @@
         </ol>
 
         <h4>Option 2: Auto-Detect Language (Premium)</h4>
-        <p>With a Google Cloud API key, enable automatic source language detection:</p>
+        <p>With a remote translation provider, enable automatic source language detection:</p>
         <div class="example-box">
             overlay.html?room=yourRoom&translate=en&fromlang=auto&googlekey=YOUR_KEY
+        </div>
+        <p>OpenAI-compatible example:</p>
+        <div class="example-box">
+            overlay.html?room=yourRoom&translate=en&fromlang=auto&tprovider=openai&turl=https://your-proxy.example/v1&tmodel=gpt-4o-mini&tkey=YOUR_KEY
         </div>
         <p>Or use the dedicated parameter:</p>
         <div class="example-box">
@@ -384,13 +412,13 @@
         </div>
         <ul>
             <li><code>fromlang=auto</code> or <code>autodetect</code> - Enable automatic language detection</li>
-            <li>Requires a Google Cloud Translation API key</li>
-            <li>Google automatically detects if the speaker is using French or English</li>
+            <li>Requires a configured remote provider (Google/OpenAI-compatible/Anthropic)</li>
+            <li>The provider detects if the speaker is using French or English</li>
             <li>French → translated to English; English → passed through</li>
         </ul>
         
         <div class="info-box">
-            <strong>Note:</strong> Auto-detect only works with Google Cloud Translation (premium). The free local translation (Bergamot) requires you to specify the source language manually using the toggle feature.
+            <strong>Note:</strong> Auto-detect only works with remote providers. The free local translation (Bergamot) requires you to specify the source language manually using the toggle feature.
         </div>
     </div>
 

@@ -1408,11 +1408,11 @@ function setup() {
 			// Option 2: Apply word/character truncation
 			textToProcess = truncateInterim(textToProcess);
 
-			if (textToProcess) {
-				// Option 1: Store for auto-finalization and reset timer
-				pendingInterim = textToProcess;
-				if (autoFinalMs > 0) {
-					if (silenceTimer) clearTimeout(silenceTimer);
+				if (textToProcess) {
+					// Option 1: Store for auto-finalization and reset timer
+					pendingInterim = textToProcess;
+					if (autoFinalMs > 0) {
+						if (silenceTimer) clearTimeout(silenceTimer);
 					silenceTimer = setTimeout(forceFinalization, autoFinalMs);
 				}
 
@@ -1434,12 +1434,18 @@ function setup() {
 						.join(' ');
 				} else {
 					text_to_translate = display_text;
-				}
+					}
 
-				translateCall(text_to_translate, true);
-			}
-		  }
-		};
+					translateCall(text_to_translate, true);
+				} else {
+					pendingInterim = "";
+					if (silenceTimer) {
+						clearTimeout(silenceTimer);
+						silenceTimer = null;
+					}
+				}
+			  }
+			};
 		if (isPaused) {
 			return;
 		}

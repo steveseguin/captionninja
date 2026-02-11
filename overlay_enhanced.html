@@ -59,6 +59,7 @@
 	<div id="interm" class="output"></div>
 	<div id="output" class="output"></div>
 	<div id="status" style="display:none;"></div>
+	<script src="translation-providers.js"></script>
 	<script>
 	
 	(function (w) {
@@ -119,20 +120,31 @@
 	  (translationParams.map(param => urlParams.get(param)).find(val => val) || "en") : false;
 	const langTo = translationLang ? translationLang.split("-")[0] : false;
 
-	// Google Translation settings
-	const googleApiKey = urlParams.get("googlekey") || urlParams.get("gkey") || false;
+	// Translation provider settings
+	const fallbackGoogleApiKey = urlParams.get("googlekey") || urlParams.get("gkey") || false;
+	const fallbackAutoDetect = urlParams.has("autodetect") || urlParams.get("fromlang") === "auto";
 	const forceLocal = urlParams.has("forcelocal");
-	
-	// Auto-detect source language (Google API only - premium feature)
-	// Usage: &fromlang=auto or &autodetect with a Google API key
-	const autoDetectLang = urlParams.has("autodetect") || urlParams.get("fromlang") === "auto";
+	const translationConfigBase = (window.CaptionTranslationProviders && window.CaptionTranslationProviders.resolveConfig)
+		? window.CaptionTranslationProviders.resolveConfig(urlParams, { forceLocal: forceLocal })
+		: {
+			provider: fallbackGoogleApiKey ? "google" : "local",
+			apiKey: fallbackGoogleApiKey || "",
+			googleApiKey: fallbackGoogleApiKey || "",
+			endpoint: "",
+			model: "",
+			forceLocal: forceLocal,
+			autoDetect: fallbackAutoDetect
+		};
+	const translationProvider = translationConfigBase.provider || "local";
+	const googleApiKey = translationConfigBase.googleApiKey || fallbackGoogleApiKey || false;
+	const autoDetectLang = Boolean(translationConfigBase.autoDetect);
 
 	// Context settings
 	const useContext = urlParams.has("context") || urlParams.has("fullcontext");
 	const contextSize = parseInt(urlParams.get("contextsize")) || 2;
 	let messageHistory = [];
 
-	// Translation cache for Google API
+	// Translation cache for remote provider responses
 	const translationCache = new Map();
 	const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -191,64 +203,60 @@
 		}
 	}
 	
-	// Google Translation function
-	// Supports auto-detection when sourceLang is "auto" or autoDetectLang is enabled
-	async function translateViaGoogle(text, sourceLang, targetLang) {
-		if (!googleApiKey || !text.trim()) return null;
-		
-		// Determine if we should use auto-detection
+	async function translateViaProvider(text, sourceLang, targetLang) {
+		if (!text.trim()) {
+			return null;
+		}
+		if (!window.CaptionTranslationProviders || !window.CaptionTranslationProviders.translateText) {
+			return null;
+		}
+
 		const useAutoDetect = autoDetectLang || sourceLang === "auto";
-		
-		// Check cache first (include auto-detect mode in cache key)
-		const cacheKey = useAutoDetect 
-			? `auto-${text}-${targetLang}` 
-			: `${text}-${sourceLang}-${targetLang}`;
-		const cached = translationCache.get(cacheKey);
-		if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-			return cached.translation;
+		const requestConfig = Object.assign({}, translationConfigBase, {
+			autoDetect: useAutoDetect
+		});
+
+		if (!window.CaptionTranslationProviders.canUseRemoteProvider(requestConfig)) {
+			return null;
 		}
-		
-		// Build URL - omit source parameter for auto-detection
-		const sourceParam = useAutoDetect ? '' : `&source=${sourceLang}`;
-		const url = `https://www.googleapis.com/language/translate/v2/?key=${googleApiKey}&q=${encodeURIComponent(text)}&target=${targetLang}${sourceParam}`;
-		
-		try {
-			const response = await fetch(url, {
-				method: 'GET',
-				headers: {
-					'Content-Type': 'application/json',
-					'Accept': 'application/json'
-				}
+
+		const cacheKey = window.CaptionTranslationProviders.buildCacheKey(
+			requestConfig,
+			text,
+			sourceLang,
+			targetLang,
+			useAutoDetect
+		);
+		if (!useAutoDetect) {
+			const cached = translationCache.get(cacheKey);
+			if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+				return cached.translation;
+			}
+		}
+
+		const result = await window.CaptionTranslationProviders.translateText(
+			requestConfig,
+			text,
+			sourceLang,
+			targetLang
+		);
+		if (!result || !result.translatedText) {
+			return null;
+		}
+
+		if (useAutoDetect && result.detectedSourceLanguage) {
+			console.log(`Auto-detected language: ${result.detectedSourceLanguage}`);
+		}
+
+		if (!useAutoDetect) {
+			translationCache.set(cacheKey, {
+				translation: result.translatedText,
+				timestamp: Date.now(),
+				detectedLang: result.detectedSourceLanguage || null
 			});
-			
-			if (!response.ok) {
-				throw new Error(`HTTP error! status: ${response.status}`);
-			}
-			
-			const data = await response.json();
-			if (data?.data?.translations?.[0]) {
-				const translationData = data.data.translations[0];
-				const translation = translationData.translatedText;
-				
-				// Log detected language when using auto-detection
-				if (useAutoDetect && translationData.detectedSourceLanguage) {
-					console.log(`Auto-detected language: ${translationData.detectedSourceLanguage}`);
-				}
-				
-				// Cache the translation
-				translationCache.set(cacheKey, {
-					translation: translation,
-					timestamp: Date.now(),
-					detectedLang: translationData.detectedSourceLanguage || null
-				});
-				return translation;
-			}
-		} catch (error) {
-			console.error('Google Translation error:', error);
-			status(`Translation error: ${error.message}`);
 		}
-		
-		return null;
+
+		return result.translatedText;
 	}
 	
 	// Clean up old cache entries periodically
@@ -643,29 +651,48 @@
 	if (langTo){
 		// Handle auto-detect: langFrom will be "auto" when auto-detection is enabled
 		var langFrom = autoDetectLang ? "auto" : (urlParams.get("fromlang") || "en");
+		let remoteTranslationEnabled = (translationProvider !== "local") && !forceLocal;
 		
-		// Only initialize local translation if no Google API key or force local
-		// Note: Local translation (Bergamot) does NOT support auto-detect - requires Google API key
-		if ((!googleApiKey || forceLocal) && !autoDetectLang) {
+		if (translationProvider === "google" && remoteTranslationEnabled && !googleApiKey) {
+			remoteTranslationEnabled = false;
+			console.warn("Google provider selected without API key. Add &googlekey=YOUR_KEY or switch providers.");
+			status("Google provider requires API key");
+		}
+		
+		// Only initialize local translation if remote provider is not active.
+		// Note: Local translation (Bergamot) does NOT support auto-detect.
+		if (!remoteTranslationEnabled && !autoDetectLang) {
 			if (window.Worker) {
 				worker = new Worker("worker.js");
 				worker.postMessage(["import"]);
 			}
 		}
 		
-		// Warn if auto-detect is enabled without Google API key
-		if (autoDetectLang && !googleApiKey) {
-			console.warn("Auto-detect language requires a Google API key. Add &googlekey=YOUR_KEY to use auto-detection.");
-			status("Auto-detect requires Google API key");
+		// Warn if auto-detect is enabled without a remote provider.
+		if (autoDetectLang && !remoteTranslationEnabled) {
+			console.warn("Auto-detect language requires a remote translation provider.");
+			status("Auto-detect requires remote provider");
 		}
 
-		var translateCall = async (text, meta, interm=false) => { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
-			if (!text.trim().length) return;
-			
-			// Use Google Translation if available and not forced to local
-			if (googleApiKey && !forceLocal) {
-				try {
-					const translation = await translateViaGoogle(text, langFrom, langTo);
+			var translateCall = async (text, meta, interm=false) => { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
+				if (!text.trim().length) return;
+				
+				const passThroughText = () => {
+					if (!meta){
+						document.getElementById("output").innerText = text;
+					} else if (meta.final){
+						processReply(meta, interm);
+					} else if (meta.interm){
+						processReply(meta, interm);
+					} else {
+						document.getElementById("output").innerText = text;
+					}
+				};
+				
+				// Use remote translation provider if enabled.
+				if (remoteTranslationEnabled) {
+					try {
+						const translation = await translateViaProvider(text, langFrom, langTo);
 					if (translation) {
 						if (!meta){
 							document.getElementById("output").innerText = translation;
@@ -675,24 +702,31 @@
 						} else if (meta.interm){
 							meta.interm = translation;
 							processReply(meta, interm);
-						} else {
-							document.getElementById("output").innerText = translation;
+							} else {
+								document.getElementById("output").innerText = translation;
+							}
+							return;
+						}
+					} catch (error) {
+						console.error("Remote translation failed, falling back to local:", error);
+						status(`Translation error: ${error.message}`);
+						// Fall back to local translation if available.
+						if (worker) {
+							const paragraphs = text.split("\n");
+							worker.postMessage(["translate", langFrom, langTo, paragraphs, meta, interm]);
+							return;
 						}
 					}
-				} catch (error) {
-					console.error("Google translation failed, falling back to local:", error);
-					// Fall back to local translation if Google fails
-					if (worker) {
-						const paragraphs = text.split("\n");
-						worker.postMessage(["translate", langFrom, langTo, paragraphs, meta, interm]);
-					}
+				} else if (worker) {
+					// Use local translation
+					const paragraphs = text.split("\n");
+					worker.postMessage(["translate", langFrom, langTo, paragraphs, meta, interm]);
+					return;
 				}
-			} else if (worker) {
-				// Use local translation
-				const paragraphs = text.split("\n");
-				worker.postMessage(["translate", langFrom, langTo, paragraphs, meta, interm]);
-			}
-		};
+				
+				// Safe fallback when translation is unavailable.
+				passThroughText();
+			};
 
 		if (worker) {
 			worker.onmessage = function (e) {

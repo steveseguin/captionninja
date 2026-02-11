@@ -245,10 +245,10 @@
 		<h2>Real-time Translation App - Premium Version</h2>
 		
 		<p>This app uses speech recognition to transcribe your voice and translate it in real-time.</p>
-		<p>The translation is powered by Google Cloud Translation, which <a href='https://console.cloud.google.com/apis/api/translate.googleapis.com/credentials' target="_blank">requires an API key -- get yours here.</a> <br /> <a href='./translate'>There is non-premium version for free of course also, but it's quite a bit more limited.</a> Check out more options and details on <a href='https://github.com/steveseguin/captionninja'>GitHub</a>.</p>
-		<p>To use this app, accept the microphone permissions on page load and then just say something outloud to see the live Transciption. Once that is working, ensure you have your Google API key enteed, and then just enable the Translation Output. The overlay link will mirror the output.</p>
+		<p>Default translation uses Google Cloud Translation (API key optional). It also supports OpenAI-compatible and Anthropic endpoints via URL params <code>tprovider</code>, <code>turl</code>, <code>tmodel</code>, and <code>tkey</code>. <br /> <a href='./translate'>There is non-premium version for free of course also, but it's quite a bit more limited.</a> Check out more options and details on <a href='https://github.com/steveseguin/captionninja'>GitHub</a>.</p>
+		<p>To use this app, accept microphone permissions on page load and start speaking. Then enable Translation Output. The overlay link mirrors translated output.</p>
 		<div class="api-key-container">
-			<label for="apiKey">Google Translation API Key:</label>
+			<label for="apiKey">Translation API Key:</label>
 			<input type="password" id="apiKey" placeholder="Enter your API key here">
 			<button id="saveApiKey" class="button">Save Key</button>
 			<span id="apiKeyStatus" class="api-key-status status-inactive">No API Key</span>
@@ -325,6 +325,7 @@
     <script src="security-utils.js"></script>
     <script src="ws-publisher.js"></script>
     <script src="text-rules.js"></script>
+    <script src="translation-providers.js"></script>
     <script>
 	
 	
@@ -362,6 +363,7 @@
 	const app = {
             state: {
                 apiKey: '',
+                translationConfig: null,
                 roomId: '',
                 myLang: navigator.language || 'en-US',
                 targetLang: 'en',
@@ -378,6 +380,7 @@
             },
             elements: {
                 apiKeyInput: document.getElementById('apiKey'),
+                apiKeyLabel: document.querySelector('label[for="apiKey"]'),
                 apiKeyStatus: document.getElementById('apiKeyStatus'),
                 saveApiKeyBtn: document.getElementById('saveApiKey'),
                 langFromSelect: document.getElementById('langFrom'),
@@ -399,6 +402,7 @@
             retryCount: 0,
             init: function() {
                 this.initTextRules();
+                this.initTranslationProvider();
                 this.loadApiKey();
                 this.generateRoomId();
                 this.loadLanguagePreferences();
@@ -415,6 +419,82 @@
                 this.textRulesEngine = (window.CaptionTextRules && window.CaptionTextRules.createEngine)
                     ? window.CaptionTextRules.createEngine(cfg)
                     : null;
+            },
+            initTranslationProvider: function() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const requestedProvider = (
+                    urlParams.get('tprovider') ||
+                    urlParams.get('provider') ||
+                    urlParams.get('translateprovider') ||
+                    ''
+                ).trim();
+                if (window.CaptionTranslationProviders && window.CaptionTranslationProviders.resolveConfig) {
+                    this.state.translationConfig = window.CaptionTranslationProviders.resolveConfig(
+                        urlParams,
+                        requestedProvider ? {} : { provider: 'google' }
+                    );
+                } else {
+                    const googleKey = urlParams.get('googlekey') || urlParams.get('gkey') || '';
+                    this.state.translationConfig = {
+                        provider: 'google',
+                        providerHint: 'google',
+                        apiKey: googleKey,
+                        googleApiKey: googleKey,
+                        endpoint: '',
+                        model: '',
+                        forceLocal: false,
+                        autoDetect: false
+                    };
+                }
+
+                const provider = this.state.translationConfig.provider || 'google';
+                if (this.elements.apiKeyLabel) {
+                    this.elements.apiKeyLabel.textContent = 'Translation API Key:';
+                }
+                if (provider !== 'google') {
+                    this.elements.saveApiKeyBtn.title = 'Used as tkey for non-Google providers.';
+                }
+            },
+            getTranslationConfig: function() {
+                const base = Object.assign({}, this.state.translationConfig || {});
+                if (!base.provider || base.provider === 'local') {
+                    base.provider = 'google';
+                }
+                // Premium translation is remote-only; ignore forcelocal on this page.
+                base.forceLocal = false;
+                base.apiKey = this.state.apiKey || base.apiKey || '';
+                if (base.provider === 'google') {
+                    base.googleApiKey = base.apiKey;
+                } else {
+                    base.googleApiKey = '';
+                }
+                return base;
+            },
+            getActiveProvider: function() {
+                const configured = (
+                    this.state.translationConfig &&
+                    this.state.translationConfig.provider
+                ) || 'google';
+                return (configured === 'local') ? 'google' : configured;
+            },
+            getProviderStorageKey: function(provider) {
+                return 'apiKey_' + provider;
+            },
+            getProviderKeyFromUrl: function(urlParams, provider) {
+                if (provider === 'google') {
+                    return (
+                        urlParams.get('googlekey') ||
+                        urlParams.get('gkey') ||
+                        urlParams.get('tkey') ||
+                        urlParams.get('translatekey') ||
+                        ''
+                    ).trim();
+                }
+                return (
+                    urlParams.get('tkey') ||
+                    urlParams.get('translatekey') ||
+                    ''
+                ).trim();
             },
             applyTextRules: function(text) {
                 if (!this.textRulesEngine || typeof text !== 'string') {
@@ -436,13 +516,28 @@
                     .replace(/'/g, '&#39;');
             },
             loadApiKey: function() {
-                const savedKey = this.getStorage('apiKey');
-                if (savedKey) {
-                    this.state.apiKey = savedKey;
-                    this.elements.apiKeyInput.value = savedKey;
+                const urlParams = new URLSearchParams(window.location.search);
+                const provider = this.getActiveProvider();
+                const keyFromUrl = this.getProviderKeyFromUrl(urlParams, provider);
+                const providerStorageKey = this.getProviderStorageKey(provider);
+                const savedKey = this.getStorage(providerStorageKey);
+                const activeKey = keyFromUrl || savedKey || '';
+
+                if (activeKey) {
+                    this.state.apiKey = activeKey;
+                    this.elements.apiKeyInput.value = activeKey;
                     this.updateApiKeyStatus(true);
                 } else {
+                    this.state.apiKey = '';
                     this.updateApiKeyStatus(false);
+                }
+                if (this.state.translationConfig) {
+                    this.state.translationConfig.apiKey = this.state.apiKey;
+                    if (provider === 'google') {
+                        this.state.translationConfig.googleApiKey = this.state.apiKey;
+                    } else {
+                        this.state.translationConfig.googleApiKey = '';
+                    }
                 }
             },
             updateApiKeyStatus: function(isActive) {
@@ -503,24 +598,34 @@
             },
             setupEventListeners: function() {
                 this.elements.saveApiKeyBtn.addEventListener('click', () => {
-					const newKey = this.elements.apiKeyInput.value.trim();
-					if (newKey) {
-						if (newKey !== this.state.apiKey) {
-							this.state.apiKey = newKey;
-							this.setStorage('apiKey', newKey, 999999);
-							this.updateApiKeyStatus(true);
-							this.fetchLanguages();
-						} else {
-							const originalText = this.elements.saveApiKeyBtn.textContent;
-							this.elements.saveApiKeyBtn.textContent = 'Key Already Active';
-							setTimeout(() => {
-								this.elements.saveApiKeyBtn.textContent = originalText;
-							}, 2000);
-						}
-					} else {
-						this.showError('Please enter a valid API key');
-					}
-				});
+                    const newKey = this.elements.apiKeyInput.value.trim();
+                    if (newKey) {
+                        if (newKey !== this.state.apiKey) {
+                            const provider = this.getActiveProvider();
+                            const providerStorageKey = this.getProviderStorageKey(provider);
+                            this.state.apiKey = newKey;
+                            if (this.state.translationConfig) {
+                                this.state.translationConfig.apiKey = newKey;
+                                if (provider === 'google') {
+                                    this.state.translationConfig.googleApiKey = newKey;
+                                } else {
+                                    this.state.translationConfig.googleApiKey = '';
+                                }
+                            }
+                            this.setStorage(providerStorageKey, newKey, 999999);
+                            this.updateApiKeyStatus(true);
+                            this.fetchLanguages();
+                        } else {
+                            const originalText = this.elements.saveApiKeyBtn.textContent;
+                            this.elements.saveApiKeyBtn.textContent = 'Key Already Active';
+                            setTimeout(() => {
+                                this.elements.saveApiKeyBtn.textContent = originalText;
+                            }, 2000);
+                        }
+                    } else {
+                        this.showError('Please enter a valid API key');
+                    }
+                });
                 this.elements.copyLinkBtn.addEventListener('click', () => {
                     navigator.clipboard.writeText(this.elements.shareLink.href)
                         .then(() => {
@@ -615,36 +720,62 @@
                 return Math.min(1000 * Math.pow(2, this.retryCount - 1), 30000);
             },
             fetchLanguages: function() {
-                let url;
-                if (this.state.apiKey) {
-                    url = `https://www.googleapis.com/language/translate/v2/languages?key=${this.state.apiKey}`;
-                } else {
-                    url = `https://captionninjapremium.vdo.workers.dev/?ts=${Date.now()}`;
-                }
-                fetch(url, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.error) {
-                        throw new Error(data.error.message || 'Error fetching languages');
-                    }
-                    this.processLanguages(data.data.languages);
-                })
-                .catch(error => {
-                    this.showError('Failed to fetch languages: ' + error.message);
-                    console.error('Language fetch error:', error);
+                const translationConfig = this.getTranslationConfig();
+                const provider = translationConfig.provider || 'local';
+
+                if (provider !== 'google') {
                     this.loadDefaultLanguages();
-                });
+                    return;
+                }
+
+                // Preserve existing behavior: no key uses the Caption.Ninja proxy endpoint.
+                if (!translationConfig.apiKey) {
+                    const proxyUrl = `https://captionninjapremium.vdo.workers.dev/?ts=${Date.now()}`;
+                    fetch(proxyUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! Status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.error) {
+                            throw new Error(data.error.message || 'Error fetching languages');
+                        }
+                        this.processLanguages(data.data.languages);
+                    })
+                    .catch(error => {
+                        this.showError('Failed to fetch languages: ' + error.message);
+                        console.error('Language fetch error:', error);
+                        this.loadDefaultLanguages();
+                    });
+                    return;
+                }
+
+                if (!window.CaptionTranslationProviders || !window.CaptionTranslationProviders.fetchLanguages) {
+                    this.loadDefaultLanguages();
+                    return;
+                }
+
+                window.CaptionTranslationProviders.fetchLanguages(translationConfig)
+                    .then(languages => {
+                        if (!Array.isArray(languages) || !languages.length) {
+                            this.loadDefaultLanguages();
+                            return;
+                        }
+                        this.processLanguages(languages);
+                    })
+                    .catch(error => {
+                        this.showError('Failed to fetch languages: ' + error.message);
+                        console.error('Language fetch error:', error);
+                        this.loadDefaultLanguages();
+                    });
             },
             processLanguages: function(languages) {
                 this.state.languageData = languages;
@@ -944,10 +1075,18 @@
                     this.state.activeRequest.abort();
                     this.state.activeRequest = null;
                 }
-                const url = this.state.apiKey
-                    ? `https://www.googleapis.com/language/translate/v2/?key=${this.state.apiKey}&q=${encodeURIComponent(contextText)}&target=${this.state.targetLang}&source=${this.state.myLangCode}`
-                    : `https://captionninjapremium.vdo.workers.dev/?ts=${Date.now()}&q=${encodeURIComponent(contextText)}&target=${this.state.targetLang}&source=${this.state.myLangCode}`;
-                const cachedTranslation = this.getCachedTranslation(url);
+                const translationConfig = this.getTranslationConfig();
+                const provider = translationConfig.provider || 'local';
+                const cacheKey = (window.CaptionTranslationProviders && window.CaptionTranslationProviders.buildCacheKey)
+                    ? window.CaptionTranslationProviders.buildCacheKey(
+                        translationConfig,
+                        contextText,
+                        this.state.myLangCode,
+                        this.state.targetLang,
+                        Boolean(translationConfig.autoDetect)
+                    )
+                    : `${provider}|${this.state.myLangCode}|${this.state.targetLang}|${contextText}`;
+                const cachedTranslation = this.getCachedTranslation(cacheKey);
                 if (cachedTranslation) {
                     console.log('Using cached translation');
                     this.updateTranslation(cachedTranslation, isInterim);
@@ -962,26 +1101,54 @@
                         this.state.activeRequest = null;
                     }
                 }, 3000);
-                fetch(url, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    signal: controller.signal
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                Promise.resolve()
+                .then(() => {
+                    // Preserve the existing no-key Google proxy behavior.
+                    if (provider === 'google' && !translationConfig.apiKey) {
+                        const proxyUrl = `https://captionninjapremium.vdo.workers.dev/?ts=${Date.now()}&q=${encodeURIComponent(contextText)}&target=${this.state.targetLang}&source=${this.state.myLangCode}`;
+                        return fetch(proxyUrl, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            signal: controller.signal
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (!data?.data?.translations?.[0]) {
+                                throw new Error('Invalid response format from translation service');
+                            }
+                            return { translatedText: data.data.translations[0].translatedText };
+                        });
                     }
-                    return response.json();
-                })
-                .then(data => {
-                    if (!data?.data?.translations?.[0]) {
-                        throw new Error('Invalid response format from translation service');
+
+                    if (!window.CaptionTranslationProviders || !window.CaptionTranslationProviders.translateText) {
+                        throw new Error('Translation provider module is not available');
                     }
-                    const translatedText = data.data.translations[0].translatedText;
-                    this.cacheTranslation(url, data.data);
+
+                    return window.CaptionTranslationProviders.translateText(
+                        translationConfig,
+                        contextText,
+                        this.state.myLangCode,
+                        this.state.targetLang,
+                        { signal: controller.signal }
+                    )
+                    .then(result => {
+                        if (!result || !result.translatedText) {
+                            throw new Error('Invalid response format from translation service');
+                        }
+                        return result;
+                    });
+                })
+                .then(result => {
+                    const translatedText = result.translatedText;
+                    this.cacheTranslation(cacheKey, { translatedText: translatedText });
                     this.updateTranslation(translatedText, isInterim);
                 })
                 .catch(error => {
@@ -990,7 +1157,7 @@
                         return;
                     }
                     console.error('Translation error:', error);
-                    if (error.message.includes('HTTP error! status: 429')) {
+                    if ((error.status === 429) || error.message.includes('HTTP error! status: 429')) {
                         if (this.elements.incrementalUpdatesCheckbox.checked) {
                             this.elements.incrementalUpdatesCheckbox.checked = false;
                             this.showError('Incremental updates have been disabled due to rate limiting');
@@ -1038,15 +1205,18 @@
             },
             handleTranslationError: function(error) {
                 let errorMessage = '';
+                const statusCode = Number(error?.status || 0);
                 if (error instanceof TypeError && error.message.includes('CORS')) {
                     errorMessage = 'CORS Error: Unable to access the translation service. Check your API key.';
                 } else if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
                     errorMessage = 'Network Error: Unable to connect to the translation service.';
-                } else if (error.message.includes('HTTP error! status: 403')) {
+                } else if (statusCode === 403 || error.message.includes('HTTP error! status: 403')) {
                     errorMessage = 'Authorization Error: Invalid API key or insufficient permissions.';
-                } else if (error.message.includes('HTTP error! status: 429')) {
+                } else if (statusCode === 401 || error.message.includes('HTTP error! status: 401')) {
+                    errorMessage = 'Authorization Error: Invalid API key.';
+                } else if (statusCode === 429 || error.message.includes('HTTP error! status: 429')) {
                     errorMessage = 'Rate Limit Error: Too many requests. Try disabling incremental updates.';
-                } else if (error.message.includes('HTTP error! status: 400')) {
+                } else if (statusCode === 400 || error.message.includes('HTTP error! status: 400')) {
                     errorMessage = 'Bad Request: Source and target languages may be the same.';
                 } else if (error.message.includes('Invalid response format')) {
                     errorMessage = 'Error: Unexpected response from the translation service.';
@@ -1095,6 +1265,9 @@
                     if (cached) {
                         const { data, timestamp } = JSON.parse(cached);
                         if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
+                            if (typeof data?.translatedText === 'string') {
+                                return data.translatedText;
+                            }
                             return data?.translations?.[0]?.translatedText || null;
                         }
                         localStorage.removeItem('translation_' + url);
@@ -1106,8 +1279,11 @@
             },
             cacheTranslation: function(url, data) {
                 try {
+                    const normalizedData = (typeof data === 'string')
+                        ? { translatedText: data }
+                        : data;
                     localStorage.setItem('translation_' + url, JSON.stringify({
-                        data: data,
+                        data: normalizedData,
                         timestamp: Date.now()
                     }));
                 } catch (e) {
