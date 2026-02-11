@@ -864,6 +864,15 @@
 	function generateSecureRoomID(len = 16) {
 		const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 		let out = '';
+		const cryptoObj = window.crypto || window.msCrypto;
+		if (cryptoObj && typeof cryptoObj.getRandomValues === "function") {
+			const randomValues = new Uint8Array(len);
+			cryptoObj.getRandomValues(randomValues);
+			for (let i = 0; i < len; i++) {
+				out += chars.charAt(randomValues[i] % chars.length);
+			}
+			return out;
+		}
 		for (let i = 0; i < len; i++) {
 			out += chars.charAt(Math.floor(Math.random() * chars.length));
 		}
@@ -1079,11 +1088,12 @@ function rebuildSrtFile() {
 			}
 		}
 	}
-	document.getElementById("shareLink").href= url+"/overlay?room="+roomID;
-	document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID;
-	navigator.clipboard.writeText(url+"/overlay?room="+roomID).then(() => {
-    }, () => {
-    });
+	const overlayShareLink = url+"/overlay?room="+encodeURIComponent(roomID);
+	document.getElementById("shareLink").href = overlayShareLink;
+	document.getElementById("shareLink").textContent = overlayShareLink;
+	navigator.clipboard.writeText(overlayShareLink).then(() => {
+	}, () => {
+	});
 	var apiKey = false;
 	var wsPublisher = null;
 	function publishCaption(payload) {

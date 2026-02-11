@@ -145,10 +145,28 @@
   })(window);
   var urlParams = new URLSearchParams(window.location.search);
 
+  function generateSecureRoomID(len) {
+    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    var text = '';
+    var cryptoObj = window.crypto || window.msCrypto;
+    if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
+      var randomValues = new Uint8Array(len);
+      cryptoObj.getRandomValues(randomValues);
+      for (var i = 0; i < len; i++) {
+        text += chars.charAt(randomValues[i] % chars.length);
+      }
+      return text;
+    }
+    for (var j = 0; j < len; j++) {
+      text += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return text;
+  }
+
   // State
   var roomID = (urlParams.has('room') ? urlParams.get('room') : null);
   if (!roomID) {
-    roomID = Math.random().toString(36).slice(2, 10);
+    roomID = generateSecureRoomID(8);
     try {
       var u = new URL(window.location.href); u.searchParams.set('room', roomID);
       window.history.replaceState({}, '', u.toString());
