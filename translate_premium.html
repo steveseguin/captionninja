@@ -582,25 +582,33 @@
 	            },
 		            initTranslationProvider: function() {
 		                const urlParams = new URLSearchParams(window.location.search);
-		                const requestedProvider = (
+		                const urlProvider = (
 		                    urlParams.get('tprovider') ||
 							urlParams.get('provider') ||
 							urlParams.get('translateprovider') ||
+		                    ''
+		                ).trim();
+		                const storedProvider = (
 		                    this.getStorage('translationProvider') ||
 		                    ''
 		                ).trim();
 		                const hasProviderEndpointOrModelHint = (
+		                    urlParams.has('googlekey') ||
+		                    urlParams.has('gkey') ||
 		                    urlParams.has('turl') ||
 		                    urlParams.has('translateurl') ||
 		                    urlParams.has('tmodel') ||
 		                    urlParams.has('translatemodel')
 		                );
+		                const providerOverride = urlProvider
+		                    ? { provider: urlProvider }
+		                    : (hasProviderEndpointOrModelHint
+		                        ? {}
+		                        : (storedProvider ? { provider: storedProvider } : { provider: 'google' }));
 		                if (window.CaptionTranslationProviders && window.CaptionTranslationProviders.resolveConfig) {
 		                    this.state.translationConfig = window.CaptionTranslationProviders.resolveConfig(
 		                        urlParams,
-	                        requestedProvider
-	                            ? { provider: requestedProvider }
-	                            : (hasProviderEndpointOrModelHint ? {} : { provider: 'google' })
+	                        providerOverride
 		                    );
 		                } else {
                     const googleKey = urlParams.get('googlekey') || urlParams.get('gkey') || '';
@@ -732,6 +740,7 @@
                     this.updateApiKeyStatus(true);
                 } else {
                     this.state.apiKey = '';
+                    this.elements.apiKeyInput.value = '';
                     this.updateApiKeyStatus(false);
                 }
                 if (this.state.translationConfig) {
