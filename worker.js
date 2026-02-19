@@ -6,7 +6,9 @@ var translationModels = new Map();
 
 const BERGAMOT_TRANSLATOR_MODULE = "bergamot-translator-worker.js";
 const MODEL_REGISTRY = "registry.json";
-var rootURL = "https://googlestorage.vdo.workers.dev/corsproxy/?apiurl="; // proxy of "https://storage.googleapis.com/bergamot-models-sandbox";  
+const LOCAL_MODEL_ROOT = "/models";
+const REMOTE_MODEL_ROOT = "https://googlestorage.vdo.workers.dev/corsproxy/?apiurl=";
+var rootURL = LOCAL_MODEL_ROOT;
 let version = null;
 let modelRegistry = null;
 
@@ -22,18 +24,53 @@ var Module = {
   }],
   onRuntimeInitialized: async function() {
     log(`Wasm Runtime initialized Successfully (preRun -> onRuntimeInitialized) in ${(Date.now() - moduleLoadStart) / 1000} secs`);
-	 
-	var resp = await fetch(`${rootURL}/latest.txt`);
-	version = await resp.text();
-	
-    resp = await fetch(`${rootURL}/${version}/${MODEL_REGISTRY}`);
-    modelRegistry = await resp.json();
+    await initModelRegistry();
     postMessage([`import_reply`, modelRegistry, version]);
   }
 };
 
 const log = (message) => {
   console.debug(message);
+}
+
+const initModelRegistry = async () => {
+  const candidates = [LOCAL_MODEL_ROOT, REMOTE_MODEL_ROOT];
+  let lastError = null;
+
+  for (const candidateRoot of candidates) {
+    try {
+      let resp = await fetch(`${candidateRoot}/latest.txt`);
+      if (!resp.ok) {
+        throw Error(`Unable to fetch latest.txt from '${candidateRoot}': HTTP ${resp.status}`);
+      }
+      const candidateVersion = (await resp.text()).trim();
+      if (!candidateVersion) {
+        throw Error(`Version file from '${candidateRoot}' is empty`);
+      }
+
+      resp = await fetch(`${candidateRoot}/${candidateVersion}/${MODEL_REGISTRY}`);
+      if (!resp.ok) {
+        throw Error(`Unable to fetch registry.json from '${candidateRoot}': HTTP ${resp.status}`);
+      }
+
+      const candidateRegistry = await resp.json();
+      rootURL = candidateRoot;
+      version = candidateVersion;
+      modelRegistry = candidateRegistry;
+
+      if (candidateRoot === LOCAL_MODEL_ROOT) {
+        log(`Using local model root '${LOCAL_MODEL_ROOT}' (version ${version})`);
+      } else {
+        console.warn(`Local models unavailable; falling back to remote model root '${REMOTE_MODEL_ROOT}' (version ${version})`);
+      }
+      return;
+    } catch (error) {
+      lastError = error;
+      console.warn(`Model root '${candidateRoot}' init failed: ${error.message}`);
+    }
+  }
+
+  throw lastError || Error("Unable to initialize model registry");
 }
 
 const isExprimental = (from, to) => {
@@ -88,13 +125,35 @@ onmessage = async function(e) {
   }
 }
 
+const getRemoteFallbackURL = (url) => {
+  const localPrefix = `${LOCAL_MODEL_ROOT}/`;
+  if (rootURL !== LOCAL_MODEL_ROOT || !url.startsWith(localPrefix)) {
+    return null;
+  }
+  return `${REMOTE_MODEL_ROOT}${url.slice(LOCAL_MODEL_ROOT.length)}`;
+}
+
 // This function downloads file from a url and returns the array buffer
 const downloadAsArrayBuffer = async(url) => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw Error(`Downloading ${url} failed: HTTP ${response.status} - ${response.statusText}`);
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw Error(`Downloading ${url} failed: HTTP ${response.status} - ${response.statusText}`);
+    }
+    return response.arrayBuffer();
+  } catch (primaryError) {
+    const fallbackURL = getRemoteFallbackURL(url);
+    if (!fallbackURL) {
+      throw primaryError;
+    }
+
+    console.warn(`Local model asset unavailable; retrying via remote proxy: ${url}`);
+    const fallbackResponse = await fetch(fallbackURL);
+    if (!fallbackResponse.ok) {
+      throw Error(`Downloading ${url} failed locally and remote fallback failed (${fallbackURL}): HTTP ${fallbackResponse.status} - ${fallbackResponse.statusText}`);
+    }
+    return fallbackResponse.arrayBuffer();
   }
-  return response.arrayBuffer();
 }
 
 // This function constructs and initializes the AlignedMemory from the array buffer and alignment size
