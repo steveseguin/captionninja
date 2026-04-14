@@ -265,6 +265,11 @@
 		Enable Text to Speech in overlay?
 		<input type="checkbox" id="enableTTS" />
 	  </label>
+
+	 <label title="Reload the page using the previous speech recognition handling">
+		Use legacy speech mode?
+		<input type="checkbox" id="legacySpeechMode" />
+	  </label>
 	  
 	 <button id="toggleTranscription" class="toggle-button">Pause Transcription</button>
 	 <br />
@@ -519,6 +524,11 @@ toggleButton.addEventListener('click', () => {
 	isPaused = !isPaused;
 
 	if (isPaused) {
+		if (recognitionRecoveryTimer) {
+			clearTimeout(recognitionRecoveryTimer);
+			recognitionRecoveryTimer = null;
+		}
+		clearPendingInterimTranslation();
 		recognition.stop();
 		toggleButton.textContent = 'Resume Transcription';
 		toggleButton.classList.add('paused');
@@ -538,10 +548,11 @@ if (urlParams.has("lang")) {
 
 var myLangCode = myLang.split("-")[0].toLowerCase();
 var targetCode = "de";
-// Opt-in speech batching mode. Use &speechmode=v2 to process mixed final/interim
-// recognition events more conservatively, matching the premium page behavior.
+// Speech batching defaults to the improved mode. Use &speechmode=legacy
+// (or &speechmode=v1) to fall back to the previous recognition handling.
 const speechMode = (urlParams.get("speechmode") || "").toLowerCase();
-const useSpeechModeV2 = speechMode === "v2";
+const useLegacySpeechMode = speechMode === "legacy" || speechMode === "v1";
+const useSpeechModeV2 = !useLegacySpeechMode;
 if (myLangCode == "de") {
 	targetCode = "en";
 }
@@ -563,6 +574,23 @@ let translationQueue = [];
 let isTranslating = false;
 let lastFinalTranslationId = 0;
 let pendingTranslations = new Map();
+let currentModelPair = "";
+let modelReady = false;
+const interimTranslationMinIntervalMs = useSpeechModeV2 ? 400 : 0;
+const interimBacklogHoldMs = useSpeechModeV2 ? 1200 : 0;
+const interimStableTailWords = 6;
+const interimRewriteConfirmations = 2;
+const maxInterimStableTailWords = 8;
+const rollingInterimFinalizeLeadWords = 6;
+let lastInterimTranslationAt = 0;
+let pendingInterimTranslationText = "";
+let pendingInterimTranslationTimer = null;
+let interimBacklogUntil = 0;
+let lastDisplayedInterimWords = [];
+let pendingInterimRewrite = null;
+let lastInterimInputWords = [];
+let lastInterimInputAt = 0;
+let recentInterimWordsPerSecond = 0;
 
 
 if (window.Worker) {
@@ -577,6 +605,13 @@ function translateCall(text, interm = false) {
 	const paragraphs = text.split("\n");
 	const lngFrom = langFrom.value;
 	const lngTo = langTo.value;
+	const requestedPair = `${lngFrom}${lngTo}`;
+
+	if (!modelReady || currentModelPair !== requestedPair) {
+		if (interm) {
+			return;
+		}
+	}
 
 	// Add to queue with priority (final translations get higher priority)
 	translationQueue.push({
@@ -595,9 +630,267 @@ function translateCall(text, interm = false) {
 	});
 
 	// Process queue if not already processing
-	if (!isTranslating) {
+	if (modelReady && !isTranslating) {
 		processTranslationQueue();
 	}
+}
+
+function hasActiveInterimTranslation() {
+	if (isTranslating) {
+		const activeTranslation = pendingTranslations.get(currentTranslationId);
+		if (activeTranslation && activeTranslation.interm) {
+			return true;
+		}
+	}
+
+	return translationQueue.some(item => item.interm);
+}
+
+function clearPendingInterimTranslation() {
+	pendingInterimTranslationText = "";
+	interimBacklogUntil = 0;
+	if (pendingInterimTranslationTimer) {
+		clearTimeout(pendingInterimTranslationTimer);
+		pendingInterimTranslationTimer = null;
+	}
+}
+
+function enterInterimBacklogMode() {
+	if (!useSpeechModeV2 || !interimBacklogHoldMs) {
+		return;
+	}
+
+	const now = Date.now();
+	const wasBacklogged = interimBacklogUntil > now;
+	interimBacklogUntil = Math.max(interimBacklogUntil, now + interimBacklogHoldMs);
+	if (!wasBacklogged) {
+		console.log("Holding interim translation until backlog clears");
+	}
+}
+
+function getInterimBacklogDelay(now = Date.now()) {
+	return Math.max(0, interimBacklogUntil - now);
+}
+
+function resetInterimOutputStabilizer() {
+	lastDisplayedInterimWords = [];
+	pendingInterimRewrite = null;
+	lastInterimInputWords = [];
+	lastInterimInputAt = 0;
+	recentInterimWordsPerSecond = 0;
+}
+
+function tokenizeCaptionWords(text) {
+	if (!text) return [];
+	return text.trim().split(/\s+/).filter(Boolean);
+}
+
+function countSharedPrefixWords(previousWords, nextWords) {
+	const minLength = Math.min(previousWords.length, nextWords.length);
+	let shared = 0;
+
+	for (let i = 0; i < minLength; i += 1) {
+		if (previousWords[i] !== nextWords[i]) {
+			break;
+		}
+		shared += 1;
+	}
+
+	return shared;
+}
+
+function trackInterimInputRate(text) {
+	if (!useSpeechModeV2) {
+		return;
+	}
+
+	const nextWords = tokenizeCaptionWords(text);
+	const now = Date.now();
+	if (lastInterimInputAt && nextWords.length >= lastInterimInputWords.length) {
+		const addedWords = nextWords.length - lastInterimInputWords.length;
+		const elapsedMs = now - lastInterimInputAt;
+		if (addedWords > 0 && elapsedMs > 0) {
+			const instantRate = addedWords / (elapsedMs / 1000);
+			recentInterimWordsPerSecond = recentInterimWordsPerSecond
+				? (recentInterimWordsPerSecond * 0.7) + (instantRate * 0.3)
+				: instantRate;
+		}
+	} else if (nextWords.length < lastInterimInputWords.length) {
+		recentInterimWordsPerSecond = 0;
+	}
+
+	lastInterimInputWords = nextWords;
+	lastInterimInputAt = now;
+}
+
+function getDynamicInterimTailWords(totalWords) {
+	let tailWords = interimStableTailWords;
+
+	if (recentInterimWordsPerSecond > 4) tailWords += 1;
+	if (totalWords > 24) tailWords += 1;
+
+	return Math.min(maxInterimStableTailWords, Math.max(interimStableTailWords, tailWords));
+}
+
+function getRequiredInterimRewriteConfirmations(stablePrefixLength, sharedPrefixLength, tailWords) {
+	const rewriteDepth = Math.max(0, stablePrefixLength - sharedPrefixLength);
+	let requiredConfirmations = interimRewriteConfirmations + Math.ceil(rewriteDepth / Math.max(4, tailWords));
+
+	if (recentInterimWordsPerSecond > 4) {
+		requiredConfirmations += 1;
+	}
+
+	return Math.min(6, Math.max(interimRewriteConfirmations, requiredConfirmations));
+}
+
+function maybePromoteInterimPrefix(text, finalizeChunk) {
+	if (!useSpeechModeV2) {
+		return text;
+	}
+
+	let remainingText = text;
+	let remainingWords = tokenizeCaptionWords(remainingText);
+
+	while (remainingWords.length > 0) {
+		const tailWords = getDynamicInterimTailWords(remainingWords.length);
+		const triggerWords = tailWords + rollingInterimFinalizeLeadWords;
+		if (remainingWords.length <= triggerWords) {
+			break;
+		}
+
+		const finalizedWordCount = remainingWords.length - tailWords;
+		const finalizedChunk = remainingWords.slice(0, finalizedWordCount).join(' ');
+		if (!finalizedChunk) {
+			break;
+		}
+
+		finalizeChunk(finalizedChunk);
+		remainingWords = remainingWords.slice(finalizedWordCount);
+		remainingText = remainingWords.join(' ');
+	}
+
+	return remainingText;
+}
+
+function stabilizeInterimOutput(text) {
+	if (!useSpeechModeV2) {
+		return text;
+	}
+
+	const nextWords = tokenizeCaptionWords(text);
+	if (!nextWords.length) {
+		resetInterimOutputStabilizer();
+		return text;
+	}
+
+	const dynamicTailWords = getDynamicInterimTailWords(nextWords.length);
+	if (!lastDisplayedInterimWords.length || nextWords.length <= dynamicTailWords) {
+		lastDisplayedInterimWords = nextWords;
+		pendingInterimRewrite = null;
+		return nextWords.join(' ');
+	}
+
+	const stablePrefixLength = Math.max(0, lastDisplayedInterimWords.length - dynamicTailWords);
+	const sharedPrefixLength = countSharedPrefixWords(lastDisplayedInterimWords, nextWords);
+
+	if (sharedPrefixLength >= stablePrefixLength) {
+		lastDisplayedInterimWords = nextWords;
+		pendingInterimRewrite = null;
+		return nextWords.join(' ');
+	}
+
+	const rewriteAnchor = nextWords.slice(sharedPrefixLength, Math.min(sharedPrefixLength + 3, nextWords.length)).join("\u0001");
+	const rewriteKey = `${sharedPrefixLength}:${rewriteAnchor}`;
+	const requiredConfirmations = getRequiredInterimRewriteConfirmations(stablePrefixLength, sharedPrefixLength, dynamicTailWords);
+	if (pendingInterimRewrite && pendingInterimRewrite.key === rewriteKey) {
+		pendingInterimRewrite.count += 1;
+		pendingInterimRewrite.words = nextWords;
+		pendingInterimRewrite.requiredConfirmations = Math.max(pendingInterimRewrite.requiredConfirmations, requiredConfirmations);
+	} else {
+		pendingInterimRewrite = {
+			key: rewriteKey,
+			count: 1,
+			words: nextWords,
+			requiredConfirmations: requiredConfirmations
+		};
+	}
+
+	if (pendingInterimRewrite.count >= pendingInterimRewrite.requiredConfirmations) {
+		lastDisplayedInterimWords = pendingInterimRewrite.words;
+		pendingInterimRewrite = null;
+		return lastDisplayedInterimWords.join(' ');
+	}
+
+	const preservedPrefixLength = Math.min(stablePrefixLength, lastDisplayedInterimWords.length);
+	const stabilizedWords = lastDisplayedInterimWords
+		.slice(0, preservedPrefixLength)
+		.concat(nextWords.slice(Math.min(preservedPrefixLength, nextWords.length)));
+
+	lastDisplayedInterimWords = stabilizedWords;
+	return stabilizedWords.join(' ');
+}
+
+function flushPendingInterimTranslation() {
+	pendingInterimTranslationTimer = null;
+	if (!useSpeechModeV2 || !pendingInterimTranslationText || !modelReady) {
+		return;
+	}
+
+	const now = Date.now();
+	const backlogDelay = getInterimBacklogDelay(now);
+	if (backlogDelay > 0) {
+		schedulePendingInterimTranslation(backlogDelay);
+		return;
+	}
+
+	const timeUntilNextSlot = interimTranslationMinIntervalMs - (now - lastInterimTranslationAt);
+	if (timeUntilNextSlot > 0) {
+		schedulePendingInterimTranslation(timeUntilNextSlot);
+		return;
+	}
+
+	if (hasActiveInterimTranslation()) {
+		schedulePendingInterimTranslation(interimTranslationMinIntervalMs);
+		return;
+	}
+
+	const textToTranslate = pendingInterimTranslationText;
+	pendingInterimTranslationText = "";
+	lastInterimTranslationAt = Date.now();
+	translateCall(textToTranslate, true);
+}
+
+function schedulePendingInterimTranslation(delayMs = interimTranslationMinIntervalMs) {
+	if (!useSpeechModeV2 || !pendingInterimTranslationText) {
+		return;
+	}
+
+	if (pendingInterimTranslationTimer) {
+		clearTimeout(pendingInterimTranslationTimer);
+	}
+
+	pendingInterimTranslationTimer = setTimeout(flushPendingInterimTranslation, Math.max(delayMs, 0));
+}
+
+function enqueueInterimTranslation(text) {
+	if (!text.trim().length) return;
+
+	if (!useSpeechModeV2) {
+		translateCall(text, true);
+		return;
+	}
+
+	pendingInterimTranslationText = text;
+	const now = Date.now();
+	const backlogDelay = getInterimBacklogDelay(now);
+	const timeUntilNextSlot = interimTranslationMinIntervalMs - (now - lastInterimTranslationAt);
+
+	if (backlogDelay > 0 || timeUntilNextSlot > 0 || hasActiveInterimTranslation()) {
+		schedulePendingInterimTranslation(Math.max(backlogDelay, timeUntilNextSlot, 0));
+		return;
+	}
+
+	flushPendingInterimTranslation();
 }
 
 var label = false;
@@ -608,17 +901,19 @@ var counter = 0;
 
 worker.onmessage = function(e) {
 	if (e.data[0] === "translate_reply" && e.data[1]) {
-		const translatedJoined = e.data[1].join("\n\n");
-		document.getElementById("output").innerText = translatedJoined;
-
 		// Get the pending translation info
 		const pendingTranslation = pendingTranslations.get(currentTranslationId);
 		if (pendingTranslation) {
-			if (pendingTranslation.interm || e.data[3]) {
+			const isInterimReply = pendingTranslation.interm || e.data[3];
+			const translatedJoined = e.data[1].join("\n\n");
+			const outputText = isInterimReply ? stabilizeInterimOutput(translatedJoined) : translatedJoined;
+			document.getElementById("output").innerText = outputText;
+
+			if (isInterimReply) {
 				if (label) {
 					wsPublisher.publish({
 						"msg": true,
-						"interm": translatedJoined,
+						"interm": outputText,
 						"id": currentTranslationId,
 						"label": label,
 						"c": document.getElementById("fullContext").checked,
@@ -627,17 +922,19 @@ worker.onmessage = function(e) {
 				} else {
 					wsPublisher.publish({
 						"msg": true,
-						"interm": translatedJoined,
+						"interm": outputText,
 						"id": currentTranslationId,
 						"c": document.getElementById("fullContext").checked,
 						"ln": langTo.value
 					});
 				}
+				pendingTranslations.delete(currentTranslationId);
 			} else {
+				resetInterimOutputStabilizer();
 				if (label) {
 					wsPublisher.publish({
 						"msg": true,
-						"final": translatedJoined,
+						"final": outputText,
 						"id": currentTranslationId,
 						"label": label,
 						"c": document.getElementById("fullContext").checked,
@@ -646,7 +943,7 @@ worker.onmessage = function(e) {
 				} else {
 					wsPublisher.publish({
 						"msg": true,
-						"final": translatedJoined,
+						"final": outputText,
 						"id": currentTranslationId,
 						"c": document.getElementById("fullContext").checked,
 						"ln": langTo.value
@@ -664,9 +961,19 @@ worker.onmessage = function(e) {
 
 		// Continue processing queue
 		setTimeout(processTranslationQueue, 0);
+		if (useSpeechModeV2 && pendingInterimTranslationText) {
+			schedulePendingInterimTranslation(0);
+		}
 	} else if (e.data[0] === "load_model_reply" && e.data[1]) {
 		status(e.data[1]);
+		modelReady = /^Model successfully loaded/.test(e.data[1]);
 		isTranslating = false;
+		if (modelReady && translationQueue.length) {
+			processTranslationQueue();
+		}
+		if (modelReady && useSpeechModeV2 && pendingInterimTranslationText) {
+			schedulePendingInterimTranslation(0);
+		}
 	} else if (e.data[0] === "import_reply" && e.data[1]) {
 		modelRegistry = e.data[1];
 		version = e.data[2];
@@ -676,8 +983,16 @@ worker.onmessage = function(e) {
 };
 
 function processTranslationQueue() {
+	if (!modelReady) {
+		isTranslating = false;
+		return;
+	}
+
 	if (translationQueue.length === 0) {
 		isTranslating = false;
+		if (useSpeechModeV2 && pendingInterimTranslationText) {
+			schedulePendingInterimTranslation(0);
+		}
 		return;
 	}
 
@@ -705,7 +1020,12 @@ function processTranslationQueue() {
 	for (const item of translationQueue) {
 		if (item.interm) {
 			if (!mostRecentInterim || item.timestamp > mostRecentInterim.timestamp) {
+				if (mostRecentInterim) {
+					pendingTranslations.delete(mostRecentInterim.id);
+				}
 				mostRecentInterim = item;
+			} else {
+				pendingTranslations.delete(item.id);
 			}
 		} else {
 			newQueue.push(item);
@@ -747,10 +1067,24 @@ const loadModel = () => {
 			document.getElementById("output").innerText = "";
 			return;
 		}
+		currentModelPair = `${lngFrom}${lngTo}`;
+		modelReady = false;
+		translationQueue = [];
+		pendingTranslations.clear();
+		isTranslating = false;
+		clearPendingInterimTranslation();
+		resetInterimOutputStabilizer();
 		status(`Installing model...`);
 		console.log(`Loading model '${lngFrom}${lngTo}'`);
 		worker.postMessage(["load_model", lngFrom, lngTo]);
 	} else {
+		currentModelPair = "";
+		modelReady = true;
+		translationQueue = [];
+		pendingTranslations.clear();
+		isTranslating = false;
+		clearPendingInterimTranslation();
+		resetInterimOutputStabilizer();
 		const input = document.getElementById("input").value;
 		document.getElementById("output").innerText = "";
 	}
@@ -1229,6 +1563,8 @@ var last_transcription = "";
 var second_transcription = "";
 var idle = null;
 var recognition = null;
+var lastRecognitionError = "";
+var recognitionRecoveryTimer = null;
 setup();
 var ends = 0;
 var sanitize = function(string) {
@@ -1238,6 +1574,42 @@ var sanitize = function(string) {
 		.substring(0, Math.min(temp.textContent.length, 500))
 		.trim());
 };
+
+function scheduleRecognitionRecovery(delayMs, rebuildRecognizer = false) {
+	if (recognitionRecoveryTimer) {
+		clearTimeout(recognitionRecoveryTimer);
+	}
+
+	recognitionRecoveryTimer = setTimeout(function() {
+		recognitionRecoveryTimer = null;
+		if (isPaused) {
+			return;
+		}
+
+		if (rebuildRecognizer) {
+			const staleRecognition = recognition;
+			if (staleRecognition) {
+				staleRecognition.onstart = null;
+				staleRecognition.onerror = null;
+				staleRecognition.onend = null;
+				staleRecognition.onresult = null;
+			}
+			recognition = null;
+			setup();
+			return;
+		}
+
+		try {
+			recognition.start();
+		} catch (restartError) {
+			console.error("Error restarting recognition:", restartError);
+			if (useSpeechModeV2) {
+				recognition = null;
+				setup();
+			}
+		}
+	}, delayMs);
+}
 
 function setup() {
 	if ('webkitSpeechRecognition' in window) {
@@ -1256,6 +1628,7 @@ function setup() {
 		recognition.continuous = true;
 		recognition.interimResults = true;
 		recognition.onstart = function() {
+			lastRecognitionError = "";
 			console.log("started transcription");
 			setTimeout(function() {
 				ends = 0;
@@ -1263,12 +1636,19 @@ function setup() {
 		};
 		recognition.onerror = function(event) {
 			console.error(event);
+			if (useSpeechModeV2 && event && event.error === "network") {
+				lastRecognitionError = "network";
+			}
 		};
 		recognition.onend = function(e) {
 			if (isPaused) {
 				return;
 			}
 			console.log("Stopped transcription");
+
+			if (useSpeechModeV2 && pendingInterim) {
+				forceFinalization();
+			}
 
 			// Save any pending transcript before restarting
 			if (transcript) {
@@ -1282,13 +1662,21 @@ function setup() {
 				transcript = "";
 			}
 
-			if (event.type === "end") {
+			const endEventType = (e && e.type) ? e.type : ((typeof event !== "undefined" && event && event.type) ? event.type : "");
+			if (endEventType === "end") {
 				ends += 1;
 			}
+			const shouldRebuildRecognizer = useSpeechModeV2 && lastRecognitionError === "network";
+			lastRecognitionError = "";
 			if (ends > 3) {
 				alert("WARNING: Cannot enable transcription service...");
 			} else {
-				setTimeout(() => recognition.start(), 100); // Small delay before restart
+				if (shouldRebuildRecognizer) {
+					console.log("Rebuilding speech recognition after network error");
+					scheduleRecognitionRecovery(750, true);
+				} else {
+					scheduleRecognitionRecovery(useSpeechModeV2 ? 300 : 100);
+				}
 			}
 		};
 
@@ -1315,6 +1703,7 @@ function setup() {
 			transcript = "";
 			pendingInterim = "";
 			silenceTimer = null;
+			clearPendingInterimTranslation();
 		}
 
 		function processFinalTranscript(finalText) {
@@ -1327,6 +1716,7 @@ function setup() {
 				silenceTimer = null;
 			}
 			pendingInterim = "";
+			clearPendingInterimTranslation();
 
 			transcript += (transcript ? ' ' : '') + finalText;
 			document.getElementById("input").value = transcript;
@@ -1359,6 +1749,8 @@ function setup() {
 			}
 
 			textToProcess = truncateInterim(textToProcess);
+			trackInterimInputRate(textToProcess);
+			textToProcess = maybePromoteInterimPrefix(textToProcess, processFinalTranscript);
 
 			if (textToProcess) {
 				pendingInterim = textToProcess;
@@ -1371,8 +1763,19 @@ function setup() {
 				document.getElementById("input").value = display_text;
 
 				if (translationQueue.length > 3) {
-					console.log("Skipping interim translation due to backlog");
-					return;
+					if (useSpeechModeV2) {
+						enterInterimBacklogMode();
+						translationQueue = translationQueue.filter(item => {
+							if (item.interm) {
+								pendingTranslations.delete(item.id);
+								return false;
+							}
+							return true;
+						});
+					} else {
+						console.log("Skipping interim translation due to backlog");
+						return;
+					}
 				}
 
 				let text_to_translate;
@@ -1384,9 +1787,10 @@ function setup() {
 					text_to_translate = display_text;
 				}
 
-				translateCall(text_to_translate, true);
+				enqueueInterimTranslation(text_to_translate);
 			} else {
 				pendingInterim = "";
+				clearPendingInterimTranslation();
 				if (silenceTimer) {
 					clearTimeout(silenceTimer);
 					silenceTimer = null;
@@ -1451,7 +1855,8 @@ function setup() {
 
 			if (currentBatchFinal) {
 				processFinalTranscript(currentBatchFinal);
-			} else if (currentBatchInterim) {
+			}
+			if (currentBatchInterim) {
 				processInterimTranscript(currentBatchInterim);
 			}
 			return;
@@ -1488,11 +1893,13 @@ document.addEventListener('DOMContentLoaded', () => {
 	const autoSplitInput = document.getElementById('autoSplitInput');
 	const maxWordsInput = document.getElementById('maxWordsInput');
 	const maxCharsInput = document.getElementById('maxCharsInput');
+	const legacySpeechModeInput = document.getElementById('legacySpeechMode');
 
 	if (autoFinalMs > 0) autoFinalInput.value = autoFinalMs;
 	if (autoSplit) autoSplitInput.checked = true;
 	if (maxWords > 0) maxWordsInput.value = maxWords;
 	if (maxChars > 0) maxCharsInput.value = maxChars;
+	legacySpeechModeInput.checked = useLegacySpeechMode;
 
 	// Update variables when controls change
 	autoFinalInput.addEventListener('change', function() {
@@ -1506,6 +1913,15 @@ document.addEventListener('DOMContentLoaded', () => {
 	});
 	maxCharsInput.addEventListener('change', function() {
 		maxChars = parseInt(this.value) || 0;
+	});
+	legacySpeechModeInput.addEventListener('change', function() {
+		const nextUrl = new URL(window.location.href);
+		if (this.checked) {
+			nextUrl.searchParams.set('speechmode', 'legacy');
+		} else {
+			nextUrl.searchParams.delete('speechmode');
+		}
+		window.location.href = nextUrl.toString();
 	});
 });
 document.getElementById('fullContext').addEventListener('change', checkForConflictingSettings);
