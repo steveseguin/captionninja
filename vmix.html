@@ -1,0 +1,57 @@
+<html>
+<head>
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+	<meta content="utf-8" http-equiv="encoding" />
+	<meta name="copyright" content="&copy; 2020 Steve Seguin" />
+	<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+	<link rel="shortcut icon" href="favicon.svg" />
+	<title>Caption Overlay Window for vMix</title>
+	<meta name="title" content="CAPTION.Ninja: vMix Overlay" />
+	<meta name="description" content="vMix-friendly Caption Ninja overlay shortcut with transparent caption backing by default." />
+	<meta name="author" content="Steve Seguin" />
+	<style>
+		html, body {
+			margin: 0;
+			padding: 0;
+			width: 100%;
+			height: 100%;
+			background: transparent;
+			overflow: hidden;
+		}
+	</style>
+</head>
+<body>
+	<script>
+	(function () {
+		var params = new URLSearchParams(window.location.search);
+		var backgroundParams = [
+			"nobg",
+			"no-bg",
+			"nobox",
+			"nohighlight",
+			"no-highlight",
+			"transparentbg",
+			"transparent-bg",
+			"bg",
+			"background",
+			"captionbg",
+			"captionbackground",
+			"highlight",
+			"highlightcolor",
+			"boxcolor"
+		];
+		var hasBackgroundChoice = backgroundParams.some(function (param) {
+			return params.has(param);
+		});
+		if (!hasBackgroundChoice) {
+			params.set("nobg", "1");
+		}
+
+		var target = "overlay.html";
+		var query = params.toString();
+		window.location.replace(target + (query ? "?" + query : ""));
+	})();
+	</script>
+</body>
+</html>

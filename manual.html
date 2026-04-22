@@ -74,6 +74,10 @@
 		<font style='color:black;font-size:60%;line-height: 1.4em;' ><div >This is a free-to-use captioning tool.</div></font><font style='color:black;font-size:30%;line-height: 1.4em;' >
 		<div ><br /><br />
 			The output of this app is mirrored here: <a id="shareLink" href="overlay.html" target='_blank'>*ERROR GENERATING LINK*</a>. Add it to OBS as a browser source overlay if wishing to use it for a live stream.
+			<br /><br />
+			For vMix, use this no-highlight overlay link: <a id="vmixLink" href="vmix.html" target='_blank'>*ERROR GENERATING LINK*</a>.
+			<br /><br />
+			Overlay style options include <code>&amp;nobg</code> or <code>&amp;bg=transparent</code> to remove the black highlight, <code>&amp;bg=COLOR</code> to set it, <code>&amp;color=COLOR</code>, <code>&amp;fontsize=SIZE</code>, <code>&amp;scale=N</code>, <code>&amp;align=center</code>, <code>&amp;valign=top</code>, <code>&amp;shadow=none</code>, and <code>&amp;outline=2&amp;outlinecolor=%23000</code>.
 		</div></font>
 		<br /><br />
 	</div>
@@ -172,6 +176,8 @@
 	
 	document.getElementById("shareLink").href= url+"/overlay?room="+roomID;
 	document.getElementById("shareLink").innerHTML = url+"/overlay?room="+roomID;
+	document.getElementById("vmixLink").href= url+"/vmix.html?room="+roomID;
+	document.getElementById("vmixLink").innerHTML = url+"/vmix.html?room="+roomID;
 
 	navigator.clipboard.writeText(url+"/overlay?room="+roomID).then(() => {
       /* clipboard successfully set */

@@ -336,6 +336,56 @@ Examples:
 .../overlay?room=abc123&intermclear=1          # Only show the interim/current line
 ```
 
+### Overlay Style Parameters
+
+The default overlay styling is unchanged. Add these optional URL parameters to customize the visual style in OBS, vMix, or another browser-source tool:
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `&nobg` / `&bg=transparent` | Remove the black caption highlight behind text. | `&nobg` |
+| `&bg=COLOR` | Set the caption highlight/background color. | `&bg=rgba(0,0,0,0.6)` |
+| `&color=COLOR` / `&fontcolor=COLOR` | Set caption text color. | `&color=%23fff200` |
+| `&fontsize=SIZE` / `&fs=SIZE` | Set text size. Numbers up to 10 use `em`; larger numbers use `px`. | `&fontsize=4em` |
+| `&scale=N` | Scale the default font size. | `&scale=1.25` |
+| `&font=FAMILY` | Set the font family. URL-encode spaces or quotes as needed. | `&font=Arial,sans-serif` |
+| `&fontweight=VALUE` | Set font weight. | `&fontweight=700` |
+| `&lineheight=VALUE` | Set line height. | `&lineheight=1.2` |
+| `&letterspacing=SIZE` | Set letter spacing. | `&letterspacing=0.04em` |
+| `&pad=SIZE` / `&padding=SIZE` | Set caption text padding. | `&pad=0` |
+| `&padx=SIZE` / `&pady=SIZE` | Set horizontal or vertical caption padding. | `&padx=12&pady=4` |
+| `&radius=SIZE` / `&rounded=SIZE` | Round caption highlight corners. | `&radius=6` |
+| `&borderwidth=SIZE&bordercolor=COLOR` | Add a border around caption text spans. | `&borderwidth=2&bordercolor=%23fff` |
+| `&shadow=none` / `&noshadow` | Remove the text shadow. | `&noshadow` |
+| `&shadow=VALUE` | Replace the text shadow. URL-encode spaces. | `&shadow=2px%202px%204px%20%23000` |
+| `&shadowcolor=COLOR` | Keep the default shadow size but change its color. | `&shadowcolor=%23000` |
+| `&outline=SIZE&outlinecolor=COLOR` | Use a simple text outline via text-shadow. | `&outline=2&outlinecolor=%23000` |
+| `&align=left|center|right` | Align caption lines horizontally. | `&align=center` |
+| `&valign=top|middle|bottom` | Position the overlay vertically. | `&valign=top` |
+| `&topoffset=SIZE` / `&bottomoffset=SIZE` | Offset the overlay from the top or bottom. | `&bottomoffset=40` |
+| `&leftoffset=SIZE` / `&rightoffset=SIZE` | Offset the overlay horizontally. | `&leftoffset=30` |
+| `&nowrap` | Keep each caption on one visual line with ellipsis overflow. | `&nowrap` |
+| `&uppercase` / `&lowercase` | Transform caption text case. | `&uppercase` |
+| `&opacity=N` | Set overall caption opacity. `0.0` to `1.0`, or `0` to `100`. | `&opacity=0.85` |
+| `&bgopacity=N` | Apply opacity to hex/rgb caption backgrounds. | `&bg=%23000&bgopacity=0.5` |
+| `&labelcolor=COLOR` / `&labelbg=COLOR` | Style speaker labels when labels are present. | `&labelcolor=%23ffd500` |
+| `&translationcolor=COLOR` / `&originalcolor=COLOR` | Style dual-overlay translation/original lines. | `&originalcolor=%23ccc` |
+| `&css=URL` | Load an external stylesheet for advanced customization. | `&css=https://example.com/captions.css` |
+| `&base64css=...` | Inject base64-encoded CSS for advanced customization. | `&base64css=I291dHB1dHt9` |
+
+Examples:
+```
+.../overlay.html?room=abc123&nobg&shadow=2px%202px%204px%20%23000
+.../overlay.html?room=abc123&bg=rgba(0,0,0,0.45)&radius=6&padx=12&pady=4
+.../overlay.html?room=abc123&color=%23fff200&fontsize=48px&align=center
+```
+
+For vMix users who want the black text highlight removed by default, use:
+```
+.../vmix.html?room=abc123
+```
+
+`vmix.html` forwards to `overlay.html` with `&nobg=1` unless a background/highlight parameter is already provided. Use `&bg=black` or another `&bg=COLOR` value to restore a caption highlight on that page.
+
 ### Interim Text Handling
 
 Browser speech recognition sometimes produces very long "interim" (non-finalized) results without breaking them into sentences. This is common when captioning talk shows, pre-recorded audio, or streams with continuous speech. The following options help manage long interim text blocks:

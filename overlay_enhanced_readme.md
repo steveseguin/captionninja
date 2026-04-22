@@ -30,6 +30,17 @@ This enhanced overlay supports local Mozilla Bergamot translation plus remote pr
 - `intermclear=1` clears finished captions while interim text streams.
 - `dual=1` (or `view=dual`) shows translated text above original text.
 
+### 6. Overlay Style Parameters
+- Existing overlay defaults are unchanged unless a style parameter is added.
+- `nobg=1` or `bg=transparent` removes the black caption highlight.
+- `bg=COLOR`, `color=COLOR`, `fontcolor=COLOR`, `fontsize=SIZE`, `scale=N`, `font=FAMILY`, `fontweight=VALUE`, `lineheight=VALUE`, and `letterspacing=SIZE` customize text appearance.
+- `pad=SIZE`, `padx=SIZE`, `pady=SIZE`, `radius=SIZE`, `borderwidth=SIZE`, and `bordercolor=COLOR` customize the caption highlight box.
+- `shadow=none`, `noshadow=1`, `shadow=VALUE`, `shadowcolor=COLOR`, `outline=SIZE`, and `outlinecolor=COLOR` customize text shadow/outline.
+- `align=left|center|right`, `valign=top|middle|bottom`, `topoffset=SIZE`, `bottomoffset=SIZE`, `leftoffset=SIZE`, and `rightoffset=SIZE` customize placement.
+- `nowrap=1`, `uppercase=1`, `lowercase=1`, `opacity=N`, `bgopacity=N`, `labelcolor=COLOR`, `labelbg=COLOR`, `translationcolor=COLOR`, and `originalcolor=COLOR` provide additional display control.
+- `css=URL` and `base64css=...` allow advanced custom styles.
+- `vmix.html?room=abc123` is a vMix-friendly shortcut that forwards to `overlay.html` with `nobg=1` unless a background/highlight parameter is already provided.
+
 ## Examples
 
 ### Google Cloud (Backward Compatible)

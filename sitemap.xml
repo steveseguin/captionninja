@@ -31,6 +31,12 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://caption.ninja/vmix</loc>
+    <lastmod>2026-04-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://caption.ninja/capture-pro</loc>
     <lastmod>2025-01-12</lastmod>
     <changefreq>weekly</changefreq>
