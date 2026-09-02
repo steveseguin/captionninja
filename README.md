@@ -395,11 +395,12 @@ Browser speech recognition sometimes produces very long "interim" (non-finalized
 | Parameter | Description | Example |
 |-----------|-------------|---------|
 | `&autofinal=MS` | Force finalization after MS milliseconds of silence (0=disabled, 800 recommended) | `&autofinal=800` |
+| `&finaldebounce=MS` | Coalesce cumulative final results before sending them to the overlay. On `translate.html`, Android defaults to 900ms and other devices default to 0; set explicitly to override. | `&finaldebounce=1200` |
 | `&maxwords=N` | Truncate interim text to last N words | `&maxwords=50` |
 | `&maxchars=N` | Truncate interim text to last N characters | `&maxchars=200` |
 | `&autosplit` | Auto-finalize on sentence boundaries (. ! ?) | `&autosplit` |
 
-On `translate.html`, these options are also available via UI controls in the **"Interim Text Handling"** section (no URL parameters needed).
+On `translate.html`, the `autofinal`, `maxwords`, `maxchars`, and `autosplit` options are also available via UI controls in the **"Interim Text Handling"** section (no URL parameters needed). `finaldebounce` is URL-only.
 
 #### Overlay Page Options (overlay.html)
 

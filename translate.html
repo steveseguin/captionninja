@@ -572,7 +572,7 @@ let supportedToCodes = {};
 let currentTo = null;
 let translationQueue = [];
 let isTranslating = false;
-let lastFinalTranslationId = 0;
+let translationCounter = 0;
 let pendingTranslations = new Map();
 let currentModelPair = "";
 let modelReady = false;
@@ -601,7 +601,7 @@ if (window.Worker) {
 function translateCall(text, interm = false) {
 	if (!text.trim().length) return;
 
-	const translationId = counter;
+	const translationId = ++translationCounter;
 	const paragraphs = text.split("\n");
 	const lngFrom = langFrom.value;
 	const lngTo = langTo.value;
@@ -1565,6 +1565,21 @@ var idle = null;
 var recognition = null;
 var lastRecognitionError = "";
 var recognitionRecoveryTimer = null;
+var defaultFinalCoalesceMs = /Android/i.test(navigator.userAgent || "") ? 900 : 0;
+var finalCoalesceMs = defaultFinalCoalesceMs;
+if (urlParams.has("finaldebounce")) {
+	finalCoalesceMs = parseInt(urlParams.get("finaldebounce"), 10);
+	if (isNaN(finalCoalesceMs) || finalCoalesceMs < 0) {
+		finalCoalesceMs = defaultFinalCoalesceMs;
+	}
+} else if (urlParams.has("finalcoalesce")) {
+	finalCoalesceMs = parseInt(urlParams.get("finalcoalesce"), 10);
+	if (isNaN(finalCoalesceMs) || finalCoalesceMs < 0) {
+		finalCoalesceMs = defaultFinalCoalesceMs;
+	}
+}
+var pendingFinalSource = "";
+var pendingFinalTimer = null;
 setup();
 var ends = 0;
 var sanitize = function(string) {
@@ -1574,6 +1589,102 @@ var sanitize = function(string) {
 		.substring(0, Math.min(temp.textContent.length, 500))
 		.trim());
 };
+
+function normalizeFinalForCompare(text) {
+	return (text || "")
+		.toLowerCase()
+		.replace(/[.,!?;:]+/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function isProgressiveFinalText(previousText, nextText) {
+	const previous = normalizeFinalForCompare(previousText);
+	const next = normalizeFinalForCompare(nextText);
+	if (!previous || !next || previous === next) {
+		return previous === next;
+	}
+	if (!next.startsWith(previous)) {
+		return false;
+	}
+	const boundary = next.charAt(previous.length);
+	return boundary === "" || /\s/.test(boundary);
+}
+
+function clearPendingFinalTimer() {
+	if (pendingFinalTimer) {
+		clearTimeout(pendingFinalTimer);
+		pendingFinalTimer = null;
+	}
+}
+
+function publishFinalSource(sourceText) {
+	if (!sourceText) {
+		return;
+	}
+
+	if (document.getElementById("fullContext").checked) {
+		translateCall([second_transcription, last_transcription, sourceText]
+			.filter(Boolean)
+			.join(' '), false);
+	} else {
+		translateCall(sourceText, false);
+	}
+
+	second_transcription = last_transcription;
+	last_transcription = sourceText + ". ";
+}
+
+function flushPendingFinalSource() {
+	clearPendingFinalTimer();
+	const sourceText = pendingFinalSource;
+	pendingFinalSource = "";
+	publishFinalSource(sourceText);
+}
+
+function scheduleFinalSource(sourceText) {
+	sourceText = (sourceText || "").trim();
+	if (!sourceText) {
+		return;
+	}
+
+	if (!finalCoalesceMs) {
+		flushPendingFinalSource();
+		publishFinalSource(sourceText);
+		return;
+	}
+
+	if (pendingFinalSource) {
+		if (isProgressiveFinalText(pendingFinalSource, sourceText)) {
+			pendingFinalSource = sourceText;
+			clearPendingFinalTimer();
+			pendingFinalTimer = setTimeout(flushPendingFinalSource, finalCoalesceMs);
+			return;
+		}
+		if (isProgressiveFinalText(sourceText, pendingFinalSource)) {
+			clearPendingFinalTimer();
+			pendingFinalTimer = setTimeout(flushPendingFinalSource, finalCoalesceMs);
+			return;
+		}
+
+		flushPendingFinalSource();
+	}
+
+	pendingFinalSource = sourceText;
+	pendingFinalTimer = setTimeout(flushPendingFinalSource, finalCoalesceMs);
+}
+
+function holdPendingFinalIfInterimContinues(interimText) {
+	if (!pendingFinalSource || !finalCoalesceMs || !interimText) {
+		return;
+	}
+	if (isProgressiveFinalText(pendingFinalSource, interimText)) {
+		clearPendingFinalTimer();
+		pendingFinalTimer = setTimeout(flushPendingFinalSource, finalCoalesceMs);
+	} else {
+		flushPendingFinalSource();
+	}
+}
 
 function scheduleRecognitionRecovery(delayMs, rebuildRecognizer = false) {
 	if (recognitionRecoveryTimer) {
@@ -1652,13 +1763,7 @@ function setup() {
 
 			// Save any pending transcript before restarting
 			if (transcript) {
-				if (document.getElementById("fullContext").checked) {
-					translateCall([second_transcription, last_transcription, transcript].filter(Boolean).join(' '), false);
-				} else {
-					translateCall(transcript, false);
-				}
-				second_transcription = last_transcription;
-				last_transcription = transcript + ". ";
+				scheduleFinalSource(transcript);
 				transcript = "";
 			}
 
@@ -1688,18 +1793,9 @@ function setup() {
 			document.getElementById("input").value = transcript;
 			console.log("auto-finalized transcript:", transcript);
 
-			// Send for translation
-			if (document.getElementById("fullContext").checked) {
-				translateCall([second_transcription, last_transcription, transcript]
-					.filter(Boolean)
-					.join(' '), false);
-			} else {
-				translateCall(transcript, false);
-			}
+			scheduleFinalSource(transcript);
 
-			// Update memory
-			second_transcription = last_transcription;
-			last_transcription = transcript + ". ";
+			// Clear finalized state; source history updates when the final is published.
 			transcript = "";
 			pendingInterim = "";
 			silenceTimer = null;
@@ -1722,16 +1818,8 @@ function setup() {
 			document.getElementById("input").value = transcript;
 			console.log("final transcript:", transcript);
 
-			if (document.getElementById("fullContext").checked) {
-				translateCall([second_transcription, last_transcription, transcript]
-					.filter(Boolean)
-					.join(' '), false);
-			} else {
-				translateCall(transcript, false);
-			}
+			scheduleFinalSource(transcript);
 
-			second_transcription = last_transcription;
-			last_transcription = transcript + ". ";
 			transcript = "";
 		}
 
@@ -1761,6 +1849,7 @@ function setup() {
 
 				let display_text = transcript + (transcript ? ' ' : '') + textToProcess;
 				document.getElementById("input").value = display_text;
+				holdPendingFinalIfInterimContinues(display_text);
 
 				if (translationQueue.length > 3) {
 					if (useSpeechModeV2) {

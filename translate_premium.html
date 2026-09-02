@@ -415,6 +415,8 @@
                 lastTranscription: '',
                 secondTranscription: '',
                 finalTranscript: '',
+                pendingInterimSource: '',
+                lastProcessedSourceKey: '',
                 counter: 0,
                 activeRequest: null,
                 lastRequestTime: 0,
@@ -1238,6 +1240,13 @@
 					}
 				}
 			},
+            normalizeTranscriptForCompare: function(text) {
+                return String(text || '')
+                    .toLowerCase()
+                    .replace(/[.,!?;:]+$/g, '')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            },
             processSpeechResults: function(event) {
                 let currentBatchFinal = '';
                 let currentBatchInterim = '';
@@ -1253,21 +1262,30 @@
                 }
                 if (currentBatchFinal) {
                     this.state.finalTranscript += (this.state.finalTranscript ? ' ' : '') + currentBatchFinal;
-                    this.elements.inputTextarea.value = this.state.finalTranscript;
-                    this.translateText(this.state.finalTranscript);
-                    this.state.secondTranscription = this.state.lastTranscription;
-                    this.state.lastTranscription = this.state.finalTranscript.trim().replace(/\.?$/, '.') + ' ';
+                    const finalSource = this.state.finalTranscript.trim();
+                    const finalKey = this.normalizeTranscriptForCompare(finalSource);
+                    this.elements.inputTextarea.value = finalSource;
+                    if (finalKey && finalKey !== this.state.lastProcessedSourceKey) {
+                        this.translateText(finalSource);
+                        this.state.lastProcessedSourceKey = finalKey;
+                        this.state.secondTranscription = this.state.lastTranscription;
+                        this.state.lastTranscription = finalSource.replace(/\.?$/, '.') + ' ';
+                        console.log("Updated context state:", {
+                            second: this.state.secondTranscription,
+                            last: this.state.lastTranscription
+                        });
+                    } else {
+                        console.log("Skipping duplicate final text:", finalSource);
+                    }
                     this.state.finalTranscript = '';
-                    console.log("Updated context state:", {
-                        second: this.state.secondTranscription,
-                        last: this.state.lastTranscription
-                    });
+                    this.state.pendingInterimSource = '';
                 }
                 else if (currentBatchInterim && this.elements.incrementalUpdatesCheckbox.checked) {
                     const displayText = this.state.finalTranscript +
                                        (this.state.finalTranscript ? ' ' : '') +
                                        currentBatchInterim;
                     this.elements.inputTextarea.value = displayText;
+                    this.state.pendingInterimSource = displayText;
                     if (this.state.activeRequest === null &&
                         (Date.now() - this.state.lastRequestTime > 250)) {
                         this.translateText(displayText, true);
@@ -1275,16 +1293,20 @@
                 }
             },
             processRemainingText: function() {
-                const currentText = this.elements.inputTextarea.value.trim();
+                const currentText = this.state.pendingInterimSource.trim();
+                const currentKey = this.normalizeTranscriptForCompare(currentText);
                 if (currentText &&
+                    currentKey &&
                     this.elements.enabledTranscriptionCheckbox.checked &&
-                    currentText !== this.state.lastTranscription.trim()) {
+                    currentKey !== this.state.lastProcessedSourceKey) {
                     console.log("Processing final text from interrupted recognition:", currentText);
                     this.translateText(currentText);
+                    this.state.lastProcessedSourceKey = currentKey;
                     this.state.secondTranscription = this.state.lastTranscription;
                     this.state.lastTranscription = currentText.replace(/\.?$/, '.') + ' ';
                     this.state.finalTranscript = '';
                 }
+                this.state.pendingInterimSource = '';
             },
             translateText: function(textToTranslate, isInterim = false) {
                 if (!textToTranslate?.trim() || !this.elements.enabledTranscriptionCheckbox.checked) {
