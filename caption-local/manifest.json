@@ -1,0 +1,14 @@
+{
+  "source": "https://github.com/steveseguin/caption-local",
+  "bundle_schema": 1,
+  "sha256": {
+    "capture-local.html": "016c258ff13ac6dd8e260c1effda5bc2a239843a5a2b2c98fbac0c62e9ea6391",
+    "caption-local/LICENSE": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+    "caption-local/app.js": "a587294a94760c867ac51b6afe90edc0e4e5ac01db8b1d8cd7359e672ddb3316",
+    "caption-local/audio-buffer.js": "f50ceff882412d3ebdf60ff1f69be584409f5595c02cd1c640c43a9fa9082334",
+    "caption-local/pcm-worklet.js": "39a1de91ab470f916ec585cfa5f37bfb2f320b66c244fbf5b1e921e583e25dce",
+    "caption-local/ws-publisher.js": "acad5fe6c35e307d8e4cbd309394361c4fc3da5301a7e33f3bccd5003a44019d",
+    "caption-local/local-connection.js": "014f553018350765313fb61f6a78df98e7863d9c8c00e3c4f087f915bf59d002",
+    "caption-local/local-page.js": "8e6a493f1b214de1932c865daa956c2fe1db979d552c822be73d95b7a5b66b76"
+  }
+}

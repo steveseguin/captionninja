@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Self-hosted captions - Caption Local</title><style>
+:root{color-scheme:dark;font:18px system-ui;background:#131923;color:#edf2fb}body{max-width:850px;margin:3rem auto;padding:0 1rem}h1{font-size:2rem}p{line-height:1.5;color:#bac9de}label{display:block;margin:1rem 0}input,select,button{font:inherit;padding:.6rem;border:1px solid #8498b3;border-radius:6px;background:#202d40;color:inherit}input:not([type=checkbox]),select{display:block;width:100%;box-sizing:border-box;margin-top:.4rem}button{cursor:pointer}button:disabled{opacity:.5}a{color:#8fc9ff}#captions{font-size:1.6rem;line-height:1.5;min-height:6rem;white-space:pre-wrap}#error{color:#ffb4ad}details{margin:2rem 0}small{color:#bac9de}#meter{width:100%}
+</style></head><body>
+<h1>Self-hosted captions</h1>
+<p><a href="https://github.com/steveseguin/caption-local#readme" rel="noreferrer">Installation, requirements and getting started</a></p>
+<p>Use your own Caption Local server for speech recognition. No cloud transcription account is needed. Model downloads and hardware settings belong on the server.</p>
+<form id="connection">
+<label>Service address<input id="endpoint" type="url" required aria-describedby="connectionHelp" value="http://localhost:8765"></label>
+<label>Service token<input id="connectionToken" type="password" autocomplete="off" spellcheck="false"></label>
+<p id="connectionHelp">Start Caption Local first, then connect. Tokens stay in this tab. For a remote host, use an SSH tunnel. A hosted capture page also needs an allowed origin and browser local-network permission. The bundled page connects to its own server.</p>
+<button id="connect" type="submit">Connect and check service</button>
+<a href="http://localhost:8765/capture-local.html" rel="noreferrer">Open the local capture page</a>
+</form>
+<form id="auth" hidden>
+<label>Service access token<input id="accessToken" type="password" autocomplete="off" spellcheck="false"></label>
+<small>Use the token supplied by the server operator. It stays in this tab and is not sent to caption.ninja.</small>
+<button type="submit">Connect to service</button>
+</form>
+<p>Speech is transcribed on the computer running this service. Audio is not saved. Start with a quiet microphone and review captions before relying on them at an event.</p>
+<label>Microphone<select id="microphone"><option value="">System default</option></select></label>
+<label>Spoken language<select id="language"><option value="en">English</option></select></label>
+<small>Use a multilingual model for languages other than English. Automatic detection is less reliable on short phrases.</small>
+<label>Microphone sensitivity<select id="sensitivity"><option value="0.0008">Quiet speech</option><option value="0.002" selected>Normal</option><option value="0.006">Noisy room</option></select></label>
+<label>Caption interval<select id="captionInterval"><option value="3">3 seconds — earlier captions, more processing</option><option value="6" selected>6 seconds — balanced</option><option value="9">9 seconds — more context, later captions</option></select></label>
+<small>Shorter intervals may reduce recognition accuracy and the number of streams this computer can handle.</small>
+<label>Caption output<select id="mode"><option value="transcribe">Transcription in the spoken language</option><option value="translate">English translation</option><option value="both">Transcription and English translation</option></select></label>
+<p id="capabilities" role="status">Checking model…</p>
+<details><summary>Send captions to caption.ninja</summary>
+<p>Optional: caption text will travel through caption.ninja’s public relay. Audio stays on the inference host. Paste the editor’s <strong>private automatic-caption room</strong> below. The editor reviews these captions before publishing to its separate public room.</p>
+<label>Text to send<select id="relayOutput"><option value="transcript">Original transcription</option><option value="translation">English translation</option></select></label>
+<label>Destination workflow<select id="relayTarget"><option value="editor">Human editor (private source room)</option><option value="overlay">Direct overlay (publishes without review)</option></select></label>
+<p>For a direct overlay, use its room instead. Anyone with that room link can see the shared text; direct captions skip human review.</p>
+<label>Source room<input id="room" autocomplete="off" maxlength="128"></label>
+<label><input id="share" type="checkbox"> Send caption text to caption.ninja</label>
+<p id="relay" role="status">Sharing off</p><a id="editorLink" hidden target="_blank" rel="noopener noreferrer">Open caption editor</a>
+</details>
+<button id="start" disabled>Start captions</button> <button id="stop" disabled>Stop</button>
+<button id="retry" hidden>Retry pending audio</button> <button id="discard" hidden>Discard pending audio</button>
+<p id="status" role="status">Ready</p><p id="error" role="alert"></p>
+<label>Microphone level<meter id="meter" min="0" max="0.1" value="0"></meter></label>
+<div id="captions" role="log" aria-live="polite" aria-label="Live captions"></div>
+<button id="download">Download transcript</button>
+<details><summary>Connection and capture diagnostics</summary>
+<p id="diagnostics">Connect to inspect capture status.</p>
+<p>Response duration includes network, queue and inference time; it is not speech-to-caption delay. The last 100 requests are retained in memory. Downloads exclude tokens, service addresses, room names, audio and captions.</p>
+<button id="downloadDiagnostics">Download diagnostics</button>
+<button id="saveSettings">Save capture settings</button>
+<label>Load capture settings<input id="loadSettings" type="file" accept="application/json,.json"></label>
+<p>Settings include the service address, language, output and capture interval. Tokens, microphone identifiers, room names and sharing are excluded. Connect first, then load settings for that service.</p>
+</details>
+<script src="./caption-local/ws-publisher.js"></script><script src="./caption-local/audio-buffer.js"></script><script src="./caption-local/local-connection.js"></script><script src="./caption-local/app.js"></script><script src="./caption-local/local-page.js"></script>
+</body></html>
