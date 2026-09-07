@@ -8,17 +8,25 @@ $('status').textContent = 'Not connected';
 $('connection').onsubmit = async event => {
   event.preventDefault();
   if (connection.busy || connection.checking) return;
+  $('connectionError').textContent = '';
   try {
     connection.configure($('endpoint').value.trim(), $('connectionToken').value.trim());
     $('endpoint').value = connection.endpoint;
     $('connectionToken').value = ''; ready = false; fail('');
     connection.checking = true; controls();
     await health();
-    if (!ready) fail('Connection not ready. Check the service, token and allowed origin. If browser local-network permission is denied, open the local capture page instead.');
-    else $('status').textContent = 'Ready to capture';
+    if (!ready) {
+      const message = 'Connection not ready. Check the service, token and allowed origin. If browser local-network permission is denied, open the local capture page instead.';
+      fail(message); $('connectionError').textContent = message;
+    } else {
+      $('status').textContent = 'Ready to capture';
+      $('connectionTitle').textContent = '1. Service connected — edit connection';
+      $('serviceConnection').open = false;
+      $('microphone').focus({preventScroll: true});
+    }
   } catch (error) {
     connection.connected = false; connection.token = ''; connection.revision = (connection.revision || 0) + 1;
-    ready = false; fail(error.message);
+    ready = false; fail(error.message); $('connectionError').textContent = error.message;
   }
   finally { connection.checking = false; controls(); }
 };

@@ -1,0 +1,46 @@
+:root { color-scheme: dark; font: 16px/1.5 system-ui, sans-serif; background: #131923; color: #edf2fb; }
+* { box-sizing: border-box; }
+body { max-width: 980px; margin: 28px auto; padding: 0 16px; }
+h1 { font-size: clamp(1.7rem, 5vw, 2.1rem); margin: 0 0 8px; }
+h2 { font-size: 1.15rem; margin: 0 0 14px; }
+p { margin: 10px 0; color: #bac9de; }
+a { color: #8fc9ff; overflow-wrap: anywhere; }
+nav, .actions { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+header { margin-bottom: 20px; }
+header p { max-width: 75ch; }
+.panel, details { border: 1px solid #3c4b60; border-radius: 10px; padding: 18px; margin: 16px 0; }
+.panel { background: #182231; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; }
+label { display: block; min-width: 0; }
+input, select, button { font: inherit; padding: 10px; border: 1px solid #8498b3; border-radius: 6px; background: #202d40; color: inherit; max-width: 100%; }
+input:not([type=checkbox]), select { display: block; width: 100%; margin-top: 5px; }
+button, summary { cursor: pointer; }
+button { min-height: 44px; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+#start, #connect { background: #20569b; border-color: #84baff; font-weight: 650; }
+:is(a, input, select, button, summary, #captureControls):focus-visible { outline: 3px solid #a8d4ff; outline-offset: 3px; }
+summary { font-weight: 650; min-height: 28px; }
+details > label { margin: 14px 0; }
+details details { background: #182231; }
+details p, .hint, #capabilities { font-size: .9rem; }
+.hint { margin-bottom: 0; }
+.connection-help { padding: 10px 0 0; border: 0; margin: 8px 0 0; }
+small { color: #bac9de; }
+#captions { font-size: 1.5rem; line-height: 1.5; min-height: 5rem; white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0; }
+#error { color: #ffb4ad; overflow-wrap: anywhere; }
+#error:empty { display: none; }
+#connectionError { color: #ffb4ad; }
+#connectionError:empty { display: none; }
+#serviceConnection > summary { font-size: 1.15rem; }
+#serviceConnection[open] > summary { margin-bottom: 14px; }
+#meter { width: 100%; }
+#diagnostics { overflow-wrap: anywhere; }
+.skip-link { position: absolute; top: -100px; }
+.skip-link:focus { top: 4px; background: #131923; padding: 8px; z-index: 5; }
+[hidden] { display: none !important; }
+@media (max-width: 600px) {
+  body { margin: 16px auto; padding: 0 12px; }
+  .fields { grid-template-columns: 1fr; }
+  .panel, details { padding: 14px; }
+  .connection-help { padding: 8px 0 0; }
+}

@@ -48,13 +48,24 @@
     if (!custom()) return {room, output};
     const valid = value => /^[A-Za-z0-9_-]{32,128}$/.test(value || '');
     if (selected && valid(tokens.read) && (kind !== 'editor' || valid(tokens.write))) return {room, output};
+    if (!document.getElementById('privateSetupStyle')) {
+      const style = document.createElement('style'); style.id = 'privateSetupStyle';
+      style.textContent = 'body.private-relay-setup{position:static!important;display:block!important;overflow:auto!important;height:auto!important;min-height:100vh;width:auto!important;padding:16px!important;box-sizing:border-box;background:#101217}body.private-relay-setup>:not(#relaySetup){display:none!important}#relaySetup a{color:#a8d4ff}#relaySetup :focus-visible{outline:3px solid #a8d4ff;outline-offset:3px}';
+      document.head.append(style);
+    }
+    document.body.classList.add('private-relay-setup');
     const form = document.createElement('form'); form.id = 'relaySetup';
-    form.style.cssText = 'max-width:640px;margin:20px auto;padding:20px;background:#172338;color:#fff;font:18px system-ui;border:1px solid #9fb8d9';
-    const heading = document.createElement('h2'); heading.textContent = 'Connect to your private caption relay'; form.append(heading);
+    form.style.cssText = 'box-sizing:border-box;width:100%;max-width:640px;margin:8px auto;padding:20px;background:#172338;color:#fff;font:16px/1.5 system-ui;border:1px solid #9fb8d9;border-radius:12px';
+    const heading = document.createElement('h2'); heading.id = 'relaySetupTitle'; heading.tabIndex = -1;
+    heading.style.cssText = 'font-size:24px;line-height:1.25;margin:0 0 12px;outline:none';
+    heading.textContent = kind === 'editor' ? 'Connect your caption editor' : 'Connect your caption viewer'; form.append(heading);
+    form.setAttribute('aria-labelledby', heading.id);
     const help = document.createElement('p'); help.textContent = kind === 'editor'
       ? 'Use the source viewing token to receive automatic captions and the output publishing token to send reviewed captions. These are separate from the speech service token.'
       : 'Enter the viewing token for this output room. A viewing token cannot publish captions.';
     form.append(help);
+    const guide = document.createElement('a'); guide.href = 'https://github.com/steveseguin/captionninja/blob/master/relay/README.md';
+    guide.textContent = 'Setup guide and room tokens'; guide.target = '_blank'; guide.rel = 'noopener noreferrer'; form.append(guide);
     function input(id, label, value = '', type = 'text') {
       const wrapper = document.createElement('label'); wrapper.textContent = label;
       wrapper.style.cssText = 'display:block;margin:12px 0';
@@ -71,7 +82,7 @@
     const button = document.createElement('button'); button.type = 'submit'; button.textContent = 'Connect private relay';
     button.style.cssText = 'padding:10px;font:inherit'; form.append(button);
     const error = document.createElement('p'); error.setAttribute('role', 'alert'); form.append(error);
-    document.body.prepend(form); read.focus();
+    document.body.prepend(form); heading.focus({preventScroll: true});
     return new Promise(resolve => {
       form.onsubmit = event => {
         event.preventDefault();
@@ -85,7 +96,8 @@
           current.searchParams.set('room', source.value); if (destination) current.searchParams.set('output', destination.value);
           w.history.replaceState(null, '', current.pathname + current.search + current.hash);
           const result = {room: source.value, output: destination?.value || output};
-          form.remove(); showStatus('Connecting to private relay…'); resolve(result);
+          form.remove(); document.body.classList.remove('private-relay-setup');
+          showStatus('Connecting to private relay…'); resolve(result);
         } catch (caught) { error.textContent = caught.message; }
       };
     });
@@ -93,9 +105,13 @@
   function addViewerLink(value, parent) {
     if (!custom()) return;
     const details = document.createElement('details'); details.id = 'privateViewerLink';
+    details.style.cssText = 'margin-top:16px;max-width:100%';
     const summary = document.createElement('summary'); summary.textContent = 'Create a view-only OBS link'; details.append(summary);
+    summary.style.cssText = 'cursor:pointer;white-space:normal;min-height:32px';
     const label = document.createElement('label'); label.textContent = 'Output room viewing token (never a publishing token)';
+    label.style.cssText = 'display:block;margin:12px 0';
     const input = document.createElement('input'); input.id = 'viewerLinkToken'; input.type = 'password'; input.autocomplete = 'off';
+    input.style.cssText = 'display:block;box-sizing:border-box;width:100%;min-width:0;margin-top:6px;padding:10px;font:inherit;border:1px solid #9fb8d9;border-radius:6px;background:#172338;color:#fff';
     label.append(input); details.append(label);
     const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Create viewer link'; details.append(button);
     const result = document.createElement('textarea'); result.id = 'viewerLinkResult'; result.readOnly = true;

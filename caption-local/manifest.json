@@ -2,18 +2,19 @@
   "source": "https://github.com/steveseguin/caption-local",
   "bundle_schema": 1,
   "sha256": {
-    "capture-local.html": "352eee8aa69da28b240a108da9a847ad1c8981b0cfb804a22e320556b211260b",
+    "capture-local.html": "e4d718541cd2b85cabfec87f28ec4627619e87ea9c9b1567e8af83adcacd3790",
     "caption-local/LICENSE": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
-    "relay-config.js": "2964e084ab291a17709212513ada1584b4342603b6b79232fb508366e4cfc319",
+    "relay-config.js": "76210b661de54fb2389ab92638f2946bb5fcb93ebb32668087acf853f135188e",
     "private-relay-client.js": "2eb1d94490b866aef3189e474ab624927a731626d63d3f26f23b4720ce65af4a",
     "ws-publisher.js": "dfebfa9c711ca9affcd450f21f47259c0076869ae1ca37105a0cc90d42926f6c",
+    "caption-local/capture.css": "f05442afbfd1bc75b27e7adadc9a081b8a864724f315d92f96025bbff4cb07ca",
     "caption-local/app.js": "50542d391c4852a975a21eff3f4c080641bc7a60a2209cacc2c51f3f394ab87b",
     "caption-local/audio-buffer.js": "f50ceff882412d3ebdf60ff1f69be584409f5595c02cd1c640c43a9fa9082334",
     "caption-local/pcm-worklet.js": "39a1de91ab470f916ec585cfa5f37bfb2f320b66c244fbf5b1e921e583e25dce",
     "caption-local/ws-publisher.js": "dfebfa9c711ca9affcd450f21f47259c0076869ae1ca37105a0cc90d42926f6c",
-    "caption-local/relay-config.js": "2964e084ab291a17709212513ada1584b4342603b6b79232fb508366e4cfc319",
+    "caption-local/relay-config.js": "76210b661de54fb2389ab92638f2946bb5fcb93ebb32668087acf853f135188e",
     "caption-local/private-relay-client.js": "2eb1d94490b866aef3189e474ab624927a731626d63d3f26f23b4720ce65af4a",
     "caption-local/local-connection.js": "014f553018350765313fb61f6a78df98e7863d9c8c00e3c4f087f915bf59d002",
-    "caption-local/local-page.js": "8e6a493f1b214de1932c865daa956c2fe1db979d552c822be73d95b7a5b66b76"
+    "caption-local/local-page.js": "dfa65c7e574f09db1ab2611823e40e3b875bcf85c11a6a09b469324d008df3e9"
   }
 }

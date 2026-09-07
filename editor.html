@@ -42,7 +42,7 @@
 		.workflow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 10px; align-items: center; }
 		.workflow-item { background: var(--panel-2); border-radius: 8px; padding: 12px; min-width: 0; }
 		.workflow-item strong, .workflow-item a { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-		.arrow { color: var(--muted); font-size: 1.4rem; }
+		.arrow { color: var(--muted); font-size: 1.4rem; pointer-events: none; }
 		.grid { display: grid; grid-template-columns: 1fr 1.25fr; gap: 16px; }
 		.incoming { min-height: 146px; padding: 14px; background: var(--panel-2); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 1.15rem; }
 		.incoming.empty { color: var(--muted); }
@@ -103,8 +103,13 @@
 			.mode-description { margin-top: 10px; }
 			.metrics { justify-content: flex-start; }
 			.workflow { grid-template-columns: 1fr; }
-			.arrow { transform: rotate(90deg); text-align: center; }
+			.arrow { transform: rotate(90deg); text-align: center; width: 1.5em; justify-self: center; }
 			.room-details { grid-template-columns: 1fr; }
+			.private-relay-editor .workflow { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; align-items: stretch; }
+			.private-relay-editor .workflow .arrow { display: none; }
+			.private-relay-editor .workflow-item { padding: 8px; }
+			.private-relay-editor .workflow-item a, .private-relay-editor .workflow-item strong { white-space: normal; font-size: .85rem; min-height: 44px; }
+			.private-relay-editor .workflow-item small { font-size: .75rem; }
 		}
 	</style>
 <script src="relay-config.js"></script><script src="private-relay-client.js"></script>
@@ -202,7 +207,7 @@
 					<button id="copyOverlay" type="button">Copy overlay URL</button>
 				</div>
 			</div>
-			<p class="help">Use the public overlay URL for venue projection, OBS browser sources, and iframes. Keep the automatic-caption room private so viewers only see the editor's output.</p>
+			<p class="help" id="overlayHelp">Use the public overlay URL for venue projection, OBS browser sources, and iframes. Keep the automatic-caption room private so viewers only see the editor's output.</p>
 		</section>
 	</main>
 
@@ -282,9 +287,20 @@
 		overlayUrl = CaptionRelay.link(overlayUrl);
 		document.getElementById('captureLink').href = captureUrl;
 		document.getElementById('overlayLink').href = overlayUrl;
-		CaptionRelay.addViewerLink(overlayUrl, document.getElementById('overlayLink').parentElement);
+		CaptionRelay.addViewerLink(overlayUrl, document.getElementById('outputRoom').parentElement);
 		document.getElementById('sourceRoom').textContent = sourceRoom;
 		document.getElementById('outputRoom').textContent = outputRoom;
+		if (CaptionRelay.custom()) {
+			document.body.classList.add('private-relay-editor');
+			document.querySelector('.subtitle').textContent = 'Review automatic captions, then send approved text to your audience overlay.';
+			document.getElementById('overlayLink').textContent = 'Open audience overlay';
+			clearButton.textContent = 'Clear audience overlay';
+			document.getElementById('overlayHelp').textContent = 'Open the audience overlay and enter its viewing token, or create a view-only link for OBS. Share only the output room so viewers see approved captions.';
+			document.getElementById('outputRoom').parentElement.querySelector('strong').textContent = 'Audience room (viewing token required)';
+			var helpLink = document.createElement('a'); helpLink.href = 'https://github.com/steveseguin/caption-local/blob/main/docs/README.md';
+			helpLink.textContent = 'Setup guides and help'; helpLink.target = '_blank'; helpLink.rel = 'noopener noreferrer';
+			document.querySelector('.header > div').append(helpLink);
+		}
 
 		var sourceJoin = CaptionRelay.join(sourceRoom, 'read');
 		var publisher = (CaptionRelay.custom() ? CaptionRelay.createPublisher : createWSPublisher)({
