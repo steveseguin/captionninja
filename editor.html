@@ -107,7 +107,7 @@
 			.room-details { grid-template-columns: 1fr; }
 		}
 	</style>
-<script src="relay-config.js"></script>
+<script src="relay-config.js"></script><script src="private-relay-client.js"></script>
 </head>
 <body>
 	<main>
@@ -208,13 +208,18 @@
 
 	<script src="ws-publisher.js"></script>
 	<script>
-	(function () {
+	(async function () {
 		'use strict';
 
 		var WS_URL = CaptionRelay.url();
 		var params = new URLSearchParams(window.location.search);
 		var sourceRoom = params.get('room') || params.get('source') || params.get('input') || loadRoom('caption_editor_source') || generateRoomId();
 		var outputRoom = params.get('output') || params.get('out') || loadRoom('caption_editor_output') || generateRoomId();
+		if (CaptionRelay.custom()) {
+			var setup = await CaptionRelay.setup({kind: 'editor', room: sourceRoom, output: outputRoom});
+			sourceRoom = setup.room; outputRoom = setup.output; WS_URL = CaptionRelay.url();
+			params = new URLSearchParams(window.location.search);
+		}
 		var publishMode = params.get('mode') || loadPreference('caption_editor_mode') || 'timed';
 		var reviewDelaySeconds = parseInt(params.get('delay') || loadPreference('caption_editor_delay') || '5', 10);
 
@@ -259,6 +264,7 @@
 		var lastIncomingWasFinal = false;
 		var publishCounter = 0;
 		var sourceSocket = null;
+		var privateSource = null;
 		var reconnectTimer = null;
 		var timingInterval = null;
 		var publisherConnected = false;
@@ -276,19 +282,21 @@
 		overlayUrl = CaptionRelay.link(overlayUrl);
 		document.getElementById('captureLink').href = captureUrl;
 		document.getElementById('overlayLink').href = overlayUrl;
+		CaptionRelay.addViewerLink(overlayUrl, document.getElementById('overlayLink').parentElement);
 		document.getElementById('sourceRoom').textContent = sourceRoom;
 		document.getElementById('outputRoom').textContent = outputRoom;
 
 		var sourceJoin = CaptionRelay.join(sourceRoom, 'read');
-		var publisher = createWSPublisher({
+		var publisher = (CaptionRelay.custom() ? CaptionRelay.createPublisher : createWSPublisher)({
 			url: WS_URL,
 			room: outputRoom,
 			onStateChange: function (state) {
-				publisherConnected = state === 'connected';
+				publisherConnected = state.startsWith('connected');
 				updateStatus();
 			},
 			onError: function (error) {
 				console.error('Output WebSocket error:', error);
+				if (CaptionRelay.custom()) CaptionRelay.showStatus(error, true);
 			}
 		});
 		publisher.connect();
@@ -350,6 +358,17 @@
 		}
 
 		function connectSource() {
+            if (CaptionRelay.custom()) {
+                if (!privateSource) privateSource = CaptionRelay.subscribe({room: sourceRoom,
+                    onCaption: receiveCaption,
+                    onState: function (state) {
+                        listenerConnected = state.startsWith('connected'); updateStatus();
+                        CaptionRelay.showStatus('Private relay: ' + state, state === 'denied');
+                    },
+                    onGap: CaptionRelay.showGap
+                });
+                return;
+            }
 			if (sourceSocket && (sourceSocket.readyState === WebSocket.OPEN || sourceSocket.readyState === WebSocket.CONNECTING)) return;
 			var socket = new WebSocket(WS_URL);
 			sourceSocket = socket;
@@ -402,7 +421,10 @@
 			if (!text.trim()) return;
 
 			queue.push({ text: text.trim(), label: data.label || '', ln: data.ln || '', receivedAt: Date.now() });
-			if (queue.length > 100) queue.shift();
+			if (queue.length > 100) {
+				queue.shift();
+				if (CaptionRelay.custom()) CaptionRelay.showStatus('The editor queue reached 100 captions. Older waiting captions were dropped; pause capture and catch up before continuing.', true);
+			}
 			loadNext();
 			updateTiming();
 		}
@@ -598,6 +620,7 @@
 				sourceSocket.close();
 			}
 			publisher.disconnect();
+			if (privateSource) privateSource.disconnect();
 		});
 
 		connectSource();

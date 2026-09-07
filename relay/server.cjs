@@ -4,6 +4,7 @@ const http = require('node:http');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const {WebSocketServer, WebSocket} = require('ws');
+const {Replay} = require('./replay.cjs');
 const ROOM = /^[A-Za-z0-9_-]{1,128}$/;
 const digest = value => crypto.createHash('sha256').update(value).digest();
 const same = (a, b) => crypto.timingSafeEqual(digest(a), digest(b));
@@ -35,24 +36,57 @@ function createRelay(input, overrides = {}) {
   // Copy credentials so caller mutation cannot change a running authorization policy.
   const config = validateConfig(JSON.parse(JSON.stringify(input)));
   const limits = {connections: 512, perIp: 128, perRoom: 256, messagesPerSecond: 40,
-    payloadBytes: 8192, bufferedBytes: 65536, joinMs: 10000, heartbeatMs: 30000, ...overrides};
+    payloadBytes: 8192, bufferedBytes: 65536, joinMs: 10000, heartbeatMs: 30000,
+    replayMs: 120000, replayMessages: 256, replayTotalMessages: 8192, replayBytes: 16 * 1024 * 1024,
+    slowMs: 10000};
+  for (const [key, value] of Object.entries({...config.limits, ...overrides})) {
+    if (!Object.hasOwn(limits, key)) throw new Error('Unknown relay limit');
+    limits[key] = value;
+  }
   for (const value of Object.values(limits))
     if (!Number.isSafeInteger(value) || value < 1) throw new Error('Limits must be positive integers');
   const rooms = new Map(Object.keys(config.rooms).map(room => [room, new Set()]));
+  const replay = new Replay(Object.keys(config.rooms), limits);
   const ips = new Map();
-  const stats = {accepted: 0, rejected: 0, published: 0, delivered: 0, slowConsumers: 0};
+  const stats = {accepted: 0, rejected: 0, published: 0, delivered: 0, slowConsumers: 0,
+    duplicates: 0, replayed: 0, gaps: 0};
   const server = http.createServer((req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     if (req.url !== '/health' || req.method !== 'GET') { res.writeHead(404); res.end(); return; }
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ready: true, connections: wss.clients.size, ...stats}));
+    res.end(JSON.stringify({ready: true, protocol: 2, connections: wss.clients.size,
+      retainedMessages: replay.global.size, retainedBytes: replay.bytes, ...stats}));
   });
   server.headersTimeout = 10000;
   server.requestTimeout = 10000;
   server.maxConnections = limits.connections + 32;
   const wss = new WebSocketServer({noServer: true, maxPayload: limits.payloadBytes,
     perMessageDeflate: false, closeTimeout: 1000, maxFragments: 128, maxBufferedChunks: 256});
+  function congested(peer, bytes) {
+    if (peer.bufferedAmount + bytes <= limits.bufferedBytes) { peer.blockedSince = null; return false; }
+    peer.blockedSince ||= Date.now();
+    if (Date.now() - peer.blockedSince > limits.slowMs) { stats.slowConsumers++; peer.terminate(); }
+    return true;
+  }
+  function pump(peer) {
+    if (peer.readyState !== WebSocket.OPEN || peer.role !== 'read' || peer.protocolVersion !== 2) return;
+    const room = replay.rooms.get(peer.room);
+    const first = room.events.keys().next().value || room.sequence + 1;
+    if (peer.nextSequence < first) {
+      if (congested(peer, 512)) return;
+      peer.nextSequence = first; stats.gaps++;
+      peer.send(JSON.stringify({gap: 'history-expired', epoch: replay.epoch, next: first}));
+    }
+    while (peer.nextSequence <= room.sequence) {
+      const record = room.events.get(peer.nextSequence);
+      if (!record) break;
+      if (congested(peer, Buffer.byteLength(record.reliable))) return;
+      peer.send(record.reliable, error => { if (error) peer.terminate(); });
+      peer.nextSequence++; stats.delivered++;
+      if (record.sequence <= peer.replayUntil) stats.replayed++;
+    }
+  }
   function reject(socket, code) {
     stats.rejected++;
     socket.end(`HTTP/1.1 ${code} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
@@ -103,14 +137,27 @@ function createRelay(input, overrides = {}) {
             typeof data.token !== 'string' || data.token.length > 128 ||
             !same(data.token, credentials[data.role])) return fail(1008, 'Join denied');
         if (rooms.get(data.join).size >= limits.perRoom) return fail(1013, 'Room capacity');
+        if (data.protocol !== undefined && data.protocol !== 2) return fail(1008, 'Unsupported protocol');
+        if (data.cursor !== undefined && (!data.cursor || typeof data.cursor.epoch !== 'string' ||
+            data.cursor.epoch.length > 64 || !Number.isSafeInteger(data.cursor.sequence) || data.cursor.sequence < 0))
+          return fail(1008, 'Invalid cursor');
         ws.room = data.join; ws.role = data.role;
+        ws.protocolVersion = data.protocol || 1;
         rooms.get(ws.room).add(ws); clearTimeout(deadline);
-        ws.send(JSON.stringify({joined: ws.room, role: ws.role}));
+        if (ws.protocolVersion === 2) {
+          let resumed;
+          try { resumed = replay.resume(ws.room, data.cursor); } catch { return fail(1008, 'Invalid cursor'); }
+          ws.nextSequence = resumed.next; ws.replayUntil = replay.rooms.get(ws.room).sequence;
+          if (resumed.gap) stats.gaps++;
+          ws.send(JSON.stringify({joined: ws.room, role: ws.role, protocol: 2, epoch: replay.epoch,
+            next: resumed.next, gap: resumed.gap, retentionMs: limits.replayMs}));
+          pump(ws);
+        } else ws.send(JSON.stringify({joined: ws.room, role: ws.role}));
         return;
       }
       if (ws.role !== 'write' || data.msg !== true || Object.hasOwn(data, 'join'))
         return fail(1008, 'Publishing denied');
-      const fields = ['msg', 'final', 'interm', 'id', 'label', 'ln'];
+      const fields = ['msg', 'final', 'interm', 'id', 'label', 'ln', 'delivery'];
       if (Object.keys(data).some(key => !fields.includes(key)) ||
           (Object.hasOwn(data, 'final') === Object.hasOwn(data, 'interm')) ||
           typeof (data.final ?? data.interm) !== 'string' || (data.final ?? data.interm).length > 4000 ||
@@ -118,9 +165,25 @@ function createRelay(input, overrides = {}) {
           ['label', 'ln'].some(key => Object.hasOwn(data, key) &&
             (typeof data[key] !== 'string' || data[key].length > (key === 'ln' ? 32 : 128))))
         return fail(1008, 'Invalid caption');
-      const encoded = JSON.stringify(data); stats.published++;
+      const delivery = data.delivery;
+      if ((ws.protocolVersion === 2 && (!delivery || typeof delivery.client !== 'string' ||
+          !/^[A-Za-z0-9_-]{16,128}$/.test(delivery.client) || !Number.isSafeInteger(delivery.sequence) || delivery.sequence < 1)) ||
+          (ws.protocolVersion !== 2 && delivery !== undefined)) return fail(1008, 'Invalid delivery identity');
+      if (delivery && Object.keys(delivery).some(key => !['client', 'sequence'].includes(key)))
+        return fail(1008, 'Invalid delivery identity');
+      if (delivery && ws.bufferedAmount + 512 > limits.bufferedBytes) { stats.slowConsumers++; ws.terminate(); return; }
+      // Canonical field order makes a retransmission independent of JSON key ordering.
+      const caption = Object.fromEntries(fields.filter(key => key !== 'delivery' && Object.hasOwn(data, key)).map(key => [key, data[key]]));
+      let added;
+      try { added = replay.append(ws.room, caption, delivery); } catch { return fail(1008, 'Delivery identity conflict'); }
+      if (delivery) {
+        ws.send(JSON.stringify({ack: delivery, epoch: replay.epoch, sequence: added.record.sequence}));
+      }
+      if (added.duplicate) { stats.duplicates++; return; }
+      const encoded = added.record.encoded; stats.published++;
       for (const peer of rooms.get(ws.room)) {
         if (peer.role !== 'read' || peer.readyState !== WebSocket.OPEN) continue;
+        if (peer.protocolVersion === 2) { pump(peer); continue; }
         if (peer.bufferedAmount + Buffer.byteLength(encoded) > limits.bufferedBytes) {
           stats.slowConsumers++; peer.terminate(); continue;
         }
@@ -135,7 +198,9 @@ function createRelay(input, overrides = {}) {
     }
   }, limits.heartbeatMs);
   heartbeat.unref();
-  return {server, wss, stats, limits,
+  const maintenance = setInterval(() => { replay.prune(); for (const peer of wss.clients) pump(peer); }, 100);
+  maintenance.unref();
+  return {server, wss, stats, limits, replay,
     async listen(port = 8787, host = '127.0.0.1') {
       await new Promise((resolve, reject) => {
         server.once('error', reject);
@@ -145,6 +210,7 @@ function createRelay(input, overrides = {}) {
     },
     async close() {
       clearInterval(heartbeat);
+      clearInterval(maintenance);
       for (const ws of wss.clients) ws.terminate();
       await new Promise(resolve => wss.close(resolve));
       await new Promise(resolve => server.close(resolve));

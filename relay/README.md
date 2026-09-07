@@ -6,7 +6,7 @@ the public `api.caption.ninja` service. It needs no GPU, speech model, cloud API
 account or Caption Local Python environment. It runs separately from inference.
 
 Use Node.js 22 or newer and this directory's pinned `ws` dependency. Windows 11
-and WSL/Linux results are recorded in [Caption Local's relay evidence](https://github.com/steveseguin/caption-local/tree/main/evidence/private-relay).
+and WSL/Linux results are recorded in [Caption Local's relay evidence](https://github.com/steveseguin/caption-local/tree/main/evidence/relay-recovery).
 Plan for 128 MiB RAM for a small private installation and measure your workload;
 this is an allowance, not a proven minimum. Text relay capacity does not establish
 speech recognition capacity. Internet hosting needs a domain and a TLS reverse
@@ -69,9 +69,11 @@ outside it. Do not use this development file server as a public hosting server.
 2. Enter relay address `ws://127.0.0.1:8787`, caption website address
    `http://127.0.0.1:8080/`, source room `source`, its **write** token, and editor
    output room `output`.
-3. Enable sharing and open the generated editor link. The editor asks for the
-   source room's **read** token and the output room's **write** token.
-4. Open the editor's overlay link. Enter the output room's **read** token.
+3. Enable sharing and open the generated editor link. Its setup panel labels the
+   source room's **read** token and the output room's **write** token. Check the
+   room names and click **Connect private relay**.
+4. Open the editor's overlay link. Its setup panel needs the output room's **read**
+   token. Connection errors and unrecoverable delivery gaps appear on the page.
 5. Start captions. Review incoming text in the editor, then send it to the overlay.
 6. Stop capture, let audio finish, and download your transcript before closing.
 
@@ -86,14 +88,20 @@ their existing public-relay behavior. Use this workflow when private routing is
 required. Optional cloud translation/TTS can still make external requests; leave
 those features off when you need all processing to stay private.
 
-For OBS, where a browser prompt is inconvenient, append the **view-only** token
-to the overlay URL fragment: `#relayReadToken=YOUR_OUTPUT_READ_TOKEN`. The page
+For OBS, expand **Create a view-only OBS link** in the editor. Enter the output
+viewing token, create the link and copy it into OBS. The helper verifies read
+access against the relay before generating a link and rejects publishing tokens.
+The link uses the fragment
+`#relayReadToken=YOUR_OUTPUT_READ_TOKEN`. The page
 reads it into memory and removes it from the address bar. Fragments are not sent
 in HTTP requests, but the original link is still a credential: OBS settings,
 clipboard and browser history may retain it. Never use a write token in an
 audience link. Editor automation also supports `relayReadToken` and
-`relayWriteToken` fragment fields; normal use can enter them at the prompts.
-Generated links carry the relay address but never copy credentials.
+`relayWriteToken` fragment fields; normal use enters them in the setup panel.
+Ordinary generated links carry the relay address and no credentials. The explicit
+OBS helper includes only the viewing credential you supply. A page with complete
+fragment credentials connects automatically; the setup panel stays out of the
+overlay once connected. Tokens remain in tab memory; reload to change them.
 
 ## Internet hosting and Docker
 
@@ -138,42 +146,75 @@ validate public deployment or Docker Desktop. No Docker installation is required
 
 Defaults: 512 WebSockets total, 128 per direct peer IP, 256 per room; 40 messages
 per connection per second including join; 8 KiB messages; 4,000-character captions;
-64 KiB pending output per viewer; 10-second join deadline; 30-second heartbeat.
+64 KiB pending transport output per connection; 10-second join deadline;
+30-second heartbeat. Slow reliable viewers have a 10-second backpressure grace
+period before disconnection. Publishers retain at most 100 unacknowledged captions
+in the browser; the newest caption is rejected visibly if that queue fills.
 HTTP connections are also bounded. Rooms must be provisioned in the configuration
 (at most 1,000). Limits are implementation defaults, not guaranteed host capacity.
 Overload rejects clients or disconnects slow viewers instead of growing buffers.
 
-The server forwards captions only to authenticated readers in the same room. It
-keeps no caption history, writes no captions/tokens/room names to logs, and stores
-no audio. Startup logs and `/health` contain operational data only. A private
-relay failure **never falls back to the public relay**.
+An optional `limits` object in the private configuration can set these bounds.
+For example, `"limits": {"perIp": 512}` admits larger audiences behind one reverse
+proxy or on one test computer. The default is 128 per IP, so 32 producers plus
+100 viewers sharing a proxy need an explicit increase. This raises admission
+capacity; it does not enlarge caption buffers or guarantee host throughput.
+Unknown limit names or nonpositive/noninteger values are rejected.
 
-The browser publisher retains a bounded queue while disconnected and waits for
-join authorization before flushing it. **There is no per-caption acknowledgement,
-durable delivery, replay or exactly-once guarantee.** Captions sent while a viewer
-is disconnected, including a viewer that rejoins after the publisher on restart,
-are lost to that viewer. Have the editor and audience reconnect before resuming
-capture after an outage. Authentication denial stops publisher automatic retries;
-turn sharing off, correct the token, and enable it again. Viewer/editor tokens stay
-in tab memory; reload to enter different tokens. Restart with changed configuration
-to revoke credentials and disconnect existing clients.
+The server forwards captions only to authenticated readers in the same room.
+It now keeps a **short replay history in RAM**, along with delivery receipts:
+at most 120 seconds and 256 messages per room, bounded globally by 8,192 messages
+and a 16 MiB accounting budget. The oldest records expire first; the accounting
+budget is not a process RSS limit. Text never goes to disk or logs; no audio is
+stored. Startup logs and `/health` contain operational data only, including replay
+counts, duplicate receipts and gaps. A private relay failure **never falls back
+to the public relay**.
+
+The private publisher keeps each caption until the relay acknowledges it, retrying
+the same identity if the acknowledgement is lost. Receipts suppress duplicate
+delivery within the retained history. Returning viewers resume from their last
+caption cursor, even when the producer reconnects first. New viewers start live.
+Each room's viewing token authorizes its retained history as well as live captions.
+
+**This is bounded recovery, not durable or exactly-once delivery.** If the buffer
+expires or is evicted, the viewer shows a gap warning. Restarting the relay clears
+history and receipts; current-process captions can be replayed after restart,
+but earlier captions may be missing and an unacknowledged retry can repeat.
+Restart/gap warnings make this visible. A crashed or reloaded browser also loses
+its in-memory queue/cursor. The editor's existing 100-caption review queue remains
+bounded; if it overflows, private-mode users get an explicit dropped-caption warning.
+
+Authentication denial stops publisher automatic retries. Turn sharing off,
+correct the token and enable it again. Reload viewers/editors to enter corrected
+tokens. Restart with changed configuration to revoke credentials and disconnect
+existing clients. Rehearse outages before relying on a deployment at an event.
 
 ## Tests and protocol
 
 ```sh
 npm test
 node benchmark.cjs 60 /path/to/new-results.json
+node soak.cjs 3600 /path/to/new-hour-results.json 100
 ```
 
 The benchmark uses 32 independent synthetic producers and two viewers per room,
 at five captions/second each. It measures loopback delivery, ordering, isolation,
 CPU and memory in one Node process containing both clients and server. It does
-not establish WAN latency or a sustained maximum capacity. The integration probe
+not establish WAN latency or a sustained maximum capacity. The separate soak uses
+the actual reliable browser client with 32 producers, the requested total viewer
+count, periodic forced disconnects and fixed-size latency histograms. Its results
+include errors, gaps, duplicates, queue/retention bounds and memory samples.
+The integration probe
 is `scripts/browser_private_relay.py` in Caption Local; it uses a synthetic
 microphone, fake inference and this real relay with public traffic blocked.
 
-Clients join using `{"join":"ROOM","role":"read|write","token":"TOKEN"}`.
-The server replies `{"joined":"ROOM","role":"read|write"}`. Writers then send
-`{"msg":true,"final":"text","id":1}` or `interm` instead of `final`; optional
-`label` and `ln` fields are preserved. IDs are forwarded, not treated as delivery
-acknowledgements. One socket has one immutable room/role; viewers cannot publish.
+Reliable clients join using `{"protocol":2,"join":"ROOM","role":"read|write","token":"TOKEN"}`.
+Returning readers include `"cursor":{"epoch":"PREVIOUS_EPOCH","sequence":123}`.
+The join response includes the process epoch, next sequence and any gap reason.
+Writers send `{"msg":true,"final":"text","id":1,"delivery":{"client":"UNIQUE_PRODUCER_ID","sequence":1}}`.
+The relay acknowledges that delivery identity and adds an epoch/sequence cursor
+to forwarded captions. `interm` can replace `final`; optional `label` and `ln`
+are preserved. Original caption IDs remain distinct from delivery identities.
+The legacy private join without `protocol` is still supported but has no reliable
+client acknowledgements or resume cursor. One socket has one immutable room/role;
+viewers cannot publish. Update both server and private pages to use recovery.

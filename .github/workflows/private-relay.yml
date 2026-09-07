@@ -21,3 +21,6 @@ jobs:
           cache-dependency-path: relay/package-lock.json
       - run: npm ci --ignore-scripts
       - run: npm test
+      - name: Linux container build, private delivery and shutdown
+        if: runner.os == 'Linux'
+        run: node docker-probe.cjs

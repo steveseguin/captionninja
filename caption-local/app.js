@@ -74,7 +74,9 @@ function configureRelay() {
       destination.searchParams.set('output', output);
     }
     if (window.CaptionRelay) destination = window.CaptionRelay.link(destination);
-    publisher = createWSPublisher({room, maxQueue: 100, relayToken: $('relayToken')?.value.trim(),
+    const publisherFactory = window.CaptionRelay?.custom() ? window.CaptionRelay.createPublisher : createWSPublisher;
+    publisher = publisherFactory({room, maxQueue: 100, relayToken: $('relayToken')?.value.trim(),
+    onError: message => fail('Caption relay: ' + message),
     onStats: stats => { $('relay').textContent = `Relay: ${stats.state}; queued ${stats.queueLength}; dropped ${stats.droppedCount}`; }
     });
   } catch (error) {

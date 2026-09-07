@@ -72,7 +72,7 @@
 		}
 		
 	</style>
-<script src="relay-config.js"></script>
+<script src="relay-config.js"></script><script src="private-relay-client.js"></script>
 </head>
 <body>
 	 
@@ -1077,7 +1077,24 @@
 		}
 	}
 
-	function connectWebSocket() {
+	var privateViewer = null, privateStarting = false;
+    function connectWebSocket() {
+        if (CaptionRelay.custom()) {
+            if (privateViewer || privateStarting) return;
+            privateStarting = true;
+            CaptionRelay.setup({kind: 'viewer', room: roomID}).then(function (setup) {
+                roomID = setup.room;
+                privateViewer = CaptionRelay.subscribe({room: roomID,
+                    onCaption: function (data) { handleSocketMessage({data: JSON.stringify(data)}); },
+                    onState: function (state) {
+                        if (state === 'connected') { var note = document.getElementById('privateRelayStatus'); if (note) note.hidden = true; }
+                        else CaptionRelay.showStatus('Private relay: ' + state, state === 'denied');
+                    },
+                    onGap: CaptionRelay.showGap
+                });
+            }).catch(function (error) { CaptionRelay.showStatus(error.message, true); });
+            return;
+        }
 		if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
 			return;
 		}
@@ -1129,6 +1146,7 @@
 	connectWebSocket();
 	
 	window.addEventListener('beforeunload', function() {
+		if (privateViewer) privateViewer.disconnect();
 		clearReconnectTimer();
 		if (socket) {
 			socket.onclose = null;
