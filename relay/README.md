@@ -139,8 +139,12 @@ Ensure the container's unprivileged `node` user can read the mounted config with
 making it world-readable. On Linux, use an appropriate owner/group or run the
 container with your numeric UID/GID using `--user "$(id -u):$(id -g)"`.
 Use `docker stop caption-ninja-relay` from another terminal to stop it.
-Docker/TLS examples need verification on your host; native loopback tests do not
-validate public deployment or Docker Desktop. No Docker installation is required.
+Linux CI has built the image and verified authenticated delivery and shutdown in
+an unprivileged, read-only container. A Windows test also verified real Caddy
+HTTPS/WSS delivery with an explicit temporary CA and rejection of invalid
+certificates/tokens. These checks do not validate a public domain, WAN performance
+or Docker Desktop; rehearse the deployment on your host. No Docker installation
+is required for the native setup.
 
 ## Bounds, privacy and recovery
 
@@ -188,6 +192,12 @@ Authentication denial stops publisher automatic retries. Turn sharing off,
 correct the token and enable it again. Reload viewers/editors to enter corrected
 tokens. Restart with changed configuration to revoke credentials and disconnect
 existing clients. Rehearse outages before relying on a deployment at an event.
+Invalid format or oversized frames also stop retries and show an error. The
+8 KiB limit counts UTF-8 bytes, so a long multilingual caption can exceed it
+before reaching 4,000 characters. Copy the text, shorten it and start a new
+publishing session before resending. A denied publisher retains its queue in
+memory until that session is closed; reconnecting the same invalid payload will
+not repair it.
 
 ## Tests and protocol
 

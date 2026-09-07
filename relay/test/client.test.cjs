@@ -65,3 +65,18 @@ test('publisher queue overflow is explicit and does not replace uncertain in-fli
   assert.equal(producer.getSnapshot().queueLength, 2); assert.equal(producer.getSnapshot().droppedCount, 1);
   assert.equal(errors.length, 1);
 });
+
+test('an oversized multilingual caption stops retries and reports its retained queue', async t => {
+  const {writer, relay} = await fixture(t), errors = [];
+  const producer = writer({onError: error => errors.push(error)});
+  await until(() => producer.isOpen());
+  // Fewer than 4,000 characters, but UTF-8 exceeds the relay's 8 KiB frame limit.
+  producer.publish({msg: true, final: '\u65e5'.repeat(3000), id: 1});
+  await until(() => errors.length > 0, 1500);
+  assert.match(errors[0], /size|large/i);
+  assert.equal(producer.getSnapshot().queueLength, 1);
+  assert.equal(producer.getSnapshot().state, 'denied');
+  const accepted = relay.stats.accepted;
+  await sleep(800);
+  assert.equal(relay.stats.accepted, accepted, 'Invalid payload must not reconnect indefinitely');
+});

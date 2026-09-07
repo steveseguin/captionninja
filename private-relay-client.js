@@ -52,7 +52,13 @@
         if (socket !== current) return;
         joined = false; clearTimeout(deadline); clearInterval(poll);
         if (manual) { emit('closed'); return; }
-        if (event.code === 1008) { manual = true; emit('denied'); options.onError?.('Private relay denied access or rejected a message. Check room credentials.'); return; }
+        if ([1003, 1007, 1008, 1009].includes(event.code)) {
+          manual = true; emit('denied');
+          options.onError?.(event.code === 1008
+            ? 'Private relay denied access or rejected a message. Check room credentials.'
+            : 'Private relay rejected caption size or format; automatic retries stopped.');
+          return;
+        }
         emit('reconnecting');
         retry = setTimeout(connect, Math.min(10000, 500 * 2 ** Math.min(retries++, 5)));
       };
