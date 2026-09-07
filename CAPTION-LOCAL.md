@@ -5,6 +5,10 @@
 cloud transcription account, and does not load into the existing capture pages.
 Run the service on your Windows/Linux computer or reach it through an SSH tunnel.
 
+**New to self-hosting?** [See the visual workflow, hosting choices and actual
+capture screen](https://github.com/steveseguin/caption-local/blob/main/docs/SELF-HOSTING.md)
+before choosing which parts to run yourself.
+
 For fully private caption delivery, also run the optional [Caption Ninja relay](relay/README.md)
 and set its address under **Use a private relay**. Generated editor/overlay links
 preserve that address. Inference and relay credentials are separate; each room

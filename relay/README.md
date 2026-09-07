@@ -5,6 +5,9 @@ It is a new implementation of the browser message protocol, not the source of
 the public `api.caption.ninja` service. It needs no GPU, speech model, cloud API
 account or Caption Local Python environment. It runs separately from inference.
 
+[See the visual workflow and hosting options](https://github.com/steveseguin/caption-local/blob/main/docs/SELF-HOSTING.md)
+for how recognition, the relay, the editor and audience displays fit together.
+
 Use Node.js 22 or newer and this directory's pinned `ws` dependency. Windows 11
 and WSL/Linux results are recorded in [Caption Local's relay evidence](https://github.com/steveseguin/caption-local/tree/main/evidence/relay-recovery).
 Plan for 128 MiB RAM for a small private installation and measure your workload;

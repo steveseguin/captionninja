@@ -13,6 +13,9 @@ Demo video: https://www.youtube.com/watch?v=v7172QO8z6c
 3. Start speaking - your words will be transcribed automatically
 4. Access the overlay URL (provided on the page) to display captions in OBS or other streaming software
 
+Prefer to run speech recognition or caption delivery yourself?
+[See the self-hosting options, workflow diagrams and capture screen](https://github.com/steveseguin/caption-local/blob/main/docs/SELF-HOSTING.md).
+
 ## How It Works
 
 CAPTION.Ninja leverages your browser's built-in speech recognition capabilities to perform real-time transcription:
