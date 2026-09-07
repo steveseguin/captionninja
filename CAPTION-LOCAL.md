@@ -5,10 +5,10 @@
 cloud transcription account, and does not load into the existing capture pages.
 Run the service on your Windows/Linux computer or reach it through an SSH tunnel.
 
-This is draft integration work. The matching Caption Local development branch is
-`windows-rtx-validation`; the published v1.1.0 does not include hosted-page CORS.
+Use the current Caption Local source on `main`; the published v1.1.0 does not
+include hosted-page CORS. [Download the source ZIP](https://github.com/steveseguin/caption-local/archive/refs/heads/main.zip).
 Start with the service's bundled **http://localhost:8765/capture-local.html** page.
-See its [setup and requirements guide](https://github.com/steveseguin/caption-local/blob/windows-rtx-validation/docs/CAPTION-NINJA-LOCAL.md)
+See its [setup and requirements guide](https://github.com/steveseguin/caption-local/blob/main/docs/CAPTION-NINJA-LOCAL.md)
 for exact commands, private hosting, tokens, hardware choices and measured limits.
 
 On this site's page, enter the service address and local-service token, then click
