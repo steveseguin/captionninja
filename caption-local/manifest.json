@@ -8,7 +8,7 @@
     "private-relay-client.js": "2eb1d94490b866aef3189e474ab624927a731626d63d3f26f23b4720ce65af4a",
     "ws-publisher.js": "dfebfa9c711ca9affcd450f21f47259c0076869ae1ca37105a0cc90d42926f6c",
     "caption-local/capture.css": "f05442afbfd1bc75b27e7adadc9a081b8a864724f315d92f96025bbff4cb07ca",
-    "caption-local/app.js": "412e4510c81e4fbc53a03e9f467f4f4022c69cf0376f89530164ab4cf2bcc6b1",
+    "caption-local/app.js": "6ad175598e847ac539f8b6881a6ef557a4cb449baeb30a0aae4054a0b8c53737",
     "caption-local/audio-buffer.js": "f50ceff882412d3ebdf60ff1f69be584409f5595c02cd1c640c43a9fa9082334",
     "caption-local/pcm-worklet.js": "39a1de91ab470f916ec585cfa5f37bfb2f320b66c244fbf5b1e921e583e25dce",
     "caption-local/ws-publisher.js": "dfebfa9c711ca9affcd450f21f47259c0076869ae1ca37105a0cc90d42926f6c",

@@ -201,10 +201,10 @@ async function stop() {
 $('stop').onclick = stop;
 $('retry').onclick = async () => { failed = false; fail(''); await drain(); };
 $('discard').onclick = async () => {
-  buffer.reset(); pending = null; failed = false; fail('Pending audio discarded.');
+  buffer.reset(); pending = null; failed = false; fail('');
   // The empty drain closes our idle server session, just like a successful Stop.
   await drain();
-  if (!failed) $('status').textContent = 'Stopped';
+  if (!failed) $('status').textContent = 'Stopped · pending audio discarded';
 };
 $('start').onclick = async () => {
   if (starting || running || processing || failed) return;
