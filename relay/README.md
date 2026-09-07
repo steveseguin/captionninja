@@ -77,6 +77,15 @@ outside it. Do not use this development file server as a public hosting server.
 5. Start captions. Review incoming text in the editor, then send it to the overlay.
 6. Stop capture, let audio finish, and download your transcript before closing.
 
+You can use `https://steveseguin.github.io/captionninja/` as the caption website
+address instead of serving the editor/overlay yourself. Add the exact origin
+`https://steveseguin.github.io` to the relay configuration's `origins` list. The
+actual hosted-page workflow passed in Edge with local-network permission granted
+through automation. On 2026-09-07, `caption.ninja/capture-local.html` still served
+the main capture page; a GitHub Pages deployment does not update that separate host.
+For hosted microphone capture, follow Caption Local's
+[service-token and allowed-origin instructions](https://github.com/steveseguin/caption-local/blob/main/docs/CAPTION-NINJA-LOCAL.md).
+
 The token for Caption Local inference is separate from all relay tokens. A viewer
 cannot publish using a read token, and credentials for one room cannot join another.
 The editor output room must exist in the relay configuration and differ from its
@@ -200,6 +209,23 @@ memory until that session is closed; reconnecting the same invalid payload will
 not repair it.
 
 ## Tests and protocol
+
+Measured on Windows 11, a Core Ultra 7 265K and Node 22.19.0, using short captions
+in six languages and five captions/second per producer:
+
+| Text producers | Total viewers | Test duration | p95 relay delay | Result |
+| ---: | ---: | ---: | ---: | --- |
+| 32 | 100 | 1 hour | 5.7 ms | 1.8 million deliveries; no errors, duplicates or gaps |
+| 32 | 400 | 1 minute | 10.3 ms | 120,000 deliveries; no errors, duplicates or gaps |
+
+Both tests injected disconnects; the maximum observed delay was about two seconds,
+including an intentional two-second viewer outage. Server and simulated browser
+clients shared one Node process on loopback. The hour used the initial recovery
+client; the later short probe and targeted tests cover the invalid-frame retry fix.
+These are text delivery measurements, not speech recognition or public-network
+capacity. The 400-viewer probe is too short to establish sustained capacity.
+See the linked evidence for exact versions, memory/CPU, recovery limits and
+unsuccessful configurations. Admission was explicitly 512 per IP for loopback.
 
 ```sh
 npm test
