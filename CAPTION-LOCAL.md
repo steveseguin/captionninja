@@ -5,6 +5,11 @@
 cloud transcription account, and does not load into the existing capture pages.
 Run the service on your Windows/Linux computer or reach it through an SSH tunnel.
 
+For fully private caption delivery, also run the optional [Caption Ninja relay](relay/README.md)
+and set its address under **Use a private relay**. Generated editor/overlay links
+preserve that address. Inference and relay credentials are separate; each room
+has different publishing and viewing tokens.
+
 Use the current Caption Local source on `main`; the published v1.1.0 does not
 include hosted-page CORS. [Download the source ZIP](https://github.com/steveseguin/caption-local/archive/refs/heads/main.zip).
 Start with the service's bundled **http://localhost:8765/capture-local.html** page.

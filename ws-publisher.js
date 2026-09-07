@@ -24,6 +24,12 @@
     options = options || {};
 
     var url = options.url || 'wss://api.caption.ninja:443';
+    if (w.CaptionRelay && w.CaptionRelay.custom()) url = w.CaptionRelay.url();
+    var privateRelay = !!(w.CaptionRelay && w.CaptionRelay.custom());
+    var joined = !privateRelay;
+    var joinTimer = null;
+    var flushTimer = null;
+    var privateJoin = privateRelay ? (options.joinPayload || w.CaptionRelay.join(options.room, 'write', options.relayToken)) : null;
     var room = options.room || '';
     var maxQueue = parseMs(options.maxQueue, 200);
     var baseDelayMs = parseMs(options.baseDelayMs, 1000);
@@ -128,6 +134,8 @@
     }
 
     function cleanupSocket() {
+      clearTimeout(joinTimer); joinTimer = null;
+      clearInterval(flushTimer); flushTimer = null;
       if (!socket) return;
       try {
         socket.onopen = null;
@@ -174,9 +182,12 @@
         return false;
       }
 
-      if (socket.readyState !== WebSocket.OPEN) {
+      if (socket.readyState !== WebSocket.OPEN || !joined) {
         enqueue(payload);
         return false;
+      }
+      if (privateRelay && (queue.length || socket.bufferedAmount + JSON.stringify(payload).length * 3 > 65536)) {
+        enqueue(payload); return false;
       }
 
       try {
@@ -197,12 +208,13 @@
     }
 
     function flushQueue() {
-      if (!socket || socket.readyState !== WebSocket.OPEN || !queue.length) {
+      if (!socket || socket.readyState !== WebSocket.OPEN || !joined || !queue.length) {
         return;
       }
 
       while (queue.length > 0) {
         var item = queue[0];
+        if (privateRelay && socket.bufferedAmount + JSON.stringify(item).length * 3 > 65536) break;
         try {
           socket.send(JSON.stringify(item));
           queue.shift();
@@ -225,6 +237,7 @@
 
       clearReconnectTimer();
       cleanupSocket();
+      joined = !privateRelay;
       emitState('connecting');
 
       try {
@@ -241,20 +254,32 @@
         firstAttemptAt = 0;
         retryCount = 0;
         blockedSuspected = false;
-        emitState('connected');
+        emitState(privateRelay ? 'authenticating' : 'connected');
 
-        var joinPayload = options.joinPayload;
+        var joinPayload = privateJoin || options.joinPayload;
         if (!joinPayload && room) {
           joinPayload = { join: room };
         }
         if (joinPayload) {
-          sendObject(joinPayload);
+          socket.send(JSON.stringify(joinPayload));
         }
+        if (privateRelay) joinTimer = setTimeout(function () {
+          if (!joined && socket) { emitError('Private relay authorization timed out.'); socket.close(); }
+        }, 10000);
+        if (privateRelay) flushTimer = setInterval(flushQueue, 250);
 
         flushQueue();
       };
 
       socket.onmessage = function (event) {
+        if (privateRelay && !joined) {
+          try {
+            var ack = JSON.parse(event.data);
+            if (ack.joined !== room || ack.role !== 'write') return;
+          } catch (_) { return; }
+          clearTimeout(joinTimer); joinTimer = null;
+          joined = true; emitState('connected'); flushQueue(); return;
+        }
         onMessage(event, getSnapshot());
       };
 
@@ -271,7 +296,13 @@
         }
       };
 
-      socket.onclose = function () {
+      socket.onclose = function (event) {
+        clearTimeout(joinTimer); joinTimer = null;
+        clearInterval(flushTimer); flushTimer = null;
+        if (privateRelay && event && event.code === 1008) {
+          manualClose = true; emitError('Private relay denied the join or publishing request. Check the room and publishing token.');
+          emitState('denied'); return;
+        }
         if (manualClose) {
           emitState('closed');
           return;
@@ -295,11 +326,12 @@
     }
 
     function setRoom(nextRoom) {
+      if (privateRelay) throw new Error('Create a new publisher to change a private relay room.');
       room = nextRoom || '';
     }
 
     function isOpen() {
-      return !!socket && socket.readyState === WebSocket.OPEN;
+      return !!socket && socket.readyState === WebSocket.OPEN && joined;
     }
 
     return {

@@ -2,6 +2,13 @@
 const streamId = crypto.randomUUID();
 const $ = id => document.getElementById(id);
 const captureAssetBase = new URL('.', document.currentScript.src);
+if ($('relayAddress') && window.CaptionRelay) {
+  $('relayAddress').value = window.CaptionRelay.url();
+  const relayParams = new URLSearchParams(location.search);
+  if (relayParams.has('room')) $('room').value = relayParams.get('room');
+  if (relayParams.has('output')) $('reviewRoom').value = relayParams.get('output');
+  if (captureAssetBase.pathname !== '/static/') $('captionSite').value = new URL('.', location.href).href;
+}
 let serviceToken = '';
 function serviceFetch(path, options = {}) {
   if (window.captionLocalConnection) return window.captionLocalConnection.fetch(path, options);
@@ -24,6 +31,7 @@ function controls() {
   const busy = running || starting || stopping || processing || failed;
   window.captionLocalConnection?.setBusy(busy);
   if ($('relayTarget')) $('relayTarget').disabled = busy;
+  for (const id of ['relayAddress', 'captionSite', 'relayToken', 'reviewRoom']) if ($(id)) $(id).disabled = busy || $('share').checked;
   for (const id of ['language', 'microphone', 'room', 'mode', 'relayOutput', 'sensitivity', 'captionInterval']) $(id).disabled = busy;
   // Operators may always turn sharing off. Turning it back on requires a stopped session.
   $('share').disabled = busy && !$('share').checked;
@@ -48,14 +56,36 @@ function configureRelay() {
   if (!/^[a-zA-Z0-9_-]{1,128}$/.test(room)) {
     $('share').checked = false; fail('Enter the editor source room before enabling sharing.'); return;
   }
-  publisher = createWSPublisher({room, maxQueue: 100,
+  let destination;
+  try {
+    if ($('relayAddress')) window.CaptionRelay.configure($('relayAddress').value.trim());
+    const site = new URL($('captionSite')?.value.trim() || 'https://caption.ninja/');
+    if (!['http:', 'https:'].includes(site.protocol) || site.username || site.password || site.search || site.hash ||
+        (site.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]'].includes(site.hostname)))
+      throw new Error('Use an HTTPS caption website address, or HTTP localhost for testing.');
+    if (!site.pathname.endsWith('/')) site.pathname += '/';
+    const direct = $('relayTarget')?.value === 'overlay';
+    destination = new URL(direct ? 'overlay.html' : 'editor.html', site);
+    destination.searchParams.set('room', room);
+    if (window.CaptionRelay?.custom() && !direct) {
+      const output = $('reviewRoom')?.value.trim();
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(output || '') || output === room)
+        throw new Error('Enter a different configured room for the editor output.');
+      destination.searchParams.set('output', output);
+    }
+    if (window.CaptionRelay) destination = window.CaptionRelay.link(destination);
+    publisher = createWSPublisher({room, maxQueue: 100, relayToken: $('relayToken')?.value.trim(),
     onStats: stats => { $('relay').textContent = `Relay: ${stats.state}; queued ${stats.queueLength}; dropped ${stats.droppedCount}`; }
-  });
+    });
+  } catch (error) {
+    $('share').checked = false; $('relay').textContent = 'Sharing off'; fail(error.message); controls(); return;
+  }
   publisher.connect();
   const direct = $('relayTarget')?.value === 'overlay';
-  $('editorLink').href = `https://caption.ninja/${direct ? 'overlay' : 'editor'}?room=${encodeURIComponent(room)}`;
+  $('editorLink').href = destination;
   $('editorLink').textContent = direct ? 'Open direct caption overlay' : 'Open caption editor';
   $('editorLink').hidden = false;
+  controls();
 }
 $('share').onchange = configureRelay;
 $('room').onchange = () => { if ($('share').checked) configureRelay(); };

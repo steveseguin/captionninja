@@ -1,0 +1,9 @@
+{
+  "name": "caption-ninja-relay",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MPL-2.0",
+  "engines": {"node": ">=22"},
+  "scripts": {"start": "node server.cjs", "test": "node --test test/*.test.cjs"},
+  "dependencies": {"ws": "8.21.3"}
+}

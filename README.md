@@ -479,10 +479,16 @@ Self-hosting is possible for free:
 2. Use Github Pages to host the website
 3. Modify the code as needed for custom styling, domain name, etc.
 
-For additional privacy, deploy your own websocket server:
-https://github.com/steveseguin/websocket_server/
+For private caption delivery, use the optional [Caption Ninja relay](relay/README.md).
+It is a separate Node service with room-scoped viewing/publishing tokens. The
+supported workflow is `capture-local.html` → `editor.html` → `overlay.html`.
+These pages accept a custom relay address; the existing public relay remains the
+default. The guide covers Windows/Linux setup, hosting, credentials and limits.
 
-Note: The actual voice-to-text transcriptions typically use Google cloud servers, so full self-hosting of that component isn't possible in most cases. However, some devices (like Pixel smartphones) may do on-device voice-to-text.
+For self-hosted speech recognition as well, use [Caption Local](CAPTION-LOCAL.md).
+The main browser-recognition page can still use a browser vendor's cloud service.
+Optional translation/TTS providers are separate choices; running a private relay
+does not make those cloud providers local.
 
 The Mozilla-powered translation component can be deployed from https://github.com/mozilla/translate if you want the free translation component.
 

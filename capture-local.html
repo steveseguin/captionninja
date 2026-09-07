@@ -28,10 +28,17 @@
 <label>Caption output<select id="mode"><option value="transcribe">Transcription in the spoken language</option><option value="translate">English translation</option><option value="both">Transcription and English translation</option></select></label>
 <p id="capabilities" role="status">Checking model…</p>
 <details><summary>Send captions to caption.ninja</summary>
-<p>Optional: caption text will travel through caption.ninja’s public relay. Audio stays on the inference host. Paste the editor’s <strong>private automatic-caption room</strong> below. The editor reviews these captions before publishing to its separate public room.</p>
+<p>Optional: caption text will travel through the selected relay (caption.ninja’s public relay by default). Audio stays on the inference host. Paste the editor’s <strong>private automatic-caption room</strong> below. The editor reviews these captions before publishing to its separate public room.</p>
 <label>Text to send<select id="relayOutput"><option value="transcript">Original transcription</option><option value="translation">English translation</option></select></label>
 <label>Destination workflow<select id="relayTarget"><option value="editor">Human editor (private source room)</option><option value="overlay">Direct overlay (publishes without review)</option></select></label>
 <p>For a direct overlay, use its room instead. Anyone with that room link can see the shared text; direct captions skip human review.</p>
+<details><summary>Use a private relay</summary>
+<label>Relay address<input id="relayAddress" type="url" value="wss://api.caption.ninja:443" spellcheck="false"></label>
+<label>Caption website address<input id="captionSite" type="url" value="https://caption.ninja/" spellcheck="false"></label>
+<label>Room publishing token<input id="relayToken" type="password" autocomplete="off" spellcheck="false"></label>
+<label>Editor output room<input id="reviewRoom" value="output" autocomplete="off" maxlength="128"></label>
+<p>A private relay needs its own room token, separate from the inference service token. The editor needs the source viewing token and output publishing token. Links carry the relay address, never tokens. Turn sharing off before changing these settings.</p>
+</details>
 <label>Source room<input id="room" autocomplete="off" maxlength="128"></label>
 <label><input id="share" type="checkbox"> Send caption text to caption.ninja</label>
 <p id="relay" role="status">Sharing off</p><a id="editorLink" hidden target="_blank" rel="noopener noreferrer">Open caption editor</a>
@@ -50,5 +57,5 @@
 <label>Load capture settings<input id="loadSettings" type="file" accept="application/json,.json"></label>
 <p>Settings include the service address, language, output and capture interval. Tokens, microphone identifiers, room names and sharing are excluded. Connect first, then load settings for that service.</p>
 </details>
-<script src="./caption-local/ws-publisher.js"></script><script src="./caption-local/audio-buffer.js"></script><script src="./caption-local/local-connection.js"></script><script src="./caption-local/app.js"></script><script src="./caption-local/local-page.js"></script>
+<script src="./caption-local/relay-config.js"></script><script src="./caption-local/ws-publisher.js"></script><script src="./caption-local/audio-buffer.js"></script><script src="./caption-local/local-connection.js"></script><script src="./caption-local/app.js"></script><script src="./caption-local/local-page.js"></script>
 </body></html>

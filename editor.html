@@ -107,6 +107,7 @@
 			.room-details { grid-template-columns: 1fr; }
 		}
 	</style>
+<script src="relay-config.js"></script>
 </head>
 <body>
 	<main>
@@ -210,7 +211,7 @@
 	(function () {
 		'use strict';
 
-		var WS_URL = 'wss://api.caption.ninja:443';
+		var WS_URL = CaptionRelay.url();
 		var params = new URLSearchParams(window.location.search);
 		var sourceRoom = params.get('room') || params.get('source') || params.get('input') || loadRoom('caption_editor_source') || generateRoomId();
 		var outputRoom = params.get('output') || params.get('out') || loadRoom('caption_editor_output') || generateRoomId();
@@ -267,17 +268,18 @@
 		publishModeSelect.value = publishMode;
 		reviewDelaySelect.value = String(reviewDelaySeconds);
 
-		var captureUrl = new URL('index.html', window.location.href);
+		var captureUrl = new URL(CaptionRelay.custom() ? 'capture-local.html' : 'index.html', window.location.href);
 		captureUrl.search = '?room=' + encodeURIComponent(sourceRoom);
-		captureUrl = captureUrl.toString();
+		captureUrl = CaptionRelay.link(captureUrl);
 		var overlayUrl = new URL('overlay.html', window.location.href);
 		overlayUrl.search = '?room=' + encodeURIComponent(outputRoom) + '&maxlines=3';
-		overlayUrl = overlayUrl.toString();
+		overlayUrl = CaptionRelay.link(overlayUrl);
 		document.getElementById('captureLink').href = captureUrl;
 		document.getElementById('overlayLink').href = overlayUrl;
 		document.getElementById('sourceRoom').textContent = sourceRoom;
 		document.getElementById('outputRoom').textContent = outputRoom;
 
+		var sourceJoin = CaptionRelay.join(sourceRoom, 'read');
 		var publisher = createWSPublisher({
 			url: WS_URL,
 			room: outputRoom,
@@ -353,23 +355,28 @@
 			sourceSocket = socket;
 			socket.onopen = function () {
 				if (sourceSocket !== socket) return;
-				listenerConnected = true;
+				listenerConnected = !CaptionRelay.custom();
 				updateStatus();
-				socket.send(JSON.stringify({ join: sourceRoom }));
+				socket.send(JSON.stringify(sourceJoin));
 			};
 			socket.onmessage = function (event) {
 				if (sourceSocket !== socket || !event.data) return;
-				try { receiveCaption(JSON.parse(event.data)); } catch (e) {}
+				try {
+					var data = JSON.parse(event.data);
+					if (data.joined === sourceRoom && data.role === 'read') { listenerConnected = true; updateStatus(); }
+					else receiveCaption(data);
+				} catch (e) {}
 			};
 			socket.onerror = function () {
 				if (sourceSocket === socket && socket.readyState !== WebSocket.CLOSED) socket.close();
 			};
-			socket.onclose = function () {
+			socket.onclose = function (event) {
 				if (sourceSocket !== socket) return;
 				sourceSocket = null;
 				listenerConnected = false;
 				updateStatus();
 				clearTimeout(reconnectTimer);
+				if (CaptionRelay.custom() && event.code === 1008) { statusText.textContent = 'Private relay denied access. Reload with the correct room tokens.'; return; }
 				reconnectTimer = setTimeout(connectSource, 1500);
 			};
 		}

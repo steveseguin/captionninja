@@ -1,0 +1,23 @@
+name: Private caption relay
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  relay:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: relay
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: relay/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm test

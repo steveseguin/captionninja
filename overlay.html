@@ -72,6 +72,7 @@
 		}
 		
 	</style>
+<script src="relay-config.js"></script>
 </head>
 <body>
 	 
@@ -1081,7 +1082,8 @@
 			return;
 		}
 
-		const ws = new WebSocket("wss://api.caption.ninja:443");
+		const relayJoin = CaptionRelay.join(roomID, 'read');
+		const ws = new WebSocket(CaptionRelay.url());
 		socket = ws;
 		ws.onmessage = function(event) {
 			if (socket !== ws) {
@@ -1090,12 +1092,15 @@
 			handleSocketMessage(event);
 		};
 
-		ws.onclose = function() {
+		ws.onclose = function(event) {
 			if (socket !== ws) {
 				return;
 			}
 			socket = null;
 			console.log("WebSocket connection closed. Attempting to reconnect...");
+			if (CaptionRelay.custom() && event.code === 1008) {
+				const error = document.createElement('p'); error.textContent = 'Private relay access denied. Reload with the correct viewing token.'; error.setAttribute('role', 'alert'); document.body.prepend(error); return;
+			}
 			scheduleReconnect();
 		};
 
@@ -1107,7 +1112,7 @@
 			// Reset retry count on successful connection
 			retryCount = 0;
 			clearReconnectTimer();
-			ws.send(JSON.stringify({"join":roomID}));
+			ws.send(JSON.stringify(relayJoin));
 		};
 
 		ws.onerror = function(error) {
@@ -1246,9 +1251,8 @@
 		}
 	}
 	
-	socket.onclose = function (){
-		setTimeout(function(){window.location.reload(true);},100);
-	};
+	// connectWebSocket owns reconnects. Reloading here discarded private relay
+	// credentials held in tab memory and overrode its existing close handler.
 
 	// Optional: open a separate TTS window powered by tts.rocks bridge
 	try {
