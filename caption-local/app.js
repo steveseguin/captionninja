@@ -159,7 +159,8 @@ async function drain() {
     }
   } catch (error) {
     failed = true;
-    fail(`${error.message}. Capture stopped. Pending audio is retained: retry it or discard it below.`);
+    $('status').textContent = 'Stopped · pending audio retained';
+    fail(`${error.message}. Capture stopped. Audio is retained: use Retry pending audio or Discard pending audio.`);
     await stop();
   } finally {
     if (!running && !stopping && !failed && !pending) {
@@ -199,7 +200,12 @@ async function stop() {
 }
 $('stop').onclick = stop;
 $('retry').onclick = async () => { failed = false; fail(''); await drain(); };
-$('discard').onclick = () => { buffer.reset(); pending = null; failed = false; fail('Pending audio discarded.'); controls(); };
+$('discard').onclick = async () => {
+  buffer.reset(); pending = null; failed = false; fail('Pending audio discarded.');
+  // The empty drain closes our idle server session, just like a successful Stop.
+  await drain();
+  if (!failed) $('status').textContent = 'Stopped';
+};
 $('start').onclick = async () => {
   if (starting || running || processing || failed) return;
   starting = true; controls(); fail('');
