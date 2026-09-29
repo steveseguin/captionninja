@@ -1314,26 +1314,27 @@ if (RENDER) {
   let playing = false, clock = 0, wall = 0, audioOk = true;
   audio.addEventListener('error', () => { audioOk = false; });
   const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  const showTime = t => { scrub.value = t; time.textContent = `${fmt(t)} / ${fmt(DURATION)}`; };
   const now = () => playing ? (audioOk && !audio.paused ? audio.currentTime : clock + (performance.now() - wall) / 1000) : clock;
   function setPlaying(p) {
     if (!p && playing) clock = now(); // read the position before `playing` flips, or now() returns the stale clock
     playing = p; pp.innerHTML = p ? PAUSE : PLAY; pp.setAttribute('aria-label', p ? 'Pause' : 'Play'); big.hidden = true;
     if (p) { if (clock >= DURATION - .05) clock = 0; wall = performance.now(); if (audioOk) { audio.currentTime = clock; audio.play().catch(() => { audioOk = false; }); } }
-    else audio.pause();
+    else { audio.pause(); showTime(clock); }
   }
   pp.onclick = () => setPlaying(!playing);
   big.onclick = () => { clock = 0; setPlaying(true); };
   const muteIcon = () => { mute.innerHTML = `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[audio.muted ? 'volume-x' : 'volume-2']}</svg>`; mute.setAttribute('aria-label', audio.muted ? 'Unmute' : 'Mute'); };
   mute.onclick = () => { audio.muted = !audio.muted; muteIcon(); };
-  scrub.oninput = () => { clock = parseFloat(scrub.value); wall = performance.now(); if (audioOk) audio.currentTime = clock; render(clock); };
+  scrub.oninput = () => { clock = parseFloat(scrub.value); wall = performance.now(); if (audioOk) audio.currentTime = clock; render(clock); showTime(clock); };
   addEventListener('keydown', e => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); setPlaying(!playing); } });
   window.__ready.then(() => {
     player.hidden = false; big.hidden = false; pp.innerHTML = PLAY; muteIcon();
     // show the logo frame as a poster, but keep the transport at the start so any Play control begins at 0:00
     clock = params.has('t') ? parseFloat(params.get('t')) : 0; render(params.has('t') ? clock : 13.4);
-    scrub.value = clock; time.textContent = `${fmt(clock)} / ${fmt(DURATION)}`;
+    showTime(clock);
     (function loop() {
-      if (playing) { let t = now(); if (t >= DURATION) { t = DURATION; clock = DURATION; setPlaying(false); } render(t); scrub.value = t; time.textContent = `${fmt(t)} / ${fmt(DURATION)}`; }
+      if (playing) { let t = now(); if (t >= DURATION) { t = DURATION; clock = DURATION; setPlaying(false); } render(t); showTime(t); }
       requestAnimationFrame(loop);
     })();
   });
