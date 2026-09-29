@@ -64,7 +64,7 @@ Requirements: Node 18+, Playwright with Chromium, ffmpeg with libx264, and Pytho
 npm install -g playwright && npx playwright install chromium
 pip install numpy scipy
 node promo/render.mjs                 # full video + teaser, about 5 minutes on 4 cores
-node promo/render.mjs --from 54 --to 66 --skip-audio   # quick check of one scene
+node promo/render.mjs --from 54 --to 66 --skip-audio   # preview one scene (written to your temp folder)
 node promo/render.mjs --teaser-only   # re-cut the teaser from the existing full video
 ```
 

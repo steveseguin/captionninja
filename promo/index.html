@@ -710,7 +710,7 @@ function rollingCaptions(el, lines, badgeIcons) {
 }
 
 // ---------- S1: the hook (0 - 10) ----------
-scene(0, 10.02, el => {
+scene(0, 10, el => {
   const upd = rollingCaptions(el, [
     { at: .55, text: "Some of your viewers can't hear you." },
     { at: 2.85, text: 'Some are watching with the sound off.' },
@@ -1243,7 +1243,7 @@ scene(90, 98.05, el => {
 });
 
 // ---------- S11: the reveal (98 - 106) ----------
-scene(98, 106.02, el => {
+scene(98, 106, el => {
   const upd = rollingCaptions(el, [
     { at: 98.5, text: 'Did you notice something?' },
     { at: 100.05, text: 'Not a single word in this video was spoken.', per: .12 },

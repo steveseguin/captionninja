@@ -45,12 +45,12 @@ function run(cmd, args, { input } = {}) {
 // 30-second social cut: the opening (hook, logo, audience) spliced onto the call to action.
 // Both cut points sit at the same position within a beat, so the music stays on the grid.
 async function cutTeaser() {
-  const a = 21.95, b = 105.95;
+  const a = 22, b = 106;
   await run(FFMPEG, ['-hide_banner', '-loglevel', 'error', '-y', '-i', OUT, '-filter_complex',
     `[0:v]trim=0:${a},setpts=PTS-STARTPTS[v0];[0:v]trim=start=${b},setpts=PTS-STARTPTS[v1];` +
-    `[0:a]atrim=0:${a},asetpts=PTS-STARTPTS,afade=t=out:st=${a - .012}:d=.012[a0];[0:a]atrim=start=${b},asetpts=PTS-STARTPTS,afade=t=in:d=.012[a1];` +
+    `[0:a]atrim=0:${a},asetpts=PTS-STARTPTS,afade=t=out:st=${(a - 0.012).toFixed(3)}:d=0.012[a0];[0:a]atrim=start=${b},asetpts=PTS-STARTPTS,afade=t=in:d=0.012[a1];` +
     `[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]`,
-    '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-tune', 'animation', '-pix_fmt', 'yuv420p',
+    '-map', '[v]', '-map', '[a]', '-r', '30', '-fps_mode', 'cfr', '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-tune', 'animation', '-pix_fmt', 'yuv420p',
     '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
     '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', TEASER]);
   console.log(`teaser -> ${TEASER}`);
@@ -81,6 +81,9 @@ const probe = await openPage(browser);
 const { fps, duration, cues } = await probe.evaluate(() => ({ fps: window.__fps, duration: window.__duration, cues: window.__sfx.slice().sort((a, b) => a[0] - b[0]) }));
 const from = parseFloat(arg('from', '0')), to = Math.min(duration, parseFloat(arg('to', String(duration))));
 const first = Math.round(from * fps), last = Math.round(to * fps); // [first, last)
+const FULL = from === 0 && to === duration;
+// partial renders are previews: keep them out of the repo so they never replace the finished video
+const DEST = FULL ? OUT : path.join(os.tmpdir(), `caption-ninja-preview-${from}-${to}.mp4`);
 console.log(`rendering frames ${first}..${last - 1} at ${fps} fps with ${WORKERS} workers -> ${TMP}`);
 
 // poster frame (logo + badges)
@@ -131,7 +134,7 @@ const list = path.join(TMP, 'segments.txt');
 fs.writeFileSync(list, segments.filter(Boolean).map(s => `file '${s}'`).join('\n'));
 const audioIn = flag('skip-audio') ? [] : ['-ss', String(from), '-t', String(to - from), '-i', wav];
 await run(FFMPEG, ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', list, ...audioIn,
-  '-map', '0:v', ...(audioIn.length ? ['-map', '1:a', '-c:a', 'aac', '-b:a', '192k'] : []), '-c:v', 'copy', '-movflags', '+faststart', '-shortest', OUT]);
+  '-map', '0:v', ...(audioIn.length ? ['-map', '1:a', '-c:a', 'aac', '-b:a', '192k'] : []), '-c:v', 'copy', '-movflags', '+faststart', '-shortest', DEST]);
 fs.rmSync(TMP, { recursive: true, force: true });
-if (from === 0 && to === duration && !flag('skip-audio')) await cutTeaser();
-console.log(`done in ${Math.round((Date.now() - t0) / 1000)}s -> ${OUT}`);
+if (FULL && !flag('skip-audio')) await cutTeaser();
+console.log(`done in ${Math.round((Date.now() - t0) / 1000)}s -> ${DEST}`);
