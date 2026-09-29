@@ -10,7 +10,7 @@
 // live page) and poster.jpg.
 
 import { createRequire } from 'node:module';
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,7 +18,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const { chromium } = require('playwright');
+// use a local install if there is one, otherwise the global one from `npm install -g playwright`
+function loadPlaywright() {
+  try { return require('playwright'); } catch (e) {
+    if (e.code !== 'MODULE_NOT_FOUND') throw e;
+    const globalRoot = execSync('npm root -g', { encoding: 'utf8' }).trim();
+    return require(path.join(globalRoot, 'playwright'));
+  }
+}
+const { chromium } = loadPlaywright();
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
