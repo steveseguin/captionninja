@@ -685,6 +685,7 @@
 	const tts = new TextToSpeech();
 	// document.body.appendChild(tts.createUI());
 	
+	var overlayClearGeneration = 0;
 	if (langTo){
 		// Handle auto-detect: langFrom will be "auto" when auto-detection is enabled
 		var langFrom = autoDetectLang ? "auto" : (urlParams.get("fromlang") || "en");
@@ -715,6 +716,7 @@
 
 			var translateCall = async (text, meta, interm=false) => { // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
 				if (!text.trim().length) return;
+				if (meta) meta._overlayClearGeneration = overlayClearGeneration;
 				
 				const isInterim = Boolean(interm);
 				if (dualOverlay && meta) {
@@ -1034,6 +1036,12 @@
 		} catch (e) {
 			return;
 		}
+		// Clear is a control frame, not text to translate.
+		if (data.c === true && data.final === '') {
+			overlayClearGeneration++;
+			processReply(data);
+			return;
+		}
 		if (data.ln) {
 		  // Update current language from socket unless translating
 		  if (!langTo) {
@@ -1189,6 +1197,8 @@
 	
 	
 	function processReply(data){
+		// Ignore translations that were started before the latest clear.
+		if (data._overlayClearGeneration !== undefined && data._overlayClearGeneration !== overlayClearGeneration) return;
 		var newLabel = false;
 		 
 		if (data.label){
