@@ -233,7 +233,13 @@ $('start').onclick = async () => {
     context.onstatechange = () => {
       if (running && context?.state === 'suspended') { fail('Audio capture was suspended by the browser. Finishing captured speech.'); stop(); }
     };
-    if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen').catch(() => null);
+    if (navigator.wakeLock) {
+      const captureContext = context;
+      const requestedLock = await navigator.wakeLock.request('screen').catch(() => null);
+      // Stop or a newer capture can finish before the browser grants this lock.
+      if (running && context === captureContext) wakeLock = requestedLock;
+      else await requestedLock?.release().catch(() => {});
+    }
   } catch (error) { fail(error.message); starting = false; await stop(); controls(); }
 };
 $('download').onclick = () => {
