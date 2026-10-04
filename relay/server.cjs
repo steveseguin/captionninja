@@ -157,9 +157,10 @@ function createRelay(input, overrides = {}) {
       }
       if (ws.role !== 'write' || data.msg !== true || Object.hasOwn(data, 'join'))
         return fail(1008, 'Publishing denied');
-      const fields = ['msg', 'final', 'interm', 'id', 'label', 'ln', 'delivery'];
+      const fields = ['msg', 'final', 'interm', 'id', 'label', 'ln', 'c', 'delivery'];
       if (Object.keys(data).some(key => !fields.includes(key)) ||
           (Object.hasOwn(data, 'final') === Object.hasOwn(data, 'interm')) ||
+          (Object.hasOwn(data, 'c') && typeof data.c !== 'boolean') ||
           typeof (data.final ?? data.interm) !== 'string' || (data.final ?? data.interm).length > 4000 ||
           !(Number.isSafeInteger(data.id) || (typeof data.id === 'string' && data.id.length <= 128)) ||
           ['label', 'ln'].some(key => Object.hasOwn(data, key) &&
