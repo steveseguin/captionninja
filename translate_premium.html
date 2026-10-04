@@ -927,6 +927,12 @@
                         this.elements.toggleTranscriptionBtn.classList.remove('paused');
                     }
                 });
+                this.elements.enabledTranscriptionCheckbox.addEventListener('change', () => {
+                    if (!this.elements.enabledTranscriptionCheckbox.checked) {
+                        this.state.activeRequest?.abort();
+                        this.state.activeRequest = null;
+                    }
+                });
                 this.elements.incrementalUpdatesCheckbox.addEventListener('change', () => {
                     this.restartRecognition();
                 });
@@ -1415,11 +1421,15 @@
                     });
                 })
                 .then(result => {
+                    if (controller.signal.aborted || this.state.activeRequest !== controller ||
+                        !this.elements.enabledTranscriptionCheckbox.checked) return;
                     const translatedText = result.translatedText;
                     this.cacheTranslation(cacheKey, { translatedText: translatedText });
                     this.updateTranslation(translatedText, isInterim);
                 })
                 .catch(error => {
+                    if (controller.signal.aborted || this.state.activeRequest !== controller ||
+                        !this.elements.enabledTranscriptionCheckbox.checked) return;
                     if (error.name === 'AbortError') {
                         console.log('Request was aborted');
                         return;
