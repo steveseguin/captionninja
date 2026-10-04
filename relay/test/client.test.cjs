@@ -80,3 +80,19 @@ test('an oversized multilingual caption stops retries and reports its retained q
   await sleep(800);
   assert.equal(relay.stats.accepted, accepted, 'Invalid payload must not reconnect indefinitely');
 });
+
+test('private editor clear is acknowledged and replayed before subsequent captions', async t => {
+  const {writer, reader} = await fixture(t), received = []; let ready = false;
+  const viewer = reader({onState: state => { ready = state === 'connected'; }, onCaption: data => received.push(data)});
+  const producer = writer(); await until(() => ready && producer.isOpen());
+  producer.publish({msg: true, final: 'Before clear', id: 1});
+  await until(() => received.length === 1);
+  viewer.disconnect(); await sleep(30);
+  const clear = {msg: true, final: '', id: 2, c: true};
+  const after = {msg: true, final: 'After clear', id: 3, c: false};
+  producer.publish(clear); producer.publish(after);
+  await until(() => producer.getSnapshot().queueLength === 0);
+  assert.equal(producer.getSnapshot().state, 'connected');
+  viewer.reconnect(); await until(() => received.length === 3);
+  assert.equal(JSON.stringify(received.slice(1)), JSON.stringify([clear, after]));
+});
