@@ -181,6 +181,7 @@
   var startEpoch = null; // absolute ms when session started
   var lastStopMs = 0;    // last cue end relative to startEpoch
   var recBackoff = 500;  // ms
+  var recRestartTimer = null;
   var saveKey = null;
 
   var agg = {
@@ -311,7 +312,18 @@
     setRecStatus('ok','listening');
     recognition.onstart = function(){ setRecStatus('ok','listening'); };
     recognition.onerror = function(e){ setRecStatus('err', 'error: '+e.error); };
-    recognition.onend = function(){ if (!isRunning || isPaused) { setRecStatus('warn','paused'); return; } setRecStatus('warn','restarting…'); setTimeout(function(){ try { recognition.start(); } catch(err) { try { startRecognition(); } catch(e){} } }, recBackoff); };
+    var currentRecognition = recognition;
+    recognition.onend = function(){
+      if (recognition !== currentRecognition) return;
+      if (!isRunning || isPaused) { setRecStatus('warn','paused'); return; }
+      setRecStatus('warn','restarting…');
+      if (recRestartTimer !== null) clearTimeout(recRestartTimer);
+      recRestartTimer = setTimeout(function(){
+        recRestartTimer = null;
+        if (!isRunning || isPaused || recognition !== currentRecognition) return;
+        try { currentRecognition.start(); } catch(err) { try { startRecognition(); } catch(e){} }
+      }, recBackoff);
+    };
     recognition.onresult = function(event){
       var now = Date.now(); if (!startEpoch) startEpoch = now; var rel = now - startEpoch;
       var interim = '';
@@ -402,8 +414,10 @@
       if (!startEpoch) { startEpoch = Date.now(); saveKey = 'transcription_'+roomID+'_'+startEpoch; }
       startRecognition(); this.textContent = 'Pause'; this.classList.remove('primary');
     } else {
+      isPaused = true; isRunning = false;
+      if (recRestartTimer !== null) { clearTimeout(recRestartTimer); recRestartTimer = null; }
       try { recognition && recognition.stop(); } catch(e){}
-      isPaused = true; isRunning = false; setRecStatus('warn','paused'); this.textContent='Resume'; this.classList.add('primary'); flushSegment();
+      setRecStatus('warn','paused'); this.textContent='Resume'; this.classList.add('primary'); flushSegment();
     }
   });
   document.getElementById('btnSettings').addEventListener('click', function(){ document.getElementById('settings').classList.toggle('open'); });
