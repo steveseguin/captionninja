@@ -80,3 +80,16 @@ test('an oversized multilingual caption stops retries and reports its retained q
   await sleep(800);
   assert.equal(relay.stats.accepted, accepted, 'Invalid payload must not reconnect indefinitely');
 });
+
+test('default relay accepts the complete backlog after automatic publisher reconnect', async t => {
+  const {writer, reader, relay} = await fixture(t), received = []; let ready = false;
+  reader({onState: state => { ready = state === 'connected'; }, onCaption: data => received.push(data.id)});
+  const producer = writer(); await until(() => ready && producer.isOpen());
+  [...relay.wss.clients].find(client => client.role === 'write').terminate();
+  await until(() => !producer.isOpen());
+  for (let id = 1; id <= 50; id++) producer.publish({msg: true, final: 'Queued caption ' + id, id});
+  await until(() => producer.getSnapshot().queueLength === 0 && received.length === 50);
+  assert.deepEqual(received, Array.from({length: 50}, (_, i) => i + 1));
+  assert.equal(producer.getSnapshot().state, 'connected');
+  assert.equal(relay.stats.rejected, 0); assert.equal(relay.stats.duplicates, 0);
+});

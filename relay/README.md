@@ -200,6 +200,13 @@ Restart/gap warnings make this visible. A crashed or reloaded browser also loses
 its in-memory queue/cursor. The editor's existing 100-caption review queue remains
 bounded; if it overflows, private-mode users get an explicit dropped-caption warning.
 
+The publisher spaces caption sends at least 30 ms apart to keep reconnect backlog
+recovery below the default 40-message/second limit, which also counts the join.
+An explicit `Rate limit` close retries after 1, 2, 4, 8 and 10 seconds; five retries
+without an acknowledgement then stop with a rate-specific error and the queue
+retained. Acknowledged progress resets that retry budget. More restrictive custom
+limits may require operator attention; the client does not change server limits.
+
 Authentication denial stops publisher automatic retries. Turn sharing off,
 correct the token and enable it again. Reload viewers/editors to enter corrected
 tokens. Restart with changed configuration to revoke credentials and disconnect
