@@ -1169,7 +1169,8 @@
 		let decodedAndStrippedText = temp.textContent || temp.innerText || ""; // Get plain text content; this decodes entities and strips tags
 		
 		decodedAndStrippedText = decodedAndStrippedText.substring(0, Math.min(decodedAndStrippedText.length, 500));
-		return decodedAndStrippedText.trim();
+		temp.textContent = decodedAndStrippedText.trim();
+		return temp.innerHTML;
 	};
 	
 	function buildLineMarkup(text, originalText){
