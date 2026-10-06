@@ -568,7 +568,12 @@
 						var itemToSend = current;
 						current.autoSendQueued = true;
 						setTimeout(function () {
-							if (current === itemToSend) sendCurrent();
+							itemToSend.autoSendQueued = false;
+							if (current === itemToSend &&
+								(publishMode === 'live' || publishMode === 'timed') &&
+								Date.now() - itemToSend.receivedAt >= reviewDelaySeconds * 1000) {
+								sendCurrent();
+							}
 						}, 0);
 					}
 				} else {
