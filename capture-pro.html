@@ -273,7 +273,7 @@
   }
 
   function formatSrtTime(ms) {
-    var d = new Date(0); d.setSeconds(ms/1000);
+    var d = new Date(ms);
     var s = d.toISOString().replace('.', ',').replace('1970-01-01T','');
     return s.substring(0, s.length-1);
   }
