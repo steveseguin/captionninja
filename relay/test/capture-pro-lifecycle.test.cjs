@@ -35,7 +35,7 @@ function setup() {
   };
   context.window=context;
   vm.createContext(context); vm.runInContext(source,context);
-  return {context,instances,published,element,click:()=>element('btnToggle').click(),run(ms){for(const [id,t] of [...timers])if(t.ms===ms){timers.delete(id);t.fn()}}};
+  return {context,instances,published,element,timers,click:()=>element('btnToggle').click(),run(ms){for(const [id,t] of [...timers])if(t.ms===ms){timers.delete(id);t.fn()}}};
 }
 test('control: ordinary Pause leaves recognition stopped',()=>{
   const h=setup();h.click();h.click();h.instances[0].end();h.run(500);
@@ -81,4 +81,83 @@ test('regression: queued retry across Pause/Resume must not create another recog
   const h=setup();h.click();h.instances[0].end();h.click();h.click();h.run(500);
   assert.equal(h.instances.length,2,'old retry used global recognition and allocated an extra active recognizer');
   assert.equal(h.instances.filter(r=>r.active).length,1);
+});
+
+function result(recognition, text, isFinal = false) {
+  recognition.onresult({resultIndex:0, results:[Object.assign([{transcript:text}], {isFinal})]});
+}
+test('regression: retired recognizer cannot publish interim or final results after Resume',()=>{
+  const h=setup();h.click();const retired=h.instances[0];h.click();h.click();
+  result(retired,'stale interim');result(retired,'stale final',true);h.run(600);
+  assert.equal(h.published.length,0);
+  assert.equal(h.context.cues.length,0);
+  assert.equal(h.context.agg.open,false);
+  result(h.instances[1],'current final',true);h.run(600);
+  assert.equal(h.published.length,1);
+  assert.equal(h.published[0].final,'current final');
+});
+test('regression: late interim after Pause cannot publish or reopen the aggregator',()=>{
+  const h=setup();h.click();h.click();result(h.instances[0],'late interim');
+  assert.equal(h.published.length,0);
+  assert.equal(h.context.agg.open,false);
+  assert.equal(h.element('interm').textContent,'');
+});
+test('regression: delayed start and error callbacks cannot replace paused status',()=>{
+  const h=setup();h.click();h.click();
+  h.instances[0].onstart();assert.equal(h.element('recStatus').textContent,'paused');
+  h.instances[0].onerror({error:'aborted'});assert.equal(h.element('recStatus').textContent,'paused');
+});
+test('regression: retired recognizer callbacks cannot overwrite resumed status',()=>{
+  const h=setup();h.click();const retired=h.instances[0];h.click();h.click();h.instances[1].end();
+  retired.onstart();assert.equal(h.element('recStatus').textContent,'restarting…');
+  retired.onerror({error:'aborted'});assert.equal(h.element('recStatus').textContent,'restarting…');
+});
+test('control: current recognizer still reports errors while running',()=>{
+  const h=setup();h.click();h.instances[0].onerror({error:'network'});
+  assert.equal(h.element('recStatus').textContent,'error: network');
+});
+test('control: late final from normal stop is retained until a new recognizer takes over',()=>{
+  const h=setup();h.click();h.click();result(h.instances[0],'accepted final',true);h.run(600);
+  assert.equal(h.published.length,1);
+  assert.equal(h.published[0].final,'accepted final');
+  assert.equal(h.element('recStatus').textContent,'paused');
+});
+
+test('regression: stale retry cannot discard ownership of a newer restart timer',()=>{
+  const h=setup();h.click();h.instances[0].end();
+  // Invoke a captured callback even after cancellation to test its ownership guard.
+  const staleRetry=[...h.timers.values()].find(t=>t.ms===500).fn;
+  h.click();h.click();h.instances[1].end();
+  const currentTimer=h.context.recRestartTimer;
+  staleRetry();
+  assert.equal(h.context.recRestartTimer,currentTimer);
+  h.click();
+  assert.equal([...h.timers.values()].filter(t=>t.ms===500).length,0);
+  h.run(500);
+  assert.equal(h.instances.filter(r=>r.active).length,0);
+});
+test('regression: superseded retry for the same recognizer cannot trigger fallback',()=>{
+  const h=setup();h.click();h.instances[0].end();
+  const staleRetry=[...h.timers.values()].find(t=>t.ms===500).fn;
+  h.instances[0].end();staleRetry();h.run(500);
+  assert.equal(h.instances.length,1);
+  assert.equal(h.instances[0].starts,2);
+});
+test('regression: repeated Pause/Resume ignores retired events and resumes once',()=>{
+  const h=setup();h.click();
+  for (let i=0;i<10;i++) {
+    const retired=h.instances.at(-1);retired.end();
+    const staleRetry=[...h.timers.values()].find(t=>t.ms===500).fn;
+    h.click();h.click();
+    retired.onstart();retired.onerror({error:'aborted'});retired.end();
+    result(retired,'stale interim');result(retired,'stale final',true);staleRetry();
+  }
+  h.run(500);h.run(600);
+  assert.equal(h.instances.length,11);
+  assert.equal(h.instances.filter(r=>r.active).length,1);
+  assert.equal(h.published.length,0);
+  assert.equal(h.element('recStatus').textContent,'listening');
+  h.click();h.run(500);
+  assert.equal(h.instances.filter(r=>r.active).length,0);
+  assert.equal(h.element('recStatus').textContent,'paused');
 });
