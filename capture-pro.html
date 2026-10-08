@@ -181,6 +181,7 @@
   var startEpoch = null; // absolute ms when session started
   var lastStopMs = 0;    // last cue end relative to startEpoch
   var recBackoff = 500;  // ms
+  var recRestartTimer = null;
   var saveKey = null;
 
   var agg = {
@@ -309,10 +310,31 @@
     if (!('webkitSpeechRecognition' in window)) { setRecStatus('err','unsupported'); alert('Speech recognition not supported. Use Chrome or Edge.'); return; }
     recognition = new webkitSpeechRecognition(); recognition.lang = myLang; recognition.continuous = true; recognition.interimResults = true;
     setRecStatus('ok','listening');
-    recognition.onstart = function(){ setRecStatus('ok','listening'); };
-    recognition.onerror = function(e){ setRecStatus('err', 'error: '+e.error); };
-    recognition.onend = function(){ if (!isRunning || isPaused) { setRecStatus('warn','paused'); return; } setRecStatus('warn','restarting…'); setTimeout(function(){ try { recognition.start(); } catch(err) { try { startRecognition(); } catch(e){} } }, recBackoff); };
+    var currentRecognition = recognition;
+    recognition.onstart = function(){
+      if (recognition !== currentRecognition || !isRunning || isPaused) return;
+      setRecStatus('ok','listening');
+    };
+    recognition.onerror = function(e){
+      if (recognition !== currentRecognition || !isRunning || isPaused) return;
+      setRecStatus('err', 'error: '+e.error);
+    };
+    recognition.onend = function(){
+      if (recognition !== currentRecognition) return;
+      if (!isRunning || isPaused) { setRecStatus('warn','paused'); return; }
+      setRecStatus('warn','restarting…');
+      if (recRestartTimer !== null) clearTimeout(recRestartTimer);
+      var restartTimer = setTimeout(function(){
+        if (recRestartTimer !== restartTimer) return;
+        recRestartTimer = null;
+        if (!isRunning || isPaused || recognition !== currentRecognition) return;
+        try { currentRecognition.start(); } catch(err) { try { startRecognition(); } catch(e){} }
+      }, recBackoff);
+      recRestartTimer = restartTimer;
+    };
     recognition.onresult = function(event){
+      if (recognition !== currentRecognition) return;
+      // Preserve final results from stop(), but ignore paused interim results below.
       var now = Date.now(); if (!startEpoch) startEpoch = now; var rel = now - startEpoch;
       var interim = '';
       for (var i = event.resultIndex; i < event.results.length; ++i) {
@@ -322,7 +344,7 @@
           agg.text += (agg.text? ' ' : '') + t; agg.lastMs = rel;
           if (silenceTimer) clearTimeout(silenceTimer);
           silenceTimer = setTimeout(flushSegment, parseInt(elPauseMs.value||'600'));
-        } else {
+        } else if (isRunning && !isPaused) {
           interim += (interim? ' ' : '') + t; agg.lastMs = rel; if (!agg.open) { agg.open = true; agg.startMs = rel; }
         }
       }
@@ -402,8 +424,10 @@
       if (!startEpoch) { startEpoch = Date.now(); saveKey = 'transcription_'+roomID+'_'+startEpoch; }
       startRecognition(); this.textContent = 'Pause'; this.classList.remove('primary');
     } else {
+      isPaused = true; isRunning = false;
+      if (recRestartTimer !== null) { clearTimeout(recRestartTimer); recRestartTimer = null; }
       try { recognition && recognition.stop(); } catch(e){}
-      isPaused = true; isRunning = false; setRecStatus('warn','paused'); this.textContent='Resume'; this.classList.add('primary'); flushSegment();
+      setRecStatus('warn','paused'); this.textContent='Resume'; this.classList.add('primary'); flushSegment();
     }
   });
   document.getElementById('btnSettings').addEventListener('click', function(){ document.getElementById('settings').classList.toggle('open'); });
