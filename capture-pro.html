@@ -408,7 +408,13 @@
   });
   document.getElementById('btnSettings').addEventListener('click', function(){ document.getElementById('settings').classList.toggle('open'); });
   document.getElementById('btnCopyLink').addEventListener('click', function(){ navigator.clipboard.writeText(overlayUrl).then(()=>{ this.textContent='Copied!'; setTimeout(()=> this.textContent='Copy Overlay Link', 1000); }); });
-  document.getElementById('btnClear').addEventListener('click', function(){ if (!confirm('Clear transcript?')) return; cues = []; chapters = []; elFinal.innerHTML=''; elInterm.textContent=''; lastStopMs=0; localStorage.removeItem(saveKey); });
+  document.getElementById('btnClear').addEventListener('click', function(){
+    if (!confirm('Clear transcript?')) return;
+    if (silenceTimer !== null) clearTimeout(silenceTimer);
+    silenceTimer = null;
+    agg.open = false; agg.startMs = null; agg.lastMs = null; agg.text = '';
+    cues = []; chapters = []; elFinal.innerHTML=''; elInterm.textContent=''; lastStopMs=0; localStorage.removeItem(saveKey);
+  });
   document.getElementById('btnDownload').addEventListener('click', function(){ flushSegment(); download('transcription_'+roomID+'_'+(startEpoch||Date.now())+'.srt', buildSrt()); });
   document.getElementById('btnMark').addEventListener('click', function(){ var now = Date.now(); if (!startEpoch) return; var rel = now - startEpoch; chapters.push({ ms: rel, label: 'Chapter '+(chapters.length+1) }); });
 
