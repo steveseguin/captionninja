@@ -51,6 +51,10 @@ https://github.com/steveseguin/electroncapture
 
 This allows you to pin the captions on top of other applications on your desktop.
 
+### Hold a button to show captions
+
+Make Caption.Ninja listen only while you hold a Stream Deck button. Follow the [step-by-step setup guide](push-to-talk.md), with optional instructions for Streamer.bot and other controls.
+
 ## Using Non-Microphone Audio Sources
 
 CAPTION.Ninja uses your system's default recording device. To capture audio from other sources:

@@ -195,6 +195,39 @@
 		  background-color: #dc3545;
 		}
 
+		#streamerbotControl {
+		  position: fixed;
+		  top: 10px;
+		  right: 10px;
+		  z-index: 1001;
+		  box-sizing: border-box;
+		  width: 400px;
+		  max-width: calc(100vw - 20px);
+		  max-height: calc(100vh - 20px);
+		  overflow: auto;
+		  padding: 16px;
+		  border-radius: 6px;
+		  background: #18212b;
+		  color: white;
+		  font: 14px/1.5 sans-serif;
+		}
+		#streamerbotControl input {
+		  display: block;
+		  box-sizing: border-box;
+		  width: 100%;
+		  margin: 8px 0;
+		  padding: 8px;
+		}
+		#streamerbotControl button:disabled {
+		  opacity: 0.65;
+		  cursor: default;
+		}
+		.streamerbot-mode .control-buttons {
+		  top: auto;
+		  bottom: 10px;
+		  flex-wrap: wrap;
+		}
+
 		/* Language toggle control styles */
 		.lang-toggle-container {
 		  position: fixed;
@@ -601,12 +634,24 @@
 	</div>
 	
 	<div id="output" class="output"></div>
+	<!-- &streamerbot[=PORT] or &api=KEY enables remote mic control and starts paused. -->
+	<div id="streamerbotControl" hidden>
+		<p><strong>Remote microphone control</strong> · <a href="https://github.com/steveseguin/captionninja/blob/master/push-to-talk.md" target="_blank">Setup guide</a></p>
+		<p id="captionApiStatus" role="status" hidden>Connecting to the VDO.Ninja API. Listening is paused.</p>
+		<div id="streamerbotSettings" hidden>
+		<label for="streamerbotPassword">Streamer.bot WebSocket password (if enabled)</label>
+		<input id="streamerbotPassword" type="password" autocomplete="off">
+		<button id="streamerbotConnect" class="control-button">Connect to Streamer.bot</button>
+		<p id="streamerbotStatus" role="status">Listening is paused. Connect to Streamer.bot to use your button.</p>
+		</div>
+	</div>
 	<button id="toggleTranscription" class="hidden control-button">Pause Transcription</button>
 
 	<script src="security-utils.js"></script>
 	<script src="tts-integration.js"></script>
 	<script src="ws-publisher.js"></script>
 	<script src="text-rules.js"></script>
+	<script src="streamerbot-control.js"></script>
 	<script>
 	
 	function detectTextDirection(text) {
@@ -663,10 +708,54 @@
 		}
 		return item.value;
 	}
-	let isPaused = false;
+	const captureControlParams = new URLSearchParams(window.location.search);
+	const streamerbotEnabled = captureControlParams.has('streamerbot');
+	const apiKey = captureControlParams.get('api') || '';
+	const remoteCaptureEnabled = streamerbotEnabled || !!apiKey;
+	var apiPublisher = null;
+	let isPaused = remoteCaptureEnabled;
+	let recognitionBusy = false;
 	const toggleButton = document.getElementById('toggleTranscription');
+	if (remoteCaptureEnabled) {
+		document.body.classList.add('streamerbot-mode');
+		document.getElementById('streamerbotControl').hidden = false;
+		document.getElementById('streamerbotSettings').hidden = !streamerbotEnabled;
+		document.getElementById('captionApiStatus').hidden = !apiKey;
+		document.getElementById('streamerbotControl').appendChild(toggleButton);
+		toggleButton.classList.remove('hidden');
+		toggleButton.textContent = 'Paused — waiting for remote control';
+		toggleButton.disabled = true;
+	}
+
+	function setControlledListening(listening) {
+		if (!remoteCaptureEnabled || isPaused === !listening) return;
+		isPaused = !listening;
+		toggleButton.textContent = isPaused ? 'Paused — waiting for remote control' : 'Stop listening';
+		toggleButton.disabled = isPaused;
+		sendCaptionApiState('muted', isPaused);
+		if (isPaused) {
+			if (silenceTimer) {
+				clearTimeout(silenceTimer);
+				silenceTimer = null;
+			}
+			// stop() releases the mic while allowing the held speech's final result.
+			if (recognition && recognitionBusy) {
+				try {
+					recognition.stop();
+				} catch (error) {
+					recognition.abort();
+				}
+			}
+		} else if (!recognitionBusy) {
+			setup();
+		}
+	}
 
 	toggleButton.addEventListener('click', () => {
+	  if (remoteCaptureEnabled) {
+		setControlledListening(false);
+		return;
+	  }
 	  isPaused = !isPaused;
 	  
 	  if (isPaused) {
@@ -1095,7 +1184,6 @@ function rebuildSrtFile() {
 	navigator.clipboard.writeText(overlayShareLink).then(() => {
 	}, () => {
 	});
-	var apiKey = false;
 	var wsPublisher = null;
 	function publishCaption(payload) {
 		if (!wsPublisher || !payload) return;
@@ -1177,6 +1265,7 @@ function rebuildSrtFile() {
 	setup();
 	var startd = false;
 	function setup() {
+	  if (remoteCaptureEnabled && (isPaused || recognitionBusy)) return;
 	  if ('webkitSpeechRecognition' in window) {
 		if (recognition) {
 		  recognition.onend = null;
@@ -1197,7 +1286,11 @@ function rebuildSrtFile() {
 		};
 		
 		recognition.onerror = function(event) {
+		  if (remoteCaptureEnabled && this !== recognition) return;
 		  console.log(event);
+		  if (remoteCaptureEnabled && event.error !== 'no-speech') {
+			setControlledListening(false);
+		  }
 		  if (event.error === 'network') {
 			handleNetworkError();
 		  }
@@ -1205,6 +1298,17 @@ function rebuildSrtFile() {
 
 		
 		recognition.onend = function(e) {
+		  if (remoteCaptureEnabled) {
+			if (this !== recognition) return;
+			recognitionBusy = false;
+			if (silenceTimer) {
+				clearTimeout(silenceTimer);
+				silenceTimer = null;
+			}
+			forceFinalization();
+			if (!isPaused) setTimeout(setup, 100);
+			return;
+		  }
 		  if (isPaused) return;
 		  console.log(e);
 		  console.log("Stopped transcription");
@@ -1240,7 +1344,15 @@ function rebuildSrtFile() {
 		};
 
 		recognition.onresult = function(event) {
+		  if (remoteCaptureEnabled && (this !== recognition || !recognitionBusy)) return;
 		  if(typeof(event.results) == 'undefined') return;
+		  if (remoteCaptureEnabled && isPaused) {
+			let hasFinal = false;
+			for (let i = event.resultIndex; i < event.results.length; ++i) {
+				if (event.results[i].isFinal) hasFinal = true;
+			}
+			if (!hasFinal) return;
+		  }
 		  
 		  // Auto-dismiss security warning when we get actual speech results
 		  const warningElement = document.getElementById('stream-security-warning');
@@ -1282,7 +1394,7 @@ function rebuildSrtFile() {
 		      }
 		      
 		      counter += 1;
-		    } else {
+		    } else if (!remoteCaptureEnabled || !isPaused) {
 		      interim_transcript += " " + transcript;
 		    }
 		  }
@@ -1449,7 +1561,7 @@ function rebuildSrtFile() {
 		        controlContainer.appendChild(shareButton);
 		        controlContainer.appendChild(customizeButton);
 		        toggleButton.classList.remove("hidden");
-		        document.querySelector('.control-buttons').appendChild(toggleButton);
+		        if (!remoteCaptureEnabled) document.querySelector('.control-buttons').appendChild(toggleButton);
 		      }
 		    } catch(e) {
 		      console.error(e);
@@ -1458,15 +1570,99 @@ function rebuildSrtFile() {
 		};
 		
 		if (!isPaused) {
-		  recognition.start();
+		  if (remoteCaptureEnabled) {
+			try {
+				recognitionBusy = true;
+				recognition.start();
+			} catch (error) {
+				recognitionBusy = false;
+				setControlledListening(false);
+				showErrorBanner('Could not start speech recognition. Check microphone permission and use Chrome or Edge.');
+			}
+		  } else {
+			recognition.start();
+		  }
 		}
+	  } else if (remoteCaptureEnabled) {
+		setControlledListening(false);
+		showErrorBanner('Speech recognition is not available in this browser. Use Chrome or Edge.');
 	  }
+	}
+
+	if (streamerbotEnabled) {
+		connectCaptionStreamerbot(roomID, urlParams.get('streamerbot') || '8080', setControlledListening);
+	}
+	if (apiKey) {
+		connectCaptionApi();
+	}
+
+	function getCaptionApiDetails() {
+		const details = Object.create(null);
+		details[roomID] = { streamID: roomID, localStream: true, label: label || 'Caption.Ninja', muted: isPaused };
+		return details;
+	}
+
+	function sendCaptionApiState(action, value) {
+		if (!apiPublisher || !apiPublisher.isOpen()) return;
+		apiPublisher.publish({ update: { streamID: roomID, action: action, value: value } });
+	}
+
+	function connectCaptionApi() {
+		const status = document.getElementById('captionApiStatus');
+		apiPublisher = createWSPublisher({
+			url: 'wss://api.vdo.ninja:443',
+			onStateChange: function(state) {
+				if (state === 'connected') {
+					// Join before sending state; the caption room uses its own connection.
+					apiPublisher.publish({ join: apiKey });
+					sendCaptionApiState('details', getCaptionApiDetails());
+					status.textContent = 'API connected. Use your VDO.Ninja microphone control.';
+				} else {
+					setControlledListening(false);
+					status.textContent = 'API disconnected. Listening is paused; waiting for connection.';
+				}
+			},
+			onMessage: function(event) {
+				let data;
+				try { data = JSON.parse(event.data); } catch (error) { return; }
+				if (data && typeof data === 'object' && 'msg' in data) data = data.msg;
+				if (!data || typeof data !== 'object' || Array.isArray(data)) return;
+				if (data.callback || data.update) return;
+				if ('target' in data && data.target !== null && data.target !== 'null') return;
+				if (data.action === 'mic') {
+					if (data.value === true || data.value === 'true') {
+						setControlledListening(true);
+					} else if (data.value === false || data.value === 'false') {
+						setControlledListening(false);
+					} else if (data.value === 'toggle') {
+						setControlledListening(isPaused);
+					}
+					data.result = isPaused;
+				} else if (data.action === 'getDetails') {
+					data.result = getCaptionApiDetails();
+				} else if (data.action === 'getGuestList') {
+					data.result = {};
+				} else {
+					return;
+				}
+				// Preserve request IDs, including the relay's HTTP `get` identifier.
+				apiPublisher.publish({ callback: data });
+			}
+		});
+		apiPublisher.connect();
+		window.addEventListener('pagehide', function() {
+			apiPublisher.disconnect();
+		});
+		window.addEventListener('pageshow', function(event) {
+			if (event.persisted) apiPublisher.connect();
+		});
 	}
 
 	// Optional: open a separate TTS window powered by tts.rocks bridge
 	try {
 	  if (urlParams.has('ttspopout')) {
 	    var qs = new URLSearchParams(window.location.search);
+	    qs.delete('api');
 	    // Ensure room param is present
 	    qs.set('room', roomID);
 	    var bridgeUrl = window.location.origin + window.location.pathname.replace(/\/[^^/]*$/, '') + '/tts.rocks/caption-bridge.html?' + qs.toString();
