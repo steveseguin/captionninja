@@ -2,9 +2,28 @@
 
 Make Caption.Ninja listen while you hold a Stream Deck button, then stop listening when you release it.
 
-You'll need Chrome or Edge, OBS, and the VDO.Ninja plugin installed in your Stream Deck software. You do not need to open a VDO.Ninja call.
+Use Chrome or Edge for the listening page. Choose **one** of these two ways to control it:
+
+| What you use | Add to your Caption.Ninja listening link | Go to the instructions |
+| --- | --- | --- |
+| Streamer.bot | `&streamerbot=8080` | [Streamer.bot setup](#streamerbot-setup) — includes controlling your OBS microphone with the same button |
+| VDO.Ninja Stream Deck plugin | `&api=YOUR_KEY` | [VDO.Ninja plugin setup](#1-set-up-your-stream-deck-button) — use its microphone button to control captions |
+
+You do not need both options. If you already use Streamer.bot, start with the **Streamer.bot setup**.
+
+## Contents
+
+- [Streamer.bot setup: connect, create actions, and assign your button](#streamerbot-setup)
+- [VDO.Ninja plugin: set up your button](#1-set-up-your-stream-deck-button)
+- [VDO.Ninja plugin: open Caption.Ninja with your API key](#2-open-captionninja)
+- [Put the captions in OBS](#3-put-the-captions-in-obs)
+- [Test your button](#4-try-it-before-going-live)
+- [Fix common problems](#if-something-goes-wrong)
+- [HTTP links and WebSocket commands](#http-links-and-websocket-commands)
 
 ## 1. Set up your Stream Deck button
+
+This method uses the **VDO.Ninja Stream Deck plugin**. You do not need to open a VDO.Ninja call.
 
 1. In the Stream Deck software, drag VDO.Ninja's **Local Control** action onto a button.
 2. Set **Control** to **Mic**.
@@ -65,10 +84,7 @@ The last words spoken while holding the button may appear shortly after you rele
 
 Reloading the listening page always starts it paused.
 
-## Other ways to control captions
-
-<details>
-<summary>Use Streamer.bot instead, including control of your OBS microphone</summary>
+## Streamer.bot setup
 
 Use this option if you want Streamer.bot to handle both captions and your OBS microphone. It needs two actions: one for pressing the button and one for releasing it.
 
@@ -129,10 +145,7 @@ Start with that OBS microphone muted. If these actions replace your old OBS push
 
 Test both your OBS audio and captions before going live. If Streamer.bot disconnects, listening pauses; click **Connect to Streamer.bot** again before using your button.
 
-</details>
-
-<details>
-<summary>Use HTTP links or WebSocket commands (for automation and scripts)</summary>
+## HTTP links and WebSocket commands
 
 Open the main Caption.Ninja page with `&api=YOUR_KEY`, as in step 2 above. Use the same private key in these links:
 
@@ -157,5 +170,3 @@ WebSocket clients connect to `wss://api.vdo.ninja:443` and send these messages i
 The second message stops listening. Use `true` to start or `"toggle"` to switch. Strings `"true"` and `"false"` also work. Leave out `target`, or set it to `null`.
 
 Replies contain `callback`, with the original request fields plus `result`. Caption.Ninja also supports `getDetails`, an empty `getGuestList`, and `details`/`muted` updates for button feedback. Other VDO.Ninja commands are ignored.
-
-</details>
