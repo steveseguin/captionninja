@@ -100,32 +100,36 @@ Reloading the listening page always starts it paused.
 
 ![After configuring both actions: press starts captions and unmutes the OBS mic; release pauses captions and mutes the OBS mic.](images/push-to-talk/streamerbot-actions.svg)
 
-Use this option if you want Streamer.bot to handle both captions and your OBS microphone. It needs two actions: one for pressing the button and one for releasing it.
+**One button controls both your OBS microphone and captions:** hold to speak, release to stop. This setup uses the **Streamer.bot** Stream Deck plugin. You do not need the VDO.Ninja plugin or an API key.
 
-### Connect Streamer.bot
+### 1. Connect Streamer.bot to OBS
 
-🤖 **Streamer.bot** ↔ 🌐 **Caption.Ninja** · Same computer, port **8080**
+Open OBS, Streamer.bot, and Chrome or Edge on the same computer. Use Streamer.bot 0.2.5 or newer.
 
-1. Use Streamer.bot 0.2.5 or newer on the same computer as Chrome or Edge.
-2. Open **Servers/Clients → WebSocket Server**. Start the server using address `127.0.0.1`, port `8080`, and endpoint `/`. Keep your existing password settings.
-3. Open the address below in Chrome or Edge. Replace `YOUR_ROOM` with your caption room name.
-4. On the page, enter your Streamer.bot WebSocket password if you use one, then click **Connect to Streamer.bot**. Allow local-network access if the browser asks.
-5. Add the captions to OBS using step 3 above.
+In Streamer.bot, open **Stream Apps → OBS** and check that OBS is connected. If it is not, follow the [OBS connection steps with screenshots](https://docs.streamer.bot/get-started/setup/broadcasters#obs-studio), then return here.
+
+### 2. Connect your Caption.Ninja listening page
+
+1. In **Streamer.bot**, open **Servers/Clients → WebSocket Server**. Set **Address** to `127.0.0.1`, **Port** to `8080`, and **Endpoint** to `/`. Keep your password settings and start the server.
+2. In **Chrome or Edge**, open your existing Caption.Ninja listening page. Add `&streamerbot=8080` to its address and reload. Keep your room name and language settings; remove `&api=...` if you added it for the other setup.
+3. On that page, enter the **Streamer.bot WebSocket password** if enabled, then click **Connect to Streamer.bot**. Allow local-network access if asked. Wait for **Connected**.
+
+For a new setup, use this address and replace `YOUR_ROOM` with a long room name of your choice, using letters and numbers:
 
 ```text
 https://caption.ninja/?room=YOUR_ROOM&streamerbot=8080
 ```
 
-If your server uses a different port, replace `8080` in the browser address with that number. Listening stays paused until you press your button.
+Use your Streamer.bot server's port in place of `8080` if it is different. Keep the listening tab open; it starts paused.
 
-### Create the two actions
+**Already have translated captions in OBS? Keep that Browser Source as it is.** Otherwise, [add the caption overlay](#3-put-the-captions-in-obs), using the same room name, then return here. The `streamerbot` setting belongs on the listening page only.
 
-| Button movement | Action to create | Captions |
-| --- | --- | --- |
-| 👇 Press | **Captions Press** | 🎙️ Start listening |
-| ☝️ Release | **Captions Release** | ⏸️ Stop listening |
+### 3. Create the press action
 
-In Streamer.bot, create an action named **Captions Press**. Add an **Execute C# Code** sub-action and paste this code. Replace `YOUR_ROOM` with your caption room name:
+1. In Streamer.bot, open **Actions & Queues → Queues**. Right-click the queue list, choose **Add**, name it **Caption Mic**, and enable **Blocking**. This keeps press and release in order.
+2. Open **Actions & Queues → Actions**. Right-click the action list and choose **Add**. Name it **Captions Press**, select the **Caption Mic** queue, and leave **Concurrent** off.
+3. Select **Captions Press**. Right-click its **Sub-Actions** area and choose **Core → C# Code → Execute C# Code**.
+4. Replace the editor contents with the code below. Change only `YOUR_ROOM` to the room name in your Caption.Ninja address, keeping the quotes. Save the code.
 
 ```csharp
 public class CPHInline
@@ -138,7 +142,13 @@ public class CPHInline
 }
 ```
 
-Create a second action named **Captions Release**, with this code. Replace `YOUR_ROOM` here too:
+Now add the microphone control to that same action: right-click **Sub-Actions**, choose **OBS Studio → Sources → Set Source Mute State**, select your OBS connection and microphone source, and set **State** to **Not Muted**.
+
+### 4. Create the release action
+
+1. Right-click the action list and choose **Add** again. Name this action **Captions Release**, select the same **Caption Mic** queue, and leave **Concurrent** off.
+2. Select it and add **Core → C# Code → Execute C# Code**, just as above.
+3. Replace the editor contents with this code, change `YOUR_ROOM` to the same room name, and save:
 
 ```csharp
 public class CPHInline
@@ -151,22 +161,31 @@ public class CPHInline
 }
 ```
 
-Put both actions in the same action queue. Give this queue its own name, turn **Concurrent** off, and do not add delays. This keeps press and release in order.
+Add **OBS Studio → Sources → Set Source Mute State** to this action too. Select the same microphone, but this time set **State** to **Muted**.
 
-### Assign the button
+Your two actions should now look like this. Do not add delays or other actions to the **Caption Mic** queue.
 
-👇 **Key-Down** → **Captions Press** · ☝️ **Key-Up** → **Captions Release**
+| Action | Caption code | OBS mic state |
+| --- | --- | --- |
+| **Captions Press** | `listening` is `true` | **Not Muted** |
+| **Captions Release** | `listening` is `false` | **Muted** |
 
-1. Install the [Streamer.bot Stream Deck plugin](https://streamdeck.streamer.bot/).
-2. Add its **Action** button to your deck and select your Streamer.bot instance.
-3. Assign **Captions Press** to **Key-Down**.
-4. Assign **Captions Release** to **Key-Up**. Leave the long-press action empty.
+### 5. Set up the Stream Deck button
 
-To control your OBS microphone too, add an OBS **unmute** sub-action to **Captions Press** and a **mute** sub-action to **Captions Release**, selecting your microphone in both.
+1. Open the **Stream Deck software** and expand **Streamer.bot** in the action list on the right. If it is missing, [install the Streamer.bot plugin](https://streamdeck.streamer.bot/).
+2. Drag its **Action** onto an empty button, then click that button to show its settings below.
+3. Select your Streamer.bot instance. Set **Key-Down** to **Captions Press** and **Key-Up** to **Captions Release**. Leave the long-press action empty.
 
-Start with that OBS microphone muted. If these actions replace your old OBS push-to-talk hotkey, turn off OBS's push-to-talk setting for that microphone. Otherwise, OBS may still block your voice.
+### 6. Switch over and test
 
-Test both your OBS audio and captions before going live. If Streamer.bot disconnects, listening pauses; click **Connect to Streamer.bot** again before using your button.
+1. In **OBS → Settings → Audio**, turn off **Enable Push-to-Talk** and **Enable Push-to-Mute** for this microphone if enabled. The new button replaces those controls. Mute the mic in OBS's Audio Mixer before testing.
+2. Keep Streamer.bot and the Caption.Ninja listening tab open. Allow microphone access when the browser asks.
+3. Make a short OBS recording. Hold the **new button**, wait for the browser's microphone indicator, and say "Button held". Release it and say "Button released". Hold it again and say "Button held again".
+4. Play back the recording. Only the two sentences spoken while holding the button should be heard and captioned. Check that the OBS mic returns to muted when you release.
+
+The last words spoken while held may finish appearing after release. Existing captions stay on screen.
+
+If captions keep listening, check **Key-Up** is assigned to **Captions Release**. If the mic stays silent, check the OBS connection, selected microphone, and old push-to-talk setting. If Caption.Ninja loses its Streamer.bot connection, click **Connect to Streamer.bot** again before pressing the button.
 
 ## HTTP links and WebSocket commands
 
