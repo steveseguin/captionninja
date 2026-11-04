@@ -402,7 +402,7 @@
 
     document.getElementById('playAll').onclick = function(){ if (!sections.length){ alert('Add a section first'); return; } if (!currentId) currentId = sections[0].id; startSectionPlayback(currentId, true); };
     document.getElementById('playCurrent').onclick = function(){ if (!currentId){ alert('Select or add a section first'); return; } startSectionPlayback(currentId, false); };
-    document.getElementById('pauseBtn').onclick = function(){ if (!playing) return; paused = !paused; this.textContent = paused? 'Resume' : 'Pause'; if (controlRollEl.checked) sendRollControl(paused? 'pause':'resume', {}); if (!paused) scheduleQueueSend(); };
+    document.getElementById('pauseBtn').onclick = function(){ if (!playing) return; paused = !paused; this.textContent = paused? 'Resume' : 'Pause'; if (paused) clearTimers(); if (controlRollEl.checked) sendRollControl(paused? 'pause':'resume', {}); if (!paused) scheduleQueueSend(); };
     document.getElementById('restartBtn').onclick = function(){ if (!playingSectionId) return; startSectionPlayback(playingSectionId, playAll); };
     document.getElementById('prevBtn').onclick = function(){ const idx = sections.findIndex(x=>x.id===playingSectionId || x.id===currentId); if (idx>0){ selectSection(sections[idx-1].id); } };
     document.getElementById('nextBtn').onclick = function(){ const idx = sections.findIndex(x=>x.id===playingSectionId || x.id===currentId); if (idx>=0 && idx<sections.length-1){ selectSection(sections[idx+1].id); } };
