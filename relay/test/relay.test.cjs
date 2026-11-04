@@ -132,3 +132,28 @@ test('heartbeat removes an unresponsive peer while healthy clients stay connecte
   dead.send(JSON.stringify({join: 'source', role: 'read', token: settings.rooms.source.read})); await ack;
   await once(dead, 'close'); assert.equal(healthy.readyState, WebSocket.OPEN);
 });
+
+test('editor clear flag reaches viewers and the writer can keep publishing', {timeout: 3000}, async t => {
+  const {join} = await fixture(t);
+  const writer = await join('output', 'write'), viewer = await join('output');
+  for (const caption of [
+    {msg: true, final: 'Before clear', id: 1},
+    {msg: true, final: '', id: 2, c: true},
+    {msg: true, final: 'After clear', id: 3, c: false}
+  ]) {
+    const received = once(viewer, 'message');
+    writer.send(JSON.stringify(caption));
+    assert.deepEqual(JSON.parse((await received)[0]), caption);
+  }
+  assert.equal(writer.readyState, WebSocket.OPEN);
+});
+
+test('clear flag rejects non-booleans without delivering a caption', async t => {
+  const {join, relay} = await fixture(t);
+  for (const c of ['true', 1, null, {}, []]) {
+    const writer = await join('output', 'write'), closed = once(writer, 'close');
+    writer.send(JSON.stringify({msg: true, final: '', id: 1, c}));
+    assert.equal((await closed)[0], 1008);
+  }
+  assert.equal(relay.stats.published, 0);
+});
