@@ -9,7 +9,7 @@ Use Chrome or Edge for the listening page. Choose **one** of these two ways to c
 | What you use | Add to your Caption.Ninja listening link | Go to the instructions |
 | --- | --- | --- |
 | 🤖 Streamer.bot | `&streamerbot=8080` | [Set up captions + OBS microphone](#streamerbot-setup) |
-| 🎛️ VDO.Ninja Stream Deck plugin | `&api=YOUR_KEY` | [Set up the caption button](#1-set-up-your-stream-deck-button) |
+| 🎛️ VDO.Ninja Stream Deck plugin | `&api=YOUR_KEY` | [Set up captions, with optional OBS mic control](#1-set-up-your-stream-deck-button) |
 
 You do not need both options. If you already use Streamer.bot, start with the **Streamer.bot setup**.
 
@@ -20,6 +20,7 @@ You do not need both options. If you already use Streamer.bot, start with the **
 - 🌐 [Open the listening page](#2-open-captionninja)
 - 🖥️ [Show captions in OBS](#3-put-the-captions-in-obs)
 - 🎙️ [Test hold and release](#4-try-it-before-going-live)
+- 🎙️ [Add the OBS microphone without Streamer.bot](#obs-microphone)
 - 🔧 [Fix common problems](#if-something-goes-wrong)
 - 🔗 [HTTP links and WebSocket commands](#http-links-and-websocket-commands)
 
@@ -43,11 +44,12 @@ The key is a password for your microphone control. Keep it private. Pages using 
 Copy this address into Chrome or Edge, replacing the two placeholders:
 
 ```text
-https://caption.ninja/?room=YOUR_ROOM&api=YOUR_KEY
+https://caption.ninja/?ver=33&room=YOUR_ROOM&api=YOUR_KEY&lang=de-DE
 ```
 
 - Replace `YOUR_ROOM` with a name you choose for your captions. Use a long name with letters and numbers, without spaces.
 - Replace `YOUR_KEY` with the connection key you copied from Stream Deck. Keep it different from your room name.
+- This example listens for German. Use `&lang=en-US` for English or choose another [spoken language](translation-guide.html).
 
 Wait for **API connected** on the page. Listening starts paused. Allow microphone access when the browser asks.
 
@@ -63,12 +65,12 @@ Keep this tab open. You can switch to another window while using the button.
 4. Click **OK**, then position the captions in your scene.
 
 ```text
-https://caption.ninja/overlay?room=YOUR_ROOM&translate=en
+https://caption.ninja/overlay?ver=33&room=YOUR_ROOM&translate=en&fromlang=de
 ```
 
-This example shows English translations. Change `en` to `de` for German, `fr` for French, or `es` for Spanish. For captions without translation, remove `&translate=en`.
+This example translates German (`fromlang=de`) into English (`translate=en`). Change these codes for other languages, such as `fr` for French or `es` for Spanish. For captions without translation, remove `&translate=en&fromlang=de`.
 
-Caption.Ninja listens in your browser's language. To choose another spoken language, add `&lang=de-DE` for German or `&lang=en-US` for English to the **Caption.Ninja tab's address**. See the [translation guide](translation-guide.html) for more languages.
+The spoken language belongs in the listening tab's `lang` setting. The output language belongs in the OBS link's `translate` setting. Without a `lang` setting, the listening page defaults to English.
 
 Keep the two links separate: the browser tab listens to you; the OBS link displays the captions. Only the listening tab needs your private key.
 
@@ -82,7 +84,25 @@ Keep the two links separate: the browser tab listens to you; the OBS link displa
 
 The last words spoken while holding the button may appear shortly after you release it. Releasing the button does not erase captions already on screen.
 
-**This button controls Caption.Ninja. It does not automatically mute your microphone in OBS.** To control both together through Streamer.bot, use the optional setup below.
+To make this same button control your OBS microphone too, follow the optional setup below.
+
+## OBS microphone
+
+Use the VDO.Ninja Stream Deck plugin **0.1.15 or newer** and **OBS Studio 28 or newer**, running on the same computer. This adds OBS microphone control to your existing caption button. No VDO.Ninja call or Streamer.bot is needed.
+
+1. In OBS, open **Tools > WebSocket Server Settings**. Enable the server and keep **Enable Authentication** checked. Open **Show Connect Info**, then note the server port and copy the password.
+2. In Stream Deck, select your caption button: **Local Control > Mic > Hold to talk**. Keep it as a standalone button, outside a Multi Action.
+3. Enable **Control OBS mic**. Enter the OBS port (usually `4455`) and password, then click **Connect to OBS**.
+4. Choose your microphone from the **Microphone** list. Use the same source you normally hear on your stream. Keep the OBS password private.
+5. In **OBS > Settings > Audio**, disable **Enable Push-to-Talk** and **Enable Push-to-Mute** for this microphone. The new button replaces the old hotkey. Mute the microphone in OBS's Audio Mixer before testing.
+6. Keep the Caption.Ninja listening tab open. Make a short OBS recording: hold the button and speak German, release it and speak again, then hold it for another sentence.
+7. Play back the recording. Speech while held should be audible with English captions. Speech after release should be neither audible nor captioned. Words spoken before release may finish translating afterward.
+
+<img src="images/push-to-talk/obs-microphone.png" width="396" alt="Stream Deck Local Control set to Mic and Hold to talk, with Control OBS mic enabled, port 4455, a masked password and Mic/Aux selected.">
+
+If **Control OBS mic** is missing, [install the newer plugin](https://github.com/steveseguin/vdo-streamdeck/releases/latest). If connection fails, check the OBS port and password. After renaming an OBS source, click **Connect to OBS** and choose it again.
+
+If either control stops responding during a stream, mute the microphone directly in OBS and click **Stop listening** in Caption.Ninja (or close its tab) before reconnecting.
 
 ## If something goes wrong
 
@@ -117,7 +137,7 @@ In Streamer.bot, open **Stream Apps → OBS** and check that OBS is connected. I
 For a new setup, use this address and replace `YOUR_ROOM` with a long room name of your choice, using letters and numbers:
 
 ```text
-https://caption.ninja/?room=YOUR_ROOM&streamerbot=8080
+https://caption.ninja/?ver=33&room=YOUR_ROOM&streamerbot=8080
 ```
 
 Use your Streamer.bot server's port in place of `8080` if it is different. Keep the listening tab open; it starts paused.

@@ -1,10 +1,13 @@
 // https://github.com/mozilla/translate - MPL 2.0 - Mozilla
 // All variables specific to translation service
-var translationService, responseOptions, input = undefined;
+var translationService;
 // A map of language-pair to TranslationModel object
 var translationModels = new Map();
+var translationModelBuffers = new Map();
+var modernEngine = false;
+var engineInitialization;
 
-const BERGAMOT_TRANSLATOR_MODULE = "bergamot-translator-worker.js";
+const BERGAMOT_RUNTIME_BASE = new URL("thirdparty/bergamot/", self.location.href).href;
 const MODEL_REGISTRY = "registry.json";
 const LOCAL_MODEL_ROOT = "/models";
 const REMOTE_MODEL_ROOT = "https://googlestorage.vdo.workers.dev/corsproxy/?apiurl=";
@@ -12,22 +15,22 @@ var rootURL = LOCAL_MODEL_ROOT;
 let version = null;
 let modelRegistry = null;
 
-const encoder = new TextEncoder(); // string to utf-8 converter
-const decoder = new TextDecoder(); // utf-8 to string converter
+var Module;
 
-const start = Date.now();
-let moduleLoadStart;
-var Module = {
-  preRun: [function() {
-    log(`Time until Module.preRun: ${(Date.now() - start) / 1000} secs`);
-    moduleLoadStart = Date.now();
-  }],
-  onRuntimeInitialized: async function() {
-    log(`Wasm Runtime initialized Successfully (preRun -> onRuntimeInitialized) in ${(Date.now() - moduleLoadStart) / 1000} secs`);
-    await initModelRegistry();
-    postMessage([`import_reply`, modelRegistry, version]);
+function initializeEngine() {
+  if (!engineInitialization) {
+    engineInitialization = Promise.resolve().then(function () {
+      importScripts(BERGAMOT_RUNTIME_BASE + "runtime-loader.js?ver=33");
+      return loadBergamotRuntime(BERGAMOT_RUNTIME_BASE + "v0.6.0/", new URL("./", self.location.href).href);
+    }).then(async function (engine) {
+      Module = engine.module;
+      modernEngine = engine.modern;
+      await initModelRegistry();
+      postMessage(["import_reply", modelRegistry, version]);
+    });
   }
-};
+  return engineInitialization;
+}
 
 const log = (message) => {
   console.debug(message);
@@ -77,12 +80,22 @@ const isExprimental = (from, to) => {
   return `${from}${to}` in modelRegistry && modelRegistry[`${from}${to}`]["model"].modelType === "dev"
 }
 
-onmessage = async function(e) {
+// Keep import, model loading and captions in order while the model downloads.
+var translationTasks = Promise.resolve();
+onmessage = function(e) {
+  translationTasks = translationTasks.then(function () {
+    return handleTranslationMessage(e);
+  }).catch(function (error) {
+    console.error("Translation worker failed:", error);
+  });
+};
+
+async function handleTranslationMessage(e) {
   const command = e.data[0];
   log(`Message '${command}' received from main script`);
   let result = "";
   if (command === 'import') {
-      importScripts(BERGAMOT_TRANSLATOR_MODULE);
+      await initializeEngine();
   } else if (command === 'load_model') {
       let start = Date.now();
       let from = e.data[1];
@@ -134,13 +147,27 @@ const getRemoteFallbackURL = (url) => {
 }
 
 // This function downloads file from a url and returns the array buffer
-const downloadAsArrayBuffer = async(url) => {
+const downloadAsArrayBuffer = async(url, asset) => {
+  let cache = null;
   try {
-    const response = await fetch(url);
+    cache = await caches.open("caption-translation-models-v1");
+    const cached = await cache.match(url);
+    if (cached) {
+      const buffer = await cached.arrayBuffer();
+      if (await verifyModelBuffer(buffer, asset)) return buffer;
+      await cache.delete(url);
+    }
+  } catch (_) {}
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 120000);
+  let buffer;
+  try {
+    const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) {
       throw Error(`Downloading ${url} failed: HTTP ${response.status} - ${response.statusText}`);
     }
-    return response.arrayBuffer();
+    buffer = await response.arrayBuffer();
   } catch (primaryError) {
     const fallbackURL = getRemoteFallbackURL(url);
     if (!fallbackURL) {
@@ -148,12 +175,27 @@ const downloadAsArrayBuffer = async(url) => {
     }
 
     console.warn(`Local model asset unavailable; retrying via remote proxy: ${url}`);
-    const fallbackResponse = await fetch(fallbackURL);
+    const fallbackResponse = await fetch(fallbackURL, { signal: controller.signal });
     if (!fallbackResponse.ok) {
       throw Error(`Downloading ${url} failed locally and remote fallback failed (${fallbackURL}): HTTP ${fallbackResponse.status} - ${fallbackResponse.statusText}`);
     }
-    return fallbackResponse.arrayBuffer();
+    buffer = await fallbackResponse.arrayBuffer();
+  } finally {
+    clearTimeout(timer);
   }
+
+  if (!await verifyModelBuffer(buffer, asset)) throw Error(`Translation model verification failed: ${url}`);
+  if (cache) {
+    try { await cache.put(url, new Response(buffer)); } catch (_) {}
+  }
+  return buffer;
+}
+
+const verifyModelBuffer = async (buffer, asset) => {
+  if (!asset || buffer.byteLength !== asset.size) return false;
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+  return hash === asset.expectedSha256Hash;
 }
 
 // This function constructs and initializes the AlignedMemory from the array buffer and alignment size
@@ -171,7 +213,7 @@ const prepareAlignedMemoryFromBuffer = async (buffer, alignmentSize) => {
 // Instantiate the Translation Service
 const constructTranslationService = async () => {
   if (!translationService) {
-    var translationServiceConfig = {};
+    var translationServiceConfig = modernEngine ? { cacheSize: 0 } : {};
     log(`Creating Translation Service with config: ${translationServiceConfig}`);
     translationService = new Module.BlockingService(translationServiceConfig);
     log(`Translation Service created successfully`);
@@ -183,8 +225,14 @@ const constructTranslationModel = async (from, to) => {
   translationModels.forEach((value, key) => {
     log(`Destructing model '${key}'`);
     value.delete();
+    const buffers = translationModelBuffers.get(key);
+    if (buffers) {
+      buffers.list.delete();
+      buffers.owned.forEach(memory => memory.delete());
+    }
   });
   translationModels.clear();
+  translationModelBuffers.clear();
 
   // If none of the languages is English then construct multiple models with
   // English as a pivot language.
@@ -246,16 +294,16 @@ gemm-precision: int8shiftAll
 `;
 
   const commonPath = `${rootURL}/${version}/${languagePair}`
-  const modelFile = `${commonPath}/${modelRegistry[languagePair]["model"].name}`;
+  const assets = modelRegistry[languagePair];
+  const assetURL = asset => asset.url || `${commonPath}/${asset.name}`;
+  const modelFile = assetURL(assets.model);
   let vocabFiles;
-  const shortlistFile = `${commonPath}/${modelRegistry[languagePair]["lex"].name}`;
+  const shortlistFile = assetURL(assets.lex);
   if (("srcvocab" in modelRegistry[languagePair]) && ("trgvocab" in modelRegistry[languagePair])) {
-        vocabFiles = [`${commonPath}/${modelRegistry[languagePair]["srcvocab"].name}`,
-                      `${commonPath}/${modelRegistry[languagePair]["trgvocab"].name}`];
+        vocabFiles = [assetURL(assets.srcvocab), assetURL(assets.trgvocab)];
   }
   else {
-    vocabFiles = [`${commonPath}/${modelRegistry[languagePair]["vocab"].name}`,
-                  `${commonPath}/${modelRegistry[languagePair]["vocab"].name}`];
+    vocabFiles = [assetURL(assets.vocab), assetURL(assets.vocab)];
   }
   const uniqueVocabFiles = new Set(vocabFiles);
   log(`modelFile: ${modelFile}\nshortlistFile: ${shortlistFile}\nNo. of unique vocabs: ${uniqueVocabFiles.size}`);
@@ -263,13 +311,14 @@ gemm-precision: int8shiftAll
 
   // Download the files as buffers from the given urls
   let start = Date.now();
-  const downloadedBuffers = await Promise.all([downloadAsArrayBuffer(modelFile), downloadAsArrayBuffer(shortlistFile)]);
+  const downloadedBuffers = await Promise.all([downloadAsArrayBuffer(modelFile, assets.model), downloadAsArrayBuffer(shortlistFile, assets.lex)]);
   const modelBuffer = downloadedBuffers[0];
   const shortListBuffer = downloadedBuffers[1];
 
   const downloadedVocabBuffers = [];
   for (let item of uniqueVocabFiles.values()) {
-    downloadedVocabBuffers.push(await downloadAsArrayBuffer(item));
+    const asset = [assets.vocab, assets.srcvocab, assets.trgvocab].find(asset => asset && assetURL(asset) === item);
+    downloadedVocabBuffers.push(await downloadAsArrayBuffer(item, asset));
   }
   log(`Total Download time for all files of '${languagePair}': ${(Date.now() - start) / 1000} secs`);
 
@@ -279,19 +328,28 @@ gemm-precision: int8shiftAll
   let alignedModelMemory = constructedAlignedMemories[0];
   let alignedShortlistMemory = constructedAlignedMemories[1];
   let alignedVocabsMemoryList = new Module.AlignedMemoryList;
+  const owned = [alignedModelMemory, alignedShortlistMemory];
   for(let item of downloadedVocabBuffers) {
     let alignedMemory = await prepareAlignedMemoryFromBuffer(item, 64);
+    owned.push(alignedMemory);
     alignedVocabsMemoryList.push_back(alignedMemory);
   }
-  for (let vocabs=0; vocabs < alignedVocabsMemoryList.size(); vocabs++) {
-    log(`Aligned vocab memory${vocabs+1} size: ${alignedVocabsMemoryList.get(vocabs).size()}`);
-  }
+
   log(`Aligned model memory size: ${alignedModelMemory.size()}`);
   log(`Aligned shortlist memory size: ${alignedShortlistMemory.size()}`);
 
   log(`Translation Model config: ${modelConfig}`);
-  var translationModel = new Module.TranslationModel(modelConfig, alignedModelMemory, alignedShortlistMemory, alignedVocabsMemoryList);
-  translationModels.set(languagePair, translationModel);
+  try {
+    const translationModel = modernEngine
+      ? new Module.TranslationModel(from.replace(/_/g, "-"), to.replace(/_/g, "-"), modelConfig, alignedModelMemory, alignedShortlistMemory, alignedVocabsMemoryList, null)
+      : new Module.TranslationModel(modelConfig, alignedModelMemory, alignedShortlistMemory, alignedVocabsMemoryList);
+    translationModels.set(languagePair, translationModel);
+    translationModelBuffers.set(languagePair, { list: alignedVocabsMemoryList, owned });
+  } catch (error) {
+    alignedVocabsMemoryList.delete();
+    owned.forEach(memory => memory.delete());
+    throw error;
+  }
 }
 
 const translate = (from, to, paragraphs) => {
@@ -313,67 +371,27 @@ const translateInvolvingEnglish = (from, to, paragraphs) => {
   if (!translationModels.has(languagePair)) {
     throw Error(`Please load translation model '${languagePair}' before translating`);
   }
-  translationModel = translationModels.get(languagePair);
-
-  // Instantiate the arguments of translate() API i.e. ResponseOptions and input (vector<string>)
-  var responseOptions = new Module.ResponseOptions();
-  let input = new Module.VectorString;
-
-  // Initialize the input
-  paragraphs.forEach(paragraph => {
-    // prevent empty paragraph - it breaks the translation
-    if (paragraph.trim() === "") {
-      return;
+  const translationModel = translationModels.get(languagePair);
+  const responseOptions = modernEngine ? new Module.VectorResponseOptions() : new Module.ResponseOptions();
+  const input = new Module.VectorString();
+  let result;
+  try {
+    paragraphs.forEach(paragraph => {
+      if (!paragraph.trim()) return;
+      input.push_back(paragraph.trim());
+      if (modernEngine) responseOptions.push_back({ qualityScores: false, alignment: false, html: false });
+    });
+    result = translationService.translate(translationModel, input, responseOptions);
+    const translatedParagraphs = [];
+    for (let i = 0; i < result.size(); i++) {
+      const response = result.get(i);
+      try { translatedParagraphs.push(response.getTranslatedText()); }
+      finally { response.delete(); }
     }
-    input.push_back(paragraph.trim())
-  })
-
-  // Access input (just for debugging)
-  log(`Input size: ${input.size()}`);
-
-  // Translate the input, which is a vector<String>; the result is a vector<Response>
-  let result = translationService.translate(translationModel, input, responseOptions);
-
-  const translatedParagraphs = [];
-  const translatedSentencesOfParagraphs = [];
-  const sourceSentencesOfParagraphs = [];
-  for (let i = 0; i < result.size(); i++) {
-    translatedParagraphs.push(result.get(i).getTranslatedText());
-    translatedSentencesOfParagraphs.push(getAllTranslatedSentencesOfParagraph(result.get(i)));
-    sourceSentencesOfParagraphs.push(getAllSourceSentencesOfParagraph(result.get(i)));
+    return translatedParagraphs;
+  } finally {
+    if (result) result.delete();
+    responseOptions.delete();
+    input.delete();
   }
-
-  responseOptions.delete();
-  input.delete();
-  return translatedParagraphs;
-}
-
-// This function extracts all the translated sentences from the Response and returns them.
-const getAllTranslatedSentencesOfParagraph = (response) => {
-  const sentences = [];
-  const text = response.getTranslatedText();
-  for (let sentenceIndex = 0; sentenceIndex < response.size(); sentenceIndex++) {
-    const utf8SentenceByteRange = response.getTranslatedSentence(sentenceIndex);
-    sentences.push(_getSentenceFromByteRange(text, utf8SentenceByteRange));
-  }
-  return sentences;
-}
-
-// This function extracts all the source sentences from the Response and returns them.
-const getAllSourceSentencesOfParagraph = (response) => {
-  const sentences = [];
-  const text = response.getOriginalText();
-  for (let sentenceIndex = 0; sentenceIndex < response.size(); sentenceIndex++) {
-    const utf8SentenceByteRange = response.getSourceSentence(sentenceIndex);
-    sentences.push(_getSentenceFromByteRange(text, utf8SentenceByteRange));
-  }
-  return sentences;
-}
-
-// This function returns a substring of text (a string). The substring is represented by
-// byteRange (begin and end endices) within the utf-8 encoded version of the text.
-const _getSentenceFromByteRange = (text, byteRange) => {
-  const utf8BytesView = encoder.encode(text);
-  const utf8SentenceBytes = utf8BytesView.subarray(byteRange.begin, byteRange.end);
-  return decoder.decode(utf8SentenceBytes);
 }

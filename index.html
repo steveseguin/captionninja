@@ -600,7 +600,7 @@
 
 		<strong>💡 Tips:</strong>
 		<ul>
-			<li>Use Google Chrome or Microsoft Edge for best results. Some users Chrome has a truncation issue though, so maybe just use Edge.</li>
+			<li>Use Chrome, Edge, or Firefox 160+ on desktop.</li>
 			<li>To save the transcription: Select all (CTRL+A), copy (CTRL+C), and paste into a text editor (CTRL+V).</li>
 		</ul>
 
@@ -1178,7 +1178,7 @@ function rebuildSrtFile() {
 			}
 		}
 	}
-	const overlayShareLink = url+"/overlay?room="+encodeURIComponent(roomID);
+	const overlayShareLink = url+"/overlay?ver=33&room="+encodeURIComponent(roomID);
 	document.getElementById("shareLink").href = overlayShareLink;
 	document.getElementById("shareLink").textContent = overlayShareLink;
 	navigator.clipboard.writeText(overlayShareLink).then(() => {
@@ -1266,12 +1266,13 @@ function rebuildSrtFile() {
 	var startd = false;
 	function setup() {
 	  if (remoteCaptureEnabled && (isPaused || recognitionBusy)) return;
-	  if ('webkitSpeechRecognition' in window) {
+	  const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+	  if (SpeechRecognition) {
 		if (recognition) {
 		  recognition.onend = null;
 		  recognition.abort();
 		}
-		recognition = new webkitSpeechRecognition();
+		recognition = new SpeechRecognition();
 		if (myLang) {
 		  recognition.lang = myLang;
 		}
@@ -1534,7 +1535,7 @@ function rebuildSrtFile() {
 		
 		        var shareButton = document.createElement("button");
 		        shareButton.onclick = function() {
-		          const overlayUrl = url+"/overlay?room="+roomID;
+		          const overlayUrl = url+"/overlay?ver=33&room="+roomID;
 		          navigator.clipboard.writeText(overlayUrl).then(() => {
 		            shareButton.innerHTML = "Link Copied!";
 		            setTimeout(() => shareButton.innerHTML = "Copy Overlay Link", 2000);
@@ -1577,7 +1578,7 @@ function rebuildSrtFile() {
 			} catch (error) {
 				recognitionBusy = false;
 				setControlledListening(false);
-				showErrorBanner('Could not start speech recognition. Check microphone permission and use Chrome or Edge.');
+				showErrorBanner('Could not start speech recognition. Check microphone permission and use Chrome, Edge, or Firefox 160+ on desktop.');
 			}
 		  } else {
 			recognition.start();
@@ -1585,7 +1586,7 @@ function rebuildSrtFile() {
 		}
 	  } else if (remoteCaptureEnabled) {
 		setControlledListening(false);
-		showErrorBanner('Speech recognition is not available in this browser. Use Chrome or Edge.');
+		showErrorBanner('Speech recognition is not available in this browser. Use Chrome, Edge, or Firefox 160+ on desktop.');
 	  }
 	}
 
@@ -1940,7 +1941,7 @@ function rebuildSrtFile() {
 
 		function updateModalUrlPreview() {
 			updateModalTranslationProviderUI();
-			const base = url + "/overlay?room=" + roomID;
+			const base = url + "/overlay?ver=33&room=" + roomID;
 			const params = [];
 
 			// Translation

@@ -700,9 +700,10 @@
 		
 		// Only initialize local translation if remote provider is not active.
 		// Note: Local translation (Bergamot) does NOT support auto-detect.
-		if (needsTranslation && !remoteTranslationEnabled && !autoDetectLang) {
+		// The capture page can announce a different source language after connecting.
+		if (!remoteTranslationEnabled && !autoDetectLang) {
 			if (window.Worker) {
-				worker = new Worker("worker.js");
+				worker = new Worker("worker.js?ver=33");
 				worker.postMessage(["import"]);
 			}
 		}

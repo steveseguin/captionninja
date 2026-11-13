@@ -306,8 +306,9 @@
   }
 
   function startRecognition(){
-    if (!('webkitSpeechRecognition' in window)) { setRecStatus('err','unsupported'); alert('Speech recognition not supported. Use Chrome or Edge.'); return; }
-    recognition = new webkitSpeechRecognition(); recognition.lang = myLang; recognition.continuous = true; recognition.interimResults = true;
+    const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+    if (!SpeechRecognition) { setRecStatus('err','unsupported'); alert('Speech recognition not supported. Use Chrome, Edge, or Firefox 160+ on desktop.'); return; }
+    recognition = new SpeechRecognition(); recognition.lang = myLang; recognition.continuous = true; recognition.interimResults = true;
     setRecStatus('ok','listening');
     recognition.onstart = function(){ setRecStatus('ok','listening'); };
     recognition.onerror = function(e){ setRecStatus('err', 'error: '+e.error); };

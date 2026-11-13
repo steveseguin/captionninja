@@ -594,7 +594,7 @@ let recentInterimWordsPerSecond = 0;
 
 
 if (window.Worker) {
-	worker = new Worker("worker.js?v=2");
+	worker = new Worker("worker.js?ver=33");
 	worker.postMessage(["import"]);
 }
 
@@ -1249,7 +1249,7 @@ if (isInsecureStreamId(roomID)) {
 }
 
 var url = document.URL.substr(0, document.URL.lastIndexOf('/'));
-const overlayShareLink = url + "/overlay?room=" + encodeURIComponent(roomID);
+const overlayShareLink = url + "/overlay?ver=33&room=" + encodeURIComponent(roomID);
 document.getElementById("shareLink").href = overlayShareLink;
 document.getElementById("shareLink").textContent = overlayShareLink;
 navigator.clipboard.writeText(overlayShareLink).then(() => {}, () => {});
@@ -1723,8 +1723,9 @@ function scheduleRecognitionRecovery(delayMs, rebuildRecognizer = false) {
 }
 
 function setup() {
-	if ('webkitSpeechRecognition' in window) {
-		recognition = new webkitSpeechRecognition();
+	const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+	if (SpeechRecognition) {
+		recognition = new SpeechRecognition();
 		if (myLang && myLangCode) {
 			if (myLang.split("-")[0] == myLangCode) {
 				recognition.lang = myLang;

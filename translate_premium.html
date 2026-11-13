@@ -1161,11 +1161,12 @@
                 this.elements.shareLink.textContent = overlayUrl;
             },
             setupSpeechRecognition: function() {
-				if (!('webkitSpeechRecognition' in window)) {
-					this.showError('Speech recognition is not supported in your browser. Try Chrome or Edge.');
+				const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+				if (!SpeechRecognition) {
+					this.showError('Speech recognition is not supported in your browser. Try Chrome, Edge, or Firefox 160+ on desktop.');
 					return;
 				}
-				this.recognition = new webkitSpeechRecognition();
+				this.recognition = new SpeechRecognition();
 				this.recognition.lang = this.state.myLang;
 				this.recognition.continuous = true;
 				this.recognition.interimResults = this.elements.incrementalUpdatesCheckbox.checked;

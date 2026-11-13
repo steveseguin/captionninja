@@ -8,7 +8,7 @@ Demo video: https://www.youtube.com/watch?v=v7172QO8z6c
 
 ## Quick Start Guide
 
-1. Open https://caption.ninja in a supported browser (Chrome or Edge recommended)
+1. Open https://caption.ninja in Chrome, Edge, or Firefox 160+ on desktop
 2. Accept microphone permissions when prompted
 3. Start speaking - your words will be transcribed automatically
 4. Access the overlay URL (provided on the page) to display captions in OBS or other streaming software
@@ -25,21 +25,19 @@ CAPTION.Ninja leverages your browser's built-in speech recognition capabilities 
 3. The text is sent through a websocket server to any connected overlay pages
 4. Overlay pages display the text with customizable formatting
 
-The application runs entirely in your browser - no software installation required. Speech-to-text processing is handled by Google's speech recognition services (through the browser), while optional translation features use either Mozilla's free translation service or Google Cloud Translation API.
+No separate app is required. Speech recognition is handled by your browser: it may use a cloud service, while Firefox 160+ uses on-device recognition. Captions are still sent through the room's websocket relay for overlays; optional translation and TTS may use separate online services.
 
 ## Browser Compatibility
 
-For best results, use **Google Chrome** or **Microsoft Edge**. These browsers provide the most reliable speech recognition services.
+Use **Google Chrome**, **Microsoft Edge**, or **Firefox 160+ on desktop** for microphone transcription. Allow microphone access when prompted. In Firefox, click **Continue** when asked to set up speech recognition and wait for the model download. Available speech recognition languages depend on the browser.
 
-**Important Note**: Firefox does not currently include free speech-to-text capabilities, making it unsuitable for the main transcription page. However, Firefox can still be used for displaying the overlay page.
-
-Some users report Chrome has issues with text truncation, so Edge may provide more consistent results.
+[Firefox 160 introduced on-device speech recognition in 40 languages](https://www.firefox.com/en-US/firefox/160.0/releasenotes/). For microphone transcription in older Firefox versions, upgrade or use Chrome/Edge. Overlay pages do not require speech recognition and can also be viewed in older Firefox versions.
 
 ## Setting Up for Streaming
 
 ### Basic Setup
 
-1. Open CAPTION.Ninja in Chrome/Edge and allow microphone access
+1. Open CAPTION.Ninja in Chrome, Edge, or Firefox 160+ on desktop and allow microphone access
 2. Copy the overlay URL provided on the page
 3. Add the overlay URL as a Browser Source in OBS Studio, vMix, or similar software
 4. Customize the appearance using CSS as needed (see customization section below)
@@ -462,7 +460,7 @@ Alternatively, use the "Download transcription" button that appears during sessi
 
 ## Capture Pages
 
-- `index.html`: Simple, minimal capture experience. Uses your browser’s default microphone and built-in speech recognition (best in Chrome/Edge). Downloads SRT and streams to overlay.
+- `index.html`: Simple, minimal capture experience. Uses your browser's default microphone and built-in speech recognition (Chrome, Edge, or Firefox 160+ on desktop). Downloads SRT and streams to overlay.
   - Non-visual change: SRT export now computes correct start/end times (fixes duplicate timestamps).
 - `capture-pro.html`: A newer enhanced Capture UI page with better usability and exports. Same local recognition under the hood, plus:
   - Pause-based segmentation (configurable threshold) for cleaner SRT cues

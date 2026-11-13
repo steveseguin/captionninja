@@ -663,7 +663,7 @@
 		// Note: Local translation (Bergamot) does NOT support auto-detect.
 		if (!remoteTranslationEnabled && !autoDetectLang) {
 			if (window.Worker) {
-				worker = new Worker("worker.js");
+				worker = new Worker("worker.js?ver=33");
 				worker.postMessage(["import"]);
 			}
 		}
