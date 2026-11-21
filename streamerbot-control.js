@@ -1,3 +1,12 @@
+async function captionStreamerbotAuthentication(password, challenge) {
+  async function hashBase64(text) {
+    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return btoa(String.fromCharCode.apply(null, new Uint8Array(hash)));
+  }
+  const secret = await hashBase64(password + challenge.salt);
+  return hashBase64(secret + challenge.challenge);
+}
+
 // Optional local Streamer.bot control for the microphone capture page.
 function connectCaptionStreamerbot(room, port, setListening) {
   const panel = document.getElementById('streamerbotControl');
@@ -21,11 +30,6 @@ function connectCaptionStreamerbot(room, port, setListening) {
     button.textContent = 'Connect to Streamer.bot';
     password.disabled = false;
     status.textContent = message;
-  }
-
-  async function hashBase64(text) {
-    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-    return btoa(String.fromCharCode.apply(null, new Uint8Array(hash)));
   }
 
   button.addEventListener('click', function() {
@@ -73,8 +77,7 @@ function connectCaptionStreamerbot(room, port, setListening) {
           return;
         }
         try {
-          const secret = await hashBase64(password.value + message.authentication.salt);
-          const authentication = await hashBase64(secret + message.authentication.challenge);
+          const authentication = await captionStreamerbotAuthentication(password.value, message.authentication);
           if (socket !== connection) return;
           connection.send(JSON.stringify({
             request: 'Authenticate', id: 'caption-auth', authentication: authentication
@@ -125,4 +128,113 @@ function connectCaptionStreamerbot(room, port, setListening) {
   window.addEventListener('pagehide', function() {
     disconnect('Disconnected. Listening is paused.');
   });
+}
+
+// The overlay opens these controls on a click in OBS Interact.
+function setupCaptionForwarding(actionName, port, targetLanguage, useContext) {
+  document.body.appendChild(document.getElementById('captionForwardingSetup').content.cloneNode(true));
+  const panel = document.getElementById('captionForwarding');
+  const button = document.getElementById('captionActionConnect');
+  const password = document.getElementById('captionActionPassword');
+  const status = document.getElementById('captionActionStatus');
+  document.getElementById('captionActionName').textContent = actionName;
+  document.addEventListener('click', function(event) {
+    if (!panel.contains(event.target) && !panel.open) panel.showModal();
+  });
+
+  if (!targetLanguage) {
+    status.textContent = 'Add a translation language to this overlay, for example &translate=en.';
+  } else if (useContext) {
+    status.textContent = 'Remove &context and &fullcontext to post one caption at a time.';
+  } else if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
+    status.textContent = 'Use a Streamer.bot port between 1 and 65535.';
+  }
+  if (status.textContent) {
+    button.disabled = true;
+    return null;
+  }
+
+  let socket = null;
+  let actionId = null;
+  let retry = null;
+  let requestId = 0;
+  function stop(message) {
+    clearTimeout(retry);
+    retry = null;
+    actionId = null;
+    if (socket) {
+      socket.onclose = socket.onerror = socket.onmessage = null;
+      socket.close();
+      socket = null;
+    }
+    button.textContent = 'Connect';
+    password.disabled = false;
+    status.textContent = message;
+  }
+  function connect() {
+    retry = null;
+    button.textContent = 'Disconnect';
+    password.disabled = true;
+    status.textContent = 'Connecting...';
+    try {
+      socket = new WebSocket('ws://127.0.0.1:' + port + '/');
+    } catch (_) {
+      stop('Connection blocked. Check browser local-network permission.');
+      return;
+    }
+    const connection = socket;
+    function getActions() {
+      connection.send(JSON.stringify({request: 'GetActions', id: 'caption-actions'}));
+    }
+    connection.onmessage = async function(event) {
+      let data;
+      try { data = JSON.parse(event.data); } catch (_) { return; }
+      if (!data || socket !== connection) return;
+      if (data.request === 'Hello') {
+        if (!data.authentication) return getActions();
+        if (!password.value) return stop('Enter your Streamer.bot WebSocket password and connect again.');
+        try {
+          const authentication = await captionStreamerbotAuthentication(password.value, data.authentication);
+          if (connection.readyState === WebSocket.OPEN && socket === connection) {
+            connection.send(JSON.stringify({request: 'Authenticate', id: 'caption-auth', authentication}));
+          }
+        } catch (_) {
+          if (socket === connection) stop('Authentication failed. Check your password and use HTTPS or localhost.');
+        }
+      } else if (data.id === 'caption-auth') {
+        if (data.status === 'ok') getActions();
+        else stop('Authentication failed. Check the WebSocket password.');
+      } else if (data.id === 'caption-actions') {
+        const action = Array.isArray(data.actions) && data.actions.find(item => item.name === actionName);
+        if (!action || !action.id || action.enabled === false) return stop('Create or enable this action in Streamer.bot, then connect again.');
+        actionId = action.id;
+        status.textContent = 'Connected.';
+        if (panel.open) panel.close();
+      } else if (String(data.id).startsWith('caption-post-') && data.status !== 'ok') {
+        stop('Streamer.bot rejected the caption. Check the action and reconnect.');
+      }
+    };
+    connection.onclose = function(event) {
+      if (socket !== connection) return;
+      if (event.code === 4009) return stop('Authentication failed. Check the WebSocket password.');
+      actionId = null;
+      socket = null;
+      status.textContent = 'Disconnected. Retrying...';
+      retry = setTimeout(connect, 3000);
+    };
+  }
+  button.onclick = function() {
+    if (socket || retry) stop('Disconnected.');
+    else connect();
+  };
+  window.addEventListener('pagehide', function() { stop('Disconnected.'); });
+
+  return function(text) {
+    if (!actionId || !socket || socket.readyState !== WebSocket.OPEN) return;
+    const caption = text.replace(/\s+/g, ' ').trim();
+    if (!caption) return;
+    socket.send(JSON.stringify({
+      request: 'DoAction', action: {id: actionId}, args: {caption}, id: 'caption-post-' + (++requestId)
+    }));
+  };
 }

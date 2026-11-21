@@ -79,6 +79,18 @@
 	<div id="interm" class="output"></div>
 	<div id="output" class="output"></div>
 	<div id="status" style="display:none;"></div>
+	<!-- &streamerbot-action=NAME enables chat output. &streamerbot=PORT overrides 8080. -->
+	<template id="captionForwardingSetup">
+		<dialog id="captionForwarding">
+			<form method="dialog">
+				<p>Streamer.bot action: <strong id="captionActionName"></strong></p>
+				<label>WebSocket password (if enabled) <input id="captionActionPassword" type="password" autocomplete="off"></label>
+				<p id="captionActionStatus" role="status"></p>
+				<button id="captionActionConnect" type="button">Connect</button>
+				<button>Close</button>
+			</form>
+		</dialog>
+	</template>
 	<script src="tts-integration.js"></script>
 	<script src="translation-providers.js"></script>
 	<script>
@@ -169,6 +181,16 @@
 	// Context settings
 	const useContext = urlParams.has("context") || urlParams.has("fullcontext");
 	const contextSize = parseInt(urlParams.get("contextsize")) || 2;
+	let forwardCaption = null;
+	const captionAction = (urlParams.get("streamerbot-action") || "").trim();
+	if (captionAction) {
+		const script = document.createElement("script");
+		script.src = "streamerbot-control.js";
+		script.onload = function() {
+			forwardCaption = setupCaptionForwarding(captionAction, urlParams.get("streamerbot") || "8080", langTo, useContext);
+		};
+		document.head.appendChild(script);
+	}
 	let messageHistory = [];
 
 	// Translation cache for remote provider responses
@@ -757,6 +779,7 @@
 						} else if (meta.final){
 							meta.final = translation;
 							processReply(meta, interm);
+							if (forwardCaption && !isInterim) forwardCaption(translation);
 						} else if (meta.interm){
 							meta.interm = translation;
 							processReply(meta, interm);
@@ -794,6 +817,7 @@
 					} else if (e.data[2].final){
 						e.data[2].final = e.data[1].join("<br /><br />");
 						processReply(e.data[2], (e.data[3]||false));
+						if (forwardCaption && !e.data[3]) forwardCaption(e.data[1].join(" "));
 					} else if (e.data[2].interm){
 						e.data[2].interm = e.data[1].join("<br /><br />");
 						processReply(e.data[2], (e.data[3]||false));

@@ -43,6 +43,8 @@ This enhanced overlay supports local Mozilla Bergamot translation plus remote pr
 
 ## Examples
 
+On the standard `/overlay` page, `&streamerbot-action=Post+caption+to+Twitch` sends finished translations to a local Streamer.bot action. See [Post translated captions to Twitch chat](push-to-talk.md#post-translated-captions-to-twitch-chat) for the action and OBS setup.
+
 For remote microphone control, add `&api=YOUR_PRIVATE_KEY` (VDO.Ninja API) or `&streamerbot=8080` (local Streamer.bot) to the main **capture** URL and use your translated overlay as usual. Both options start capture paused. See the [setup guide](push-to-talk.md); these are not overlay controls.
 
 ### Google Cloud (Backward Compatible)

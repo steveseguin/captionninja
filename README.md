@@ -49,6 +49,10 @@ https://github.com/steveseguin/electroncapture
 
 This allows you to pin the captions on top of other applications on your desktop.
 
+### Show captions in chat with Social Stream Ninja
+
+[Social Stream Ninja](https://socialstream.ninja) can show each finished caption as a message in its dock and chat overlays, so what you said stays readable after the caption leaves the screen. Link your capture page to it and it can also post your captions into your Twitch, YouTube, Kick and other chats. Follow the [setup guide](social-stream.md).
+
 ### Hold a button to show captions
 
 Make Caption.Ninja listen only while you hold a Stream Deck button. Follow the [step-by-step setup guide](push-to-talk.md), with optional instructions for Streamer.bot and other controls.

@@ -21,6 +21,7 @@ You do not need both options. If you already use Streamer.bot, start with the **
 - 🖥️ [Show captions in OBS](#3-put-the-captions-in-obs)
 - 🎙️ [Test hold and release](#4-try-it-before-going-live)
 - 🎙️ [Add the OBS microphone without Streamer.bot](#obs-microphone)
+- [Post translated captions to Twitch chat](#post-translated-captions-to-twitch-chat)
 - 🔧 [Fix common problems](#if-something-goes-wrong)
 - 🔗 [HTTP links and WebSocket commands](#http-links-and-websocket-commands)
 
@@ -115,6 +116,20 @@ If either control stops responding during a stream, mute the microphone directly
 | 🛑 Need to stop now | Click **Stop listening**, or close the tab. Use this if your Stream Deck disconnects while held. |
 
 Reloading the listening page always starts it paused.
+
+## Post translated captions to Twitch chat
+
+Use your existing button and translated OBS Browser Source. Each finished translation can also go to chat through Streamer.bot.
+
+1. Connect your Twitch account in Streamer.bot. Open [Post caption to Twitch](post-caption-to-twitch.sb) and copy the whole import string. In Streamer.bot, click **Import**, paste it into **Import String**, then click **Import**.
+2. In **Servers/Clients > WebSocket Server**, start the server on `127.0.0.1`, port `8080`, endpoint `/`.
+3. In OBS, open **Properties** on your translated Browser Source. Append `&streamerbot-action=Post+caption+to+Twitch` to its URL. Enable forwarding on just one source. If you use a different WebSocket port, also append `&streamerbot=YOUR_PORT`.
+4. Before going live, right-click the source, choose **Interact**, then click inside the overlay. Enter the WebSocket password if enabled and click **Connect**. Allow local-network access if prompted. The setup box closes when connected.
+5. Hold your usual button, say a short sentence and release. Look for the finished overlay text once in Twitch chat.
+
+Connect again after the Browser Source reloads. Captions completed while Streamer.bot is disconnected are skipped. For single-caption output, remove `&context` and `&fullcontext` from this overlay.
+
+To use your own Streamer.bot action, put its name in `streamerbot-action`. The translated text is available as `%caption%`.
 
 ## Streamer.bot setup
 
