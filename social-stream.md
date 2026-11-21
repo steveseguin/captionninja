@@ -1,45 +1,39 @@
-# Use Caption.Ninja with Social Stream Ninja
+# Post Caption.Ninja captions to your stream chat
 
-[Social Stream Ninja](https://socialstream.ninja) (SSN) can show each finished caption as a message in its dock and chat overlays, next to your Twitch, YouTube, Kick and other chats. It can also post what you say into those chats, so it stays readable after the caption leaves the screen.
+Speak into Caption.Ninja as usual. Social Stream Ninja (SSN) can send each finished sentence to the chats you choose.
 
-There are two ways to connect them. Your captions, overlays and settings in Caption.Ninja work the same either way.
+## 1. 🔗 Link Caption.Ninja
 
-| | SSN reads your room | Caption.Ninja linked to SSN |
-|---|---|---|
-| Shows captions in the SSN dock | Yes | Yes |
-| Can post captions to your chats | No | Yes |
-| What you change in Caption.Ninja | Nothing | Add `&ssn=` to your capture page address |
+Switch SSN on. In **Search settings**, type **Caption.Ninja linked**. Select the result, then click **Open Caption.Ninja linked to SSN**. Allow microphone access on the page that opens.
 
-## SSN reads your room
+![SSN settings search showing the Open Caption.Ninja linked to SSN result.](images/social-stream/find-link.png)
 
-1. Open [caption.ninja](https://caption.ninja) and allow the microphone. Your room is in the address bar, after `room=`.
-2. In the SSN popup, open **Settings → Mechanics - Connections & Integrations**.
-3. Turn on **Show Caption.Ninja captions as messages**.
-4. Paste your room, or the whole Caption.Ninja link, into **Caption.Ninja room**. The status beside the field changes to **Connected**.
-5. Speak. Each finished caption appears in the SSN dock.
+## 2. 🎙️ Check your first caption
 
-SSN does not post these captions into your chats. Anyone who has your room name can add captions to the room, so SSN shows them but does not send them out under your account.
+Say a short sentence, then pause. Your words should appear in Caption.Ninja and in the SSN dock. To show live captions on stream, use the **overlay link** from the Caption.Ninja page in OBS. Keep the microphone page address private.
 
-## Link Caption.Ninja to SSN
+![Caption.Ninja sends live captions to the OBS overlay and finished captions to the SSN dock. Posting to chat is optional.](images/social-stream/caption-path.svg)
 
-Linking sends your finished captions to SSN over a private connection as well as to your room. SSN then knows they are yours and can post them to the chats you pick.
+## 3. 💬 Choose your chats
 
-1. In the SSN popup, open **Settings → Mechanics - Connections & Integrations** and select **Open Caption.Ninja linked to SSN**.
-   Or add `&ssn=YOUR_SSN_SESSION_ID` to the capture page address you already use, for example `https://caption.ninja/?room=abc123&lang=en-US&ssn=YOUR_SSN_SESSION_ID`.
-2. Allow the microphone. A line on the page reads **Social Stream Ninja: linked** once it is connected. SSN must be open and switched on.
-3. To post to chat, turn on **Post my captions to chat** in SSN and pick the chats.
+Back in the same SSN settings, turn on **Post my captions to chat**. Choose a connected chat from **Select source** and click **Add**. Say another sentence and look for it in that chat.
 
-- **Keep the linked capture page address to yourself.** It contains your SSN session.
-- The overlay link shown on the capture page contains only your room. It is safe to share, as before.
-- If your SSN session has a password, also add `&ssnpassword=YOUR_PASSWORD`. The link in the SSN popup does this for you.
-- If SSN is also set to read the same room, each of your captions is still shown once. Captions from other speakers in the room are shown as before.
+![Post my captions to chat switched on. Selected chats appear above the Select source menu and Add button.](images/social-stream/chat-settings.png)
 
-## Notes
+## Other setups
 
-- To show your name instead of "Captions", add `&label=YourName` to the address of the capture page.
-- SSN uses finished captions only, not the word-by-word text. Keep the Caption.Ninja overlay in OBS for live on-screen captions.
-- SSN receives the language you spoke. Translations are made inside the Caption.Ninja overlay and are not sent to SSN.
-- Rooms on a private relay are not supported by "SSN reads your room".
-- The link is available on the main capture page (`index.html`).
+<details>
+<summary>Keep a custom Caption.Ninja link you already use</summary>
 
-More options are in the [SSN captions guide](https://socialstream.ninja/beta/docs/index.html?file=captions.md).
+1. Select **Copy ID** on SSN's **Chat** tab.
+2. Add `&ssn=YOUR_SSN_SESSION_ID` to your existing microphone page address. Replace the placeholder with the ID you copied. If your SSN session has a password, also add `&ssnpassword=YOUR_PASSWORD`.
+3. Press Enter and continue from **Check your first caption** above.
+
+</details>
+
+<details>
+<summary>Display a room in SSN without posting to chat</summary>
+
+Turn on **Show Caption.Ninja captions as messages** and paste the overlay link into **Caption.Ninja room**. When it says **Connected**, the room's captions appear in the dock and overlays. This option works with public relay rooms.
+
+</details>
