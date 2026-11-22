@@ -414,9 +414,9 @@
                 languageData: [],
                 lastTranscription: '',
                 secondTranscription: '',
-                finalTranscript: '',
                 pendingInterimSource: '',
-                lastProcessedSourceKey: '',
+                nextFinalIndex: null,
+                finalTranslations: [],
                 counter: 0,
                 activeRequest: null,
                 lastRequestTime: 0,
@@ -811,6 +811,12 @@
                 this.setStorage('myLang', this.state.myLang, 999999);
             },
 	            setupEventListeners: function() {
+                const controls = this.elements;
+                for (const control of [controls.enabledTranscriptionCheckbox, controls.langFromSelect,
+                    controls.langToSelect, controls.providerSelect, controls.providerEndpointInput,
+                    controls.providerModelInput, controls.fullContextCheckbox]) {
+                    control.addEventListener('change', () => this.cancelTranslations());
+                }
 	                if (this.elements.providerSelect) {
 	                    this.elements.providerSelect.addEventListener('change', () => {
 	                        const previousProvider = this.normalizeProviderForSelect(
@@ -846,6 +852,7 @@
 	                    const newKey = this.elements.apiKeyInput.value.trim();
 	                    if (newKey) {
                         if (newKey !== this.state.apiKey) {
+                            this.cancelTranslations();
                             const provider = this.getActiveProvider();
                             const providerStorageKey = this.getProviderStorageKey(provider);
                             this.state.apiKey = newKey;
@@ -1166,12 +1173,16 @@
 					this.showError('Speech recognition is not supported in your browser. Try Chrome, Edge, or Firefox 160+ on desktop.');
 					return;
 				}
-				this.recognition = new SpeechRecognition();
+				const recognition = new SpeechRecognition();
+				this.recognition = recognition;
 				this.recognition.lang = this.state.myLang;
 				this.recognition.continuous = true;
 				this.recognition.interimResults = this.elements.incrementalUpdatesCheckbox.checked;
                 this.recognition.onstart = () => {
+                    if (recognition !== this.recognition) return;
                     console.log("Speech recognition started");
+                    this.state.nextFinalIndex = 0;
+                    this.state.pendingInterimSource = '';
                     this.elements.statusDiv.textContent = "Listening...";
                     this.state.isTranscribing = true;
                 };
@@ -1196,8 +1207,10 @@
 					}
 				};
                 this.recognition.onend = () => {
+                    if (recognition !== this.recognition) return;
                     console.log("Speech recognition ended");
                     this.processRemainingText();
+                    this.state.nextFinalIndex = null;
                     if (!this.state.isPaused && this.state.isTranscribing) {
                         console.log("Restarting recognition...");
                         this.elements.statusDiv.textContent = "Reconnecting...";
@@ -1214,6 +1227,7 @@
                     }
                 };
                 this.recognition.onresult = (event) => {
+                    if (recognition !== this.recognition) return;
                     if (typeof(event.results) === 'undefined') {
                         console.log('Undefined results in event:', event);
                         return;
@@ -1241,75 +1255,45 @@
 					}
 				}
 			},
-            normalizeTranscriptForCompare: function(text) {
-                return String(text || '')
-                    .toLowerCase()
-                    .replace(/[.,!?;:]+$/g, '')
-                    .replace(/\s+/g, ' ')
-                    .trim();
-            },
             processSpeechResults: function(event) {
-                let currentBatchFinal = '';
+                if (this.state.nextFinalIndex === null) return;
                 let currentBatchInterim = '';
-                for (let i = event.resultIndex; i < event.results.length; i++) {
+                // Final slots are immutable for this listening session. The same words in
+                // a later slot are a new caption, even when the translation is cached.
+                for (let i = this.state.nextFinalIndex; i < event.results.length; i++) {
                     const transcript = this.sanitizeText(event.results[i][0].transcript);
                     if (event.results[i].isFinal) {
-                        currentBatchFinal += (currentBatchFinal ? ' ' : '') + transcript;
-                        console.log(`Processing text: ${transcript} Final: true`);
+                        this.state.nextFinalIndex = i + 1;
+                        this.finishSpeechCaption(transcript);
                     } else {
                         currentBatchInterim += (currentBatchInterim ? ' ' : '') + transcript;
-                        console.log(`Processing text: ${transcript} Final: false`);
                     }
                 }
-                if (currentBatchFinal) {
-                    this.state.finalTranscript += (this.state.finalTranscript ? ' ' : '') + currentBatchFinal;
-                    const finalSource = this.state.finalTranscript.trim();
-                    const finalKey = this.normalizeTranscriptForCompare(finalSource);
-                    this.elements.inputTextarea.value = finalSource;
-                    if (finalKey && finalKey !== this.state.lastProcessedSourceKey) {
-                        this.translateText(finalSource);
-                        this.state.lastProcessedSourceKey = finalKey;
-                        this.state.secondTranscription = this.state.lastTranscription;
-                        this.state.lastTranscription = finalSource.replace(/\.?$/, '.') + ' ';
-                        console.log("Updated context state:", {
-                            second: this.state.secondTranscription,
-                            last: this.state.lastTranscription
-                        });
-                    } else {
-                        console.log("Skipping duplicate final text:", finalSource);
-                    }
-                    this.state.finalTranscript = '';
-                    this.state.pendingInterimSource = '';
-                }
-                else if (currentBatchInterim && this.elements.incrementalUpdatesCheckbox.checked) {
-                    const displayText = this.state.finalTranscript +
-                                       (this.state.finalTranscript ? ' ' : '') +
-                                       currentBatchInterim;
-                    this.elements.inputTextarea.value = displayText;
-                    this.state.pendingInterimSource = displayText;
-                    if (this.state.activeRequest === null &&
-                        (Date.now() - this.state.lastRequestTime > 250)) {
-                        this.translateText(displayText, true);
-                    }
+                this.state.pendingInterimSource = this.elements.incrementalUpdatesCheckbox.checked ? currentBatchInterim.trim() : '';
+                if (this.state.pendingInterimSource) {
+                    this.elements.inputTextarea.value = this.state.pendingInterimSource;
+                    this.translateText(this.state.pendingInterimSource, true);
                 }
             },
+            finishSpeechCaption: function(transcript) {
+                const text = transcript.trim();
+                if (!/[^\s.,!?;:]/.test(text)) return;
+                this.elements.inputTextarea.value = text;
+                this.translateText(text);
+                this.state.secondTranscription = this.state.lastTranscription;
+                this.state.lastTranscription = text.replace(/\.?$/, '.') + ' ';
+            },
             processRemainingText: function() {
-                const currentText = this.state.pendingInterimSource.trim();
-                const currentKey = this.normalizeTranscriptForCompare(currentText);
-                if (currentText &&
-                    currentKey &&
-                    this.elements.enabledTranscriptionCheckbox.checked &&
-                    currentKey !== this.state.lastProcessedSourceKey) {
-                    console.log("Processing final text from interrupted recognition:", currentText);
-                    this.translateText(currentText);
-                    this.state.lastProcessedSourceKey = currentKey;
-                    this.state.secondTranscription = this.state.lastTranscription;
-                    this.state.lastTranscription = currentText.replace(/\.?$/, '.') + ' ';
-                    this.state.finalTranscript = '';
+                if (this.state.pendingInterimSource && this.elements.enabledTranscriptionCheckbox.checked) {
+                    this.finishSpeechCaption(this.state.pendingInterimSource);
                 }
                 this.state.pendingInterimSource = '';
             },
-            translateText: function(textToTranslate, isInterim = false) {
+            cancelTranslations: function() {
+                this.state.finalTranslations = [];
+                if (this.state.activeRequest) this.state.activeRequest.abort();
+            },
+            translateText: async function(textToTranslate, isInterim = false) {
                 if (!textToTranslate?.trim() || !this.elements.enabledTranscriptionCheckbox.checked) {
                     return;
                 }
@@ -1333,18 +1317,34 @@
                     contextText = fullText.join(' ');
                     console.log("Translating with context:", contextText);
                 }
-                const now = Date.now();
-                const timeSinceLastRequest = now - this.state.lastRequestTime;
-                if (timeSinceLastRequest < 250) {
-                    console.log("Rate limiting in effect, skipping request");
+                const queue = this.state.finalTranslations;
+                if (isInterim) {
+                    if (!queue.length && !this.state.activeRequest && Date.now() - this.state.lastRequestTime >= 250) {
+                        return this.requestTranslation(contextText, true, this.getTranslationConfig());
+                    }
                     return;
                 }
-                this.state.lastRequestTime = now;
+                queue.push({ text: contextText, config: this.getTranslationConfig() });
+                if (queue.length > 1) return;
+                // Previews can be superseded. Finished captions take turns, including cache hits.
+                while (queue === this.state.finalTranslations && queue.length) {
+                    const delay = 250 - (Date.now() - this.state.lastRequestTime);
+                    if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay));
+                    if (queue !== this.state.finalTranslations) return;
+                    try {
+                        await this.requestTranslation(queue[0].text, false, queue[0].config);
+                    } catch (error) {
+                        this.handleTranslationError(error);
+                    }
+                    queue.shift();
+                }
+            },
+            requestTranslation: function(contextText, isInterim, translationConfig) {
+                this.state.lastRequestTime = Date.now();
                 if (this.state.activeRequest) {
                     this.state.activeRequest.abort();
                     this.state.activeRequest = null;
                 }
-                const translationConfig = this.getTranslationConfig();
                 const provider = translationConfig.provider || 'local';
                 const cacheKey = (window.CaptionTranslationProviders && window.CaptionTranslationProviders.buildCacheKey)
                     ? window.CaptionTranslationProviders.buildCacheKey(
@@ -1370,7 +1370,7 @@
                         this.state.activeRequest = null;
                     }
                 }, 3000);
-                Promise.resolve()
+                return Promise.resolve()
                 .then(() => {
                     // Preserve the existing no-key Google proxy behavior.
                     if (provider === 'google' && !translationConfig.apiKey) {
@@ -1416,6 +1416,7 @@
                     });
                 })
                 .then(result => {
+                    if (controller.signal.aborted) return;
                     const translatedText = result.translatedText;
                     this.cacheTranslation(cacheKey, { translatedText: translatedText });
                     this.updateTranslation(translatedText, isInterim);
