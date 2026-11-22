@@ -1,7 +1,8 @@
 // Optional private link from the capture page to Social Stream Ninja (SSN), enabled by adding
 // &ssn=YOUR_SSN_SESSION to the capture page address. Finished captions are sent to SSN over its
-// own peer-to-peer connection, so SSN knows they are yours and can post them to the chats you
-// picked there. The public caption room and its overlay links are unchanged. Guide: social-stream.md
+// own peer-to-peer connection, so SSN knows they are yours and posts them to your chats (or shows
+// them in its dock only, if you chose that there). The public caption room and its overlay links
+// are unchanged. Guide: social-stream.md
 function connectCaptionSocialStream(session, password) {
   var BRIDGE_ORIGIN = 'https://vdo.socialstream.ninja';
   var MAX_SEND_LENGTH = 1500; // SSN takes up to 2000 characters at a time.
@@ -10,6 +11,7 @@ function connectCaptionSocialStream(session, password) {
   var presence = null;
   var counter = 0;
   var pending = {};
+  var spoken = ''; // The language being spoken, as last sent with a caption.
 
   // Names this page for as long as it is open. The same id goes on each finished caption sent to
   // the room, so SSN can pair a caption's two copies and leave other speakers' captions alone.
@@ -53,7 +55,7 @@ function connectCaptionSocialStream(session, password) {
 
   // Tells SSN this page is linked, so it waits for the private copy of each caption.
   function announce() {
-    post({ linked: true, pub: publisher });
+    post({ linked: true, pub: publisher, lang: spoken });
   }
 
   function onReply(data) {
@@ -69,7 +71,22 @@ function connectCaptionSocialStream(session, password) {
     if (result && result.ok === false) {
       say((result.error && result.error.message) || 'did not accept that caption.');
     } else {
-      say('linked. Finished captions are sent to it.');
+      // SSN says where each caption went: the chats it was posted to, or its dock only.
+      var payload = result && result.payload;
+      if (payload && payload.choose === true) {
+        // Posting is public, so SSN waits for the host to choose once where captions go.
+        say('linked. In Social Stream Ninja, open Captions and choose where your captions go.');
+      } else if (payload && payload.dock === true) {
+        say('linked. Captions go to its dock only.');
+      } else if (payload && Array.isArray(payload.chats)) {
+        var languages = payload.languages || {};
+        say(payload.chats.length ? 'posting to ' + payload.chats.map(function(chat) {
+          var tag = languages[chat];
+          return tag ? chat + ' (' + tag.to + (tag.state === 'ready' ? '' : ', not ready') + ')' : chat;
+        }).join(', ') + '.' : 'linked, but no chat is connected there.');
+      } else {
+        say('linked. Finished captions are sent to it.');
+      }
     }
   }
 
@@ -129,11 +146,14 @@ function connectCaptionSocialStream(session, password) {
     // One finished caption, with the id it was published to the room under. It is sent whole.
     // Only a very long one is sent as several messages, cut between words; each then says where
     // it sits in the caption (at) and how long the caption is (of), so SSN can match it exactly.
-    send: function(text, label, captionId) {
+    // language is the one being spoken (the room copy's ln). SSN translates from it for any chat
+    // the host tagged with another language.
+    send: function(text, label, captionId, language) {
+      spoken = typeof language === 'string' ? language : spoken;
       text = String(text === undefined || text === null ? '' : text).replace(/\s+/g, ' ').trim();
       var name = typeof label === 'string' ? label.replace(/_/g, ' ') : '';
       if (text.length <= MAX_SEND_LENGTH) {
-        if (text) post({ text: text, name: name, pub: publisher, id: captionId });
+        if (text) post({ text: text, name: name, pub: publisher, id: captionId, lang: spoken });
         return;
       }
       var start = 0;
@@ -143,7 +163,7 @@ function connectCaptionSocialStream(session, password) {
           var cut = text.lastIndexOf(' ', end);
           if (cut > start + MAX_SEND_LENGTH / 2) end = cut;
         }
-        post({ text: text.slice(start, end), name: name, pub: publisher, id: captionId, at: start, of: text.length });
+        post({ text: text.slice(start, end), name: name, pub: publisher, id: captionId, at: start, of: text.length, lang: spoken });
         start = end;
         while (text.charAt(start) === ' ') start += 1;
       }

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="424" height="138" viewBox="0 0 424 138" role="img" aria-labelledby="title desc">
   <title id="title">Where your Caption.Ninja captions go</title>
-  <desc id="desc">One microphone feeds the OBS overlay and the Social Stream Ninja dock. Posting from SSN to selected chats is optional.</desc>
+  <desc id="desc">One microphone feeds the OBS overlay and Social Stream Ninja, which posts each finished caption to your chats.</desc>
   <rect width="424" height="138" rx="12" fill="#f4f7fa"/>
   <g fill="none" stroke="#527184" stroke-width="2.5" stroke-linejoin="round">
     <path d="M151 69h17V35h21m-6-5 6 5-6 5M168 69v35h21m-6-5 6 5-6 5"/>
@@ -13,7 +13,7 @@
     <text x="22" y="86" fill="#e2f1f6" font-size="14">Your microphone</text>
     <text x="208" y="32" fill="#193e50" font-weight="700">OBS overlay</text>
     <text x="208" y="51" fill="#334d60" font-size="14">Live captions on stream</text>
-    <text x="208" y="101" fill="#193e50" font-weight="700">Social Stream Ninja dock</text>
-    <text x="208" y="120" fill="#334d60" font-size="14">Optional: post to selected chats</text>
+    <text x="208" y="101" fill="#193e50" font-weight="700">Social Stream Ninja</text>
+    <text x="208" y="120" fill="#334d60" font-size="14">Posts captions to your chats</text>
   </g>
 </svg>
