@@ -824,6 +824,10 @@
 					} else {
 						document.getElementById("output").innerText = e.data[1].join("<br /><br />");
 					}
+				} else if (e.data[0] === "translate_reply" && e.data[2]) {
+					// Keep the original caption when local translation fails.
+					processReply(e.data[2], (e.data[3] || false));
+					status("Translation unavailable; showing original captions");
 				} else if (e.data[0] === "load_model_reply" && e.data[1]) {
 					status(e.data[1]);
 				} else if (e.data[0] === "import_reply" && e.data[1]) {
