@@ -477,7 +477,7 @@
 		}
 
 		function publishItem(type, text, item) {
-			publisher.publish(createPayload(type, text, item));
+			return publisher.publish(createPayload(type, text, item));
 		}
 
 		function publishInterim() {
@@ -494,7 +494,14 @@
 			var text = editor.value.trim();
 			if (!current || !text) return;
 			var completed = current;
-			publishItem('final', text, completed);
+			var accepted = publishItem('final', text, completed);
+			// The legacy publisher returns false for captions it queued while offline.
+			// A private relay false means rejection: keep the edit for explicit retry.
+			if (CaptionRelay.custom() && accepted === false) {
+				current.sendBlocked = true;
+				updateTiming();
+				return;
+			}
 			lastDelay.textContent = formatDuration(Date.now() - completed.receivedAt);
 			current = null;
 			editor.value = '';
@@ -559,7 +566,10 @@
 			} else {
 				var age = now - current.receivedAt;
 				var autoMode = publishMode === 'live' || publishMode === 'timed';
-				if (autoMode) {
+				if (current.sendBlocked) {
+					currentTiming.textContent = 'Not queued · press Send to retry';
+					setTimingTone(currentTiming, 'danger');
+				} else if (autoMode) {
 					var totalDelay = reviewDelaySeconds * 1000;
 					var remaining = Math.max(0, totalDelay - age);
 					currentTiming.textContent = 'Auto-send in ' + formatDuration(remaining) + ' · age ' + formatDuration(age);
@@ -568,7 +578,7 @@
 						var itemToSend = current;
 						current.autoSendQueued = true;
 						setTimeout(function () {
-							if (current === itemToSend) sendCurrent();
+							if (current === itemToSend && !current.sendBlocked) sendCurrent();
 						}, 0);
 					}
 				} else {
