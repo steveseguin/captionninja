@@ -5,12 +5,13 @@
     const relay = w.CaptionRelay, url = relay.url(), room = options.room;
     const identity = crypto.randomUUID(), join = {...relay.join(room, 'write', options.relayToken), protocol: 2};
     const queue = []; let counter = 0, socket, retry, deadline, poll, manual = false, joined = false;
+    let sendTimer, lastSentAt = 0, rateLimitRetries = 0;
     let state = 'idle', drops = 0, retries = 0, epoch = null, uncertain = false;
     const maximum = Math.max(1, Math.min(1000, options.maxQueue || 100));
     function snapshot() { return {state, queueLength: queue.length, droppedCount: drops,
       retryCount: retries, uncertain, room, url}; }
     function emit(next) { state = next; options.onStateChange?.(state, snapshot()); options.onStats?.(snapshot()); }
-    function clear() { clearTimeout(retry); clearTimeout(deadline); clearInterval(poll); retry = deadline = poll = null; }
+    function clear() { clearTimeout(retry); clearTimeout(deadline); clearInterval(poll); clearTimeout(sendTimer); retry = deadline = poll = sendTimer = null; }
     function cleanup() {
       clear(); joined = false;
       if (socket) { socket.onclose = socket.onmessage = socket.onopen = socket.onerror = null; socket.close(); socket = null; }
@@ -19,9 +20,15 @@
       if (!joined || !queue.length || socket?.readyState !== WebSocket.OPEN) return;
       const next = queue[0];
       if (next.sent && Date.now() - next.sent < 3000) return;
+      // Leave room for the join under the private relay's default 40 frames/s limit.
+      const wait = 30 - (Date.now() - lastSentAt);
+      if (wait > 0) {
+        if (!sendTimer) sendTimer = setTimeout(() => { sendTimer = null; flush(); }, wait);
+        return;
+      }
       const body = JSON.stringify(next.payload);
       if (socket.bufferedAmount + body.length * 3 > 65536) return;
-      socket.send(body); next.sent = Date.now(); next.everSent = true;
+      socket.send(body); next.sent = lastSentAt = Date.now(); next.everSent = true;
     }
     function connect() {
       cleanup(); manual = false; emit('connecting');
@@ -44,14 +51,24 @@
         }
         const next = queue[0];
         if (next && data.ack?.client === identity && data.ack.sequence === next.payload.delivery.sequence) {
-          queue.shift(); emit(uncertain ? 'connected-with-gap' : 'connected'); flush();
+          queue.shift(); rateLimitRetries = 0; emit(uncertain ? 'connected-with-gap' : 'connected'); flush();
         }
       };
       current.onerror = () => current.close();
       current.onclose = event => {
         if (socket !== current) return;
-        joined = false; clearTimeout(deadline); clearInterval(poll);
+        joined = false; clearTimeout(deadline); clearInterval(poll); clearTimeout(sendTimer); sendTimer = null;
         if (manual) { emit('closed'); return; }
+        if (event.code === 1008 && event.reason === 'Rate limit') {
+          if (++rateLimitRetries > 5) {
+            manual = true; emit('denied');
+            options.onError?.('Private relay rate limit prevents delivery; queued captions are retained. Check relay rate settings.');
+            return;
+          }
+          emit('reconnecting');
+          retry = setTimeout(connect, Math.min(10000, 1000 * 2 ** (rateLimitRetries - 1)));
+          return;
+        }
         if ([1003, 1007, 1008, 1009].includes(event.code)) {
           manual = true; emit('denied');
           options.onError?.(event.code === 1008
